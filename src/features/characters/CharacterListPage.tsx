@@ -36,6 +36,7 @@ function CharacterCard({ character }: { character: Character }) {
       </a>
       <div className="character-actions">
         <a className="text-button" href={`#sheet/${character.id}`}>Sheet</a>
+        <a className="text-button" href={`#spellbook/${character.id}`}>Spells</a>
         <a className="text-button" href={`#character/${character.id}`}>Edit</a>
         <button className="text-button" onClick={() => void duplicateCharacter(character.id)}>Duplicate</button>
         <button className="text-button" onClick={() => void setCharacterArchived(character.id, !character.archivedAt)}>

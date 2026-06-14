@@ -9,6 +9,8 @@ import type {
   PdfDocument,
   PdfFile,
   SoulReaperProgression,
+  Spell,
+  Spellbook,
 } from "../domain/models";
 import { settingsSchema } from "../domain/models";
 
@@ -200,6 +202,8 @@ class CharacterVaultDatabase extends Dexie {
   characterSheets!: EntityTable<CharacterSheet, "characterId">;
   inventoryContainers!: EntityTable<InventoryContainer, "id">;
   inventoryItems!: EntityTable<InventoryItem, "id">;
+  spellbooks!: EntityTable<Spellbook, "characterId">;
+  spells!: EntityTable<Spell, "id">;
   soulReaperProgressions!: EntityTable<SoulReaperProgression, "characterId">;
   pdfDocuments!: EntityTable<PdfDocument, "id">;
   pdfFiles!: EntityTable<PdfFile, "documentId">;
@@ -329,6 +333,20 @@ class CharacterVaultDatabase extends Dexie {
         settings: "id",
       })
       .upgrade(repairAkivaSoulReaperOwnership);
+
+    this.version(10).stores({
+      characters: "id, name, updatedAt, createdAt, archivedAt",
+      characterSheets: "characterId, updatedAt",
+      inventoryContainers: "id, characterId, [characterId+sortOrder], updatedAt",
+      inventoryItems: "id, characterId, containerId, [characterId+containerId], updatedAt",
+      spellbooks: "characterId, updatedAt",
+      spells: "id, characterId, level, school, actionType, damageType, updatedAt, [characterId+level]",
+      soulReaperProgressions: "characterId, level, path, updatedAt",
+      pdfDocuments: "id, name, gameSystem, updatedAt, *characterIds",
+      pdfFiles: "documentId",
+      pdfBookmarks: "id, documentId, [documentId+page], createdAt",
+      settings: "id",
+    });
 
     this.on("populate", () => {
       void this.settings.add(defaultSettings);

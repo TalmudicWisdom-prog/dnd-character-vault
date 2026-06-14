@@ -101,7 +101,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Play tools"
         title={character.name}
         description="A touch-friendly sheet for the details you reach for during play."
-        actions={<div className="header-action-group"><a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a><a className="secondary-button button-link" href="#characters">Characters</a></div>}
+        actions={<div className="header-action-group"><a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a><a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a><a className="secondary-button button-link" href="#characters">Characters</a></div>}
       />
 
       <div className="sheet-status"><span className="status-dot" />{status}</div>

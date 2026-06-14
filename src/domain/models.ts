@@ -100,6 +100,49 @@ export const inventoryItemSchema = z.object({
 });
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 
+export const spellActionTypeSchema = z.enum(["action", "bonusAction", "reaction", "minute", "hour", "special"]);
+export type SpellActionType = z.infer<typeof spellActionTypeSchema>;
+
+export const spellbookSchema = z.object({
+  characterId: z.string().uuid(),
+  pinnedSpellIds: z.array(z.string().uuid()),
+  updatedAt: z.string().datetime(),
+});
+export type Spellbook = z.infer<typeof spellbookSchema>;
+
+export const spellSchema = z.object({
+  id: z.string().uuid(),
+  characterId: z.string().uuid(),
+  name: z.string().min(1).max(200),
+  level: z.number().int().min(0).max(9),
+  school: z.string().min(1).max(100),
+  castingTime: z.string().min(1).max(200),
+  actionType: spellActionTypeSchema,
+  range: z.string().min(1).max(200),
+  verbalComponent: z.boolean(),
+  somaticComponent: z.boolean(),
+  materialComponent: z.boolean(),
+  materialDetails: z.string().max(1000),
+  duration: z.string().min(1).max(200),
+  concentration: z.boolean(),
+  ritual: z.boolean(),
+  damageType: z.string().max(100),
+  damageFormula: z.string().max(200),
+  healingFormula: z.string().max(200),
+  areaOfEffectType: z.string().max(100),
+  areaOfEffectSize: z.string().max(100),
+  savingThrowType: z.string().max(100),
+  attackRollRequired: z.boolean(),
+  statusEffects: z.string().max(2000),
+  description: z.string().max(50000),
+  higherLevelScaling: z.string().max(20000),
+  sourceNotes: z.string().max(10000),
+  homebrew: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type Spell = z.infer<typeof spellSchema>;
+
 export const soulReaperPathSchema = z.enum([
   "unselected",
   "graveWarden",

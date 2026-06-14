@@ -217,6 +217,7 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
               <h2>Character sheet</h2>
               <p>Open HP controls, abilities, proficiencies, and notes.</p>
               <a className="primary-button button-link" href={`#sheet/${characterId}`}>Open character sheet</a>
+              <a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Open spellbook</a>
             </article>
           )}
           {!isNew && (

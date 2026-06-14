@@ -10,6 +10,7 @@ Implemented foundations, character management, and play tools include:
 - Ability scores, saving throws, skill proficiencies, combat stats, and character notes
 - Touch-sized HP damage and healing controls
 - Character-scoped inventory, equipment, custom containers, and freeform item effects
+- Character-scoped editable spellbooks with complete spell metadata, filters, and ordered pinned shortcuts
 - Editable character-scoped body enhancements and abilities stored alongside inventory
 - Character-scoped Soul Reaper progression with independent levels, path features, soul tracking, and a linked local source PDF
 - Offline PDF library with local uploads, PDF.js rendering, page memory, bookmarks, and character associations

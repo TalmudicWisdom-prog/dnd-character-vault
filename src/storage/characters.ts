@@ -3,6 +3,7 @@ import { characterDraftSchema, characterSchema } from "../domain/models";
 import { db } from "./database";
 import { copyInventory } from "./inventory";
 import { copySoulReaperProgression } from "./soulReaper";
+import { copySpellbook } from "./spellbooks";
 
 function now() {
   return new Date().toISOString();
@@ -59,6 +60,7 @@ export async function duplicateCharacter(id: string): Promise<Character> {
   }
   await copyInventory(id, copy.id);
   await copySoulReaperProgression(id, copy.id);
+  await copySpellbook(id, copy.id);
   return copy;
 }
 
@@ -71,11 +73,13 @@ export async function setCharacterArchived(id: string, archived: boolean) {
 }
 
 export async function deleteCharacter(id: string) {
-  await db.transaction("rw", [db.characters, db.characterSheets, db.inventoryContainers, db.inventoryItems, db.soulReaperProgressions, db.pdfDocuments], async () => {
+  await db.transaction("rw", [db.characters, db.characterSheets, db.inventoryContainers, db.inventoryItems, db.spellbooks, db.spells, db.soulReaperProgressions, db.pdfDocuments], async () => {
     await db.characters.delete(id);
     await db.characterSheets.delete(id);
     await db.inventoryItems.where("characterId").equals(id).delete();
     await db.inventoryContainers.where("characterId").equals(id).delete();
+    await db.spells.where("characterId").equals(id).delete();
+    await db.spellbooks.delete(id);
     await db.soulReaperProgressions.delete(id);
     await db.pdfDocuments.where("characterIds").equals(id).modify((document) => {
       document.characterIds = document.characterIds.filter((characterId: string) => characterId !== id);

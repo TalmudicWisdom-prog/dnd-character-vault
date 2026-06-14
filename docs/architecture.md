@@ -53,9 +53,14 @@ Versions 7 and 8 perform the requested one-time, character-ID-scoped import of A
 
 Version 9 corrects the earlier local Soul Reaper ownership mismatch by moving the progression and its source-PDF association from Cloud to Akiva after validating both character IDs and names.
 
+Version 10 adds:
+
+- `spellbooks`: one per-character ordered pinned-spell list
+- `spells`: full editable per-character spell metadata and rules text
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
-Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
+Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
 
 Browser storage remains limited by device capacity and browser policy. The diagnostics page shows quota estimates and lets the user request persistent storage when supported. Large PDFs are stored directly as blobs rather than encoded into structured records or application caches.
 

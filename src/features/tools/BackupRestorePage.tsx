@@ -51,7 +51,7 @@ export function BackupRestorePage() {
       <div className="tool-grid">
         <article className="panel tool-card">
           <span className="card-label">Export</span><h2>Lightweight vault backup</h2>
-          <p>Characters, sheets, notes, inventory, containers, custom modules, PDF metadata, bookmarks, and settings. PDF files are omitted.</p>
+          <p>Characters, sheets, notes, inventory, spellbooks, custom modules, PDF metadata, bookmarks, and settings. PDF files are omitted.</p>
           <button className="primary-button" onClick={() => void exportBackup(false)} type="button">Export without PDFs</button>
         </article>
         <article className="panel tool-card">

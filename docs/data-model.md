@@ -20,6 +20,16 @@ The character record stores identity and organization details without implementi
 
 Related sheet and inventory tables keep character-owned data independent rather than turning this record into one large document.
 
+## Spellbook
+
+Each character owns one `spellbooks` record and any number of `spells` records.
+
+- `spellbooks` stores the required `characterId` and the manually ordered `pinnedSpellIds` quick-access list.
+- `spells` stores the required `characterId`, complete editable spell metadata, rule text, source notes, and standard/homebrew flag.
+- A pinned ID is valid only when its spell belongs to the same character.
+
+Deleting a character removes only that character's spellbook and spells. Duplicating a character creates new spell IDs and preserves the pinned order in the copy.
+
 ## App settings
 
 | Field | Type | Notes |
@@ -81,4 +91,4 @@ This separation keeps large PDF blobs out of metadata queries and future structu
 
 ## Manual backup file
 
-Backups contain a format version, app version, creation timestamp, PDF inclusion flag, SHA-256 payload checksum, and arrays for every current IndexedDB table. Full backups additionally include PDF blobs encoded as base64. Backup files are never stored or transmitted automatically.
+Backups contain a format version, app version, creation timestamp, PDF inclusion flag, SHA-256 payload checksum, and arrays for every current IndexedDB table, including spellbooks and spells. Full backups additionally include PDF blobs encoded as base64. Backup files are never stored or transmitted automatically. Version 1 backups remain restorable and are upgraded with empty spellbook collections.
