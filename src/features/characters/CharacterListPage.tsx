@@ -81,8 +81,8 @@ export function CharacterListPage() {
       <PageHeader
         eyebrow="Your adventuring party"
         title="Characters"
-        description="Create, organize, and revisit every hero in your local vault."
-        actions={<a className="primary-button button-link" href="#character/new">New character</a>}
+        description="Create a character manually or import one from PDFs and photos."
+        actions={<div className="character-create-actions"><a className="primary-button button-link" href="#character/new"><span>New Character</span><small>Manual entry</small></a><a className="secondary-button button-link import-character-button" href="#import"><span>Import Character</span><small>From PDF / Photos</small></a></div>}
       />
 
       <div className="summary-grid">
@@ -127,8 +127,8 @@ export function CharacterListPage() {
         <div className="empty-state">
           <div className="empty-emblem" aria-hidden="true">V</div>
           <h2>{query ? "No characters found" : filter === "archived" ? "No archived characters" : "Your vault is ready"}</h2>
-          <p>{query ? "Try another name, campaign, ancestry, or class." : "Create your first character and keep their story close at hand."}</p>
-          {!query && filter !== "archived" && <a className="secondary-button button-link" href="#character/new">Create first character</a>}
+          <p>{query ? "Try another name, campaign, ancestry, or class." : "Create your first character manually or import one from documents and photos."}</p>
+          {!query && filter !== "archived" && <div className="empty-create-actions"><a className="primary-button button-link" href="#character/new">Create manually</a><a className="secondary-button button-link" href="#import">Import from PDF / Photos</a></div>}
         </div>
       )}
     </section>

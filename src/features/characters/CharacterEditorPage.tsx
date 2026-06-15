@@ -141,8 +141,8 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
       <PageHeader
         eyebrow={isNew ? "A new story begins" : character?.archivedAt ? "Archived character" : "Character profile"}
         title={isNew ? "New character" : character?.name ?? "Character"}
-        description={isNew ? "Start with the details that make this character yours." : "Identity and campaign details save automatically on this device."}
-        actions={<a className="secondary-button button-link" href="#characters">Back to characters</a>}
+        description={isNew ? "Enter details manually, or import a character from PDFs and photos." : "Identity and campaign details save automatically on this device."}
+        actions={<div className="header-action-group">{isNew && <a className="primary-button button-link" href="#import">Import Character</a>}<a className="secondary-button button-link" href="#characters">Back to characters</a></div>}
       />
 
       <form className="editor-layout" onSubmit={(event) => void create(event)}>
@@ -205,12 +205,20 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
 
         <aside className="editor-side">
           {isNew ? (
-            <article className="panel action-panel">
-              <span className="card-label">Ready?</span>
-              <h2>Create this character</h2>
-              <p>The character will be stored locally and can be edited at any time.</p>
-              <button className="primary-button" disabled={!draft.name.trim() || status === "saving"} type="submit">Create character</button>
-            </article>
+            <>
+              <article className="panel action-panel">
+                <span className="card-label">Manual entry</span>
+                <h2>Create this character</h2>
+                <p>Fill in the form and store the character locally.</p>
+                <button className="primary-button" disabled={!draft.name.trim() || status === "saving"} type="submit">Create character manually</button>
+              </article>
+              <article className="panel action-panel import-alternative-panel">
+                <span className="card-label">Prefer to import?</span>
+                <h2>Import from files</h2>
+                <p>Build one character from PDFs, photos, scans, or screenshots using private local import.</p>
+                <a className="secondary-button button-link" href="#import">Import Character</a>
+              </article>
+            </>
           ) : (
             <article className="panel action-panel">
               <span className="card-label">Play</span>
