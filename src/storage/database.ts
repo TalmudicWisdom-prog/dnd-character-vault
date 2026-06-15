@@ -12,6 +12,7 @@ import type {
   Spell,
   Spellbook,
 } from "../domain/models";
+import type { ImportSession, ImportSessionFile } from "../domain/import";
 import { settingsSchema } from "../domain/models";
 
 const defaultSettings: AppSettings = {
@@ -204,6 +205,8 @@ class CharacterVaultDatabase extends Dexie {
   inventoryItems!: EntityTable<InventoryItem, "id">;
   spellbooks!: EntityTable<Spellbook, "characterId">;
   spells!: EntityTable<Spell, "id">;
+  importSessions!: EntityTable<ImportSession, "id">;
+  importSessionFiles!: EntityTable<ImportSessionFile, "id">;
   soulReaperProgressions!: EntityTable<SoulReaperProgression, "characterId">;
   pdfDocuments!: EntityTable<PdfDocument, "id">;
   pdfFiles!: EntityTable<PdfFile, "documentId">;
@@ -341,6 +344,22 @@ class CharacterVaultDatabase extends Dexie {
       inventoryItems: "id, characterId, containerId, [characterId+containerId], updatedAt",
       spellbooks: "characterId, updatedAt",
       spells: "id, characterId, level, school, actionType, damageType, updatedAt, [characterId+level]",
+      soulReaperProgressions: "characterId, level, path, updatedAt",
+      pdfDocuments: "id, name, gameSystem, updatedAt, *characterIds",
+      pdfFiles: "documentId",
+      pdfBookmarks: "id, documentId, [documentId+page], createdAt",
+      settings: "id",
+    });
+
+    this.version(11).stores({
+      characters: "id, name, updatedAt, createdAt, archivedAt",
+      characterSheets: "characterId, updatedAt",
+      inventoryContainers: "id, characterId, [characterId+sortOrder], updatedAt",
+      inventoryItems: "id, characterId, containerId, [characterId+containerId], updatedAt",
+      spellbooks: "characterId, updatedAt",
+      spells: "id, characterId, level, school, actionType, damageType, updatedAt, [characterId+level]",
+      importSessions: "id, status, updatedAt, createdAt",
+      importSessionFiles: "id, sessionId, [sessionId+lastModified]",
       soulReaperProgressions: "characterId, level, path, updatedAt",
       pdfDocuments: "id, name, gameSystem, updatedAt, *characterIds",
       pdfFiles: "documentId",

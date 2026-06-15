@@ -58,6 +58,11 @@ Version 10 adds:
 - `spellbooks`: one per-character ordered pinned-spell list
 - `spells`: full editable per-character spell metadata and rules text
 
+Version 11 adds:
+
+- `importSessions`: resumable local multi-file import state, selected mode, per-file parse results, merged draft, and conflicts
+- `importSessionFiles`: temporary source-file blobs and ordering metadata
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
 Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
@@ -68,7 +73,9 @@ PDF.js renders uploaded files entirely inside the app. The original file remains
 
 ## Offline import and backups
 
-The Character Sheet Import Wizard extracts embedded PDF text with PDF.js. Images and scanned PDFs use locally bundled Tesseract.js worker, core, and English language assets. Extraction produces a transient review draft and cannot write to IndexedDB until the user chooses create or merge and saves reviewed fields.
+The Character Sheet Import Wizard extracts embedded PDF text with PDF.js. Images and scanned PDFs use locally bundled Tesseract.js worker, core, and English language assets. Multiple mixed source files are parsed independently and merged into one review draft. Contradictory scalar values become explicit conflicts, while complementary inventory, feature, spell, and note text is combined.
+
+Import sessions and original source blobs are stored temporarily in IndexedDB so the user can resume later. The optional Online AI provider abstraction is disabled unless an endpoint is configured and the device is online. It requires explicit confirmation before sending files; local import remains the default.
 
 Manual backups are versioned, checksummed JSON files. Lightweight backups omit PDF blobs; full backups encode PDF blobs into the user-controlled file. Restore validates schemas, checksum, character ownership, inventory containers, PDF associations, bookmarks, and custom class ownership before opening a write transaction.
 

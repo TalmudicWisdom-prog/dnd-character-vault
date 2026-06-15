@@ -14,7 +14,8 @@ Implemented foundations, character management, and play tools include:
 - Editable character-scoped body enhancements and abilities stored alongside inventory
 - Character-scoped Soul Reaper progression with independent levels, path features, soul tracking, and a linked local source PDF
 - Offline PDF library with local uploads, PDF.js rendering, page memory, bookmarks, and character associations
-- Review-first offline character sheet import from text PDFs, scanned PDFs, and photos
+- Resumable multi-file character import from mixed PDFs, scans, photos, and screenshots
+- Private local OCR by default, with a consent-gated optional Online AI provider interface
 - Manual checksummed lightweight and full vault backups with validated restore modes
 - IndexedDB setup with Dexie
 - Zod schemas for stored data
@@ -62,6 +63,8 @@ This project folder currently resolves into Dropbox. Some macOS Node installatio
 The app uses the browser's IndexedDB database named `dnd-character-vault`. Settings, character sheets, inventories, and PDFs stay on the current device and browser profile. Clearing site data or deleting an installed PWA may remove the vault.
 
 See [docs/architecture.md](docs/architecture.md) for technical boundaries and future-phase guidance.
+
+See [docs/import-sessions.md](docs/import-sessions.md) for multi-file import behavior and the optional Online AI provider contract.
 
 ## iPad and iPhone
 

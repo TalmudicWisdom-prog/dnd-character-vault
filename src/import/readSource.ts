@@ -16,7 +16,7 @@ async function recognizeImage(source: Blob | HTMLCanvasElement, onStatus: (messa
   });
   try {
     const result = await worker.recognize(source);
-    return result.data.text;
+    return { rawText: result.data.text, confidence: result.data.confidence / 100 };
   } finally {
     await worker.terminate();
   }
@@ -34,12 +34,16 @@ async function renderPage(pdf: Awaited<ReturnType<typeof getDocument>["promise"]
   return canvas;
 }
 
-export async function readCharacterSheetSource(file: File, onStatus: (message: string) => void) {
-  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+export type ReadSourceResult = { rawText: string; pageCount: number; confidence: number | null };
+
+export async function readCharacterSheetSource(file: Blob & { name?: string }, onStatus: (message: string) => void): Promise<ReadSourceResult> {
+  const fileName = file.name ?? "Imported file";
+  const isPdf = file.type === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
   if (!isPdf) {
     if (!file.type.startsWith("image/")) throw new Error("Choose a PDF or image file");
     onStatus("Reading photo locally...");
-    return recognizeImage(file, onStatus);
+    const result = await recognizeImage(file, onStatus);
+    return { ...result, pageCount: 1 };
   }
 
   onStatus("Reading PDF text locally...");
@@ -54,14 +58,14 @@ export async function readCharacterSheetSource(file: File, onStatus: (message: s
       pages.push(content.items.map((item) => "str" in item ? item.str : "").join(" "));
     }
     const embeddedText = pages.join("\n");
-    if (embeddedText.replace(/\s/g, "").length >= 120) return embeddedText;
+    if (embeddedText.replace(/\s/g, "").length >= 120) return { rawText: embeddedText, pageCount: pdf.numPages, confidence: 0.95 };
 
     const ocrPages: string[] = [];
     for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 3); pageNumber += 1) {
       onStatus(`Scanning PDF page ${pageNumber} locally...`);
-      ocrPages.push(await recognizeImage(await renderPage(pdf, pageNumber), onStatus));
+      ocrPages.push((await recognizeImage(await renderPage(pdf, pageNumber), onStatus)).rawText);
     }
-    return ocrPages.join("\n");
+    return { rawText: ocrPages.join("\n"), pageCount: pdf.numPages, confidence: null };
   } finally {
     await loadingTask.destroy();
   }
