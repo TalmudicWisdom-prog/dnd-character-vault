@@ -53,6 +53,27 @@ describe("guided character creation", () => {
     expect(spells.map((spell) => spell.name)).toEqual(expect.arrayContaining(["Mage Hand", "Shield", "Fireball"]));
   });
 
+  it("saves draft progress locally before the character is created", async () => {
+    const draft = await getOrCreateCreationDraft();
+    await saveCreationDraft({
+      ...draft,
+      step: 11,
+      character: {
+        ...draft.character,
+        name: "Saved Draft",
+        characterClass: "Ranger",
+        ancestry: "Human",
+      },
+    });
+
+    const reloaded = await getOrCreateCreationDraft();
+    const createdCharacters = await db.characters.toArray();
+
+    expect(reloaded.step).toBe(11);
+    expect(reloaded.character.name).toBe("Saved Draft");
+    expect(createdCharacters).toEqual([]);
+  });
+
   it("applies defaults for older minimal character drafts", async () => {
     const character = await createCharacter({ name: "Old Style", characterClass: "Fighter", ancestry: "Human" });
     expect(character.background).toBe("");

@@ -219,6 +219,12 @@ h1, h2, strong { color: var(--ink); }
 .creation-step.active span { color: inherit; }
 .creation-panel { min-width: 0; }
 .creation-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.creation-status-actions { display: grid; justify-items: end; gap: 8px; }
+.creation-nav-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.choice-step, .ability-step { display: grid; gap: 16px; }
+.choice-explainer { padding: 18px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; }
+.choice-explainer h3 { margin: 0 0 8px; font-family: Georgia, serif; font-size: 1.25rem; font-weight: 500; }
+.creation-panel .inline-message.full-width { grid-column: 1 / -1; }
 .creation-ability-grid .ability-card { min-height: 160px; }
 .creation-proficiency-grid h3 { margin: 0 0 10px; font-family: Georgia, serif; font-weight: 500; }
 .combat-extra-grid { margin-top: 16px; }
@@ -541,7 +547,7 @@ h1, h2, strong { color: var(--ink); }
   .temp-hp { grid-column: 1 / -1; }
   .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar { grid-template-columns: 1fr; }
   .creation-steps, .slot-grid, .creation-equipment-row { grid-template-columns: 1fr; }
-  .creation-nav { display: grid; }
+  .creation-nav, .creation-nav-actions, .creation-status-actions { display: grid; justify-items: stretch; }
   .creation-equipment-row .full-width { grid-column: auto; }
   .ability-grid { grid-template-columns: repeat(2, 1fr); }
   .pdf-upload-panel > * { grid-column: auto; }

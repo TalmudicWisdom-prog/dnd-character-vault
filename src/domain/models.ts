@@ -127,7 +127,7 @@ const characterCreationCharacterSchema = characterDraftSchema.extend({
 
 export const characterCreationDraftSchema = z.object({
   id: z.literal("new-character"),
-  step: z.number().int().min(0).max(9),
+  step: z.number().int().min(0).max(11),
   character: characterCreationCharacterSchema,
   sheet: characterSheetSchema.omit({ characterId: true, updatedAt: true }),
   equipment: z.array(creationEquipmentItemSchema),

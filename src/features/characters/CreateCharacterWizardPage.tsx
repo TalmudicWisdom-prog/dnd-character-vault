@@ -9,18 +9,50 @@ import {
   resetCreationDraft,
   saveCreationDraft,
 } from "../../storage/characterCreation";
+import { clampCreationStep, creationSteps, nextCreationStep, previousCreationStep } from "./createCharacterWizard";
 
-const steps = [
-  "Essentials",
-  "Concept",
-  "Abilities",
-  "Skills",
-  "Combat",
-  "Proficiencies",
-  "Equipment",
-  "Spells",
-  "Features",
-  "Review",
+const classOptions = [
+  { name: "Barbarian", description: "A durable warrior powered by rage, instinct, and big physical moments." },
+  { name: "Bard", description: "A flexible magic-user and performer who supports allies with words, music, and skill." },
+  { name: "Cleric", description: "A divine caster with healing, protection, and strong themed powers from a domain." },
+  { name: "Druid", description: "A nature-focused caster who can control the battlefield and often change shape." },
+  { name: "Fighter", description: "A weapon master with reliable combat tools and room for many fighting styles." },
+  { name: "Monk", description: "A mobile martial artist who uses discipline, speed, and precise strikes." },
+  { name: "Paladin", description: "A holy warrior with armor, healing, protective magic, and powerful smites." },
+  { name: "Ranger", description: "A scout and hunter with weapons, exploration strengths, and nature magic." },
+  { name: "Rogue", description: "A precise expert who wins with skill, stealth, positioning, and sneak attacks." },
+  { name: "Sorcerer", description: "An innate spellcaster who shapes magic through bloodline, blessing, or raw power." },
+  { name: "Warlock", description: "A pact-bound caster with unusual magic, invocations, and a strong patron theme." },
+  { name: "Wizard", description: "A learned spellcaster with a broad spellbook and deep magical preparation." },
+  { name: "Custom / Homebrew", description: "Use this for Soul Reaper, Final Fantasy jobs, DM-made classes, or anything custom." },
+];
+
+const speciesOptions = [
+  { name: "Human", description: "Adaptable, flexible, and easy to fit into almost any campaign or origin." },
+  { name: "Elf", description: "Graceful, long-lived, and often tied to magic, perception, or ancient cultures." },
+  { name: "Dwarf", description: "Sturdy, resilient, and commonly connected to craft, clans, and endurance." },
+  { name: "Halfling", description: "Small, lucky, brave, and often underestimated in the best possible way." },
+  { name: "Dragonborn", description: "Draconic ancestry with a breath weapon and a strong elemental identity." },
+  { name: "Tiefling", description: "Fiendish heritage with striking presence and innate magical flavor." },
+  { name: "Aasimar", description: "Celestial influence, radiant themes, and an easy fit for chosen-one stories." },
+  { name: "Custom / Homebrew", description: "Use this for DM-made ancestries, setting-specific species, or reskins." },
+];
+
+const backgroundOptions = [
+  "Acolyte",
+  "Charlatan",
+  "Criminal",
+  "Entertainer",
+  "Folk Hero",
+  "Guild Artisan",
+  "Hermit",
+  "Noble",
+  "Outlander",
+  "Sage",
+  "Sailor",
+  "Soldier",
+  "Urchin",
+  "Custom / Homebrew",
 ];
 
 const abilityLabels: Record<AbilityId, string> = {
@@ -82,6 +114,10 @@ function lines(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
+function optionDescription(options: Array<{ name: string; description: string }>, value: string, fallback: string) {
+  return options.find((option) => option.name === value)?.description ?? fallback;
+}
+
 export function CreateCharacterWizardPage() {
   const [draft, setDraft] = useState<CharacterCreationDraft | null>(null);
   const [status, setStatus] = useState("Loading saved draft...");
@@ -92,7 +128,7 @@ export function CreateCharacterWizardPage() {
     let active = true;
     void getOrCreateCreationDraft().then((loaded) => {
       if (!active) return;
-      setDraft(loaded);
+      setDraft({ ...loaded, step: clampCreationStep(loaded.step) });
       setStatus("Draft saved locally");
     });
     return () => { active = false; };
@@ -131,7 +167,20 @@ export function CreateCharacterWizardPage() {
   const updateSheet = <Key extends keyof CharacterCreationDraft["sheet"]>(key: Key, value: CharacterCreationDraft["sheet"][Key]) =>
     update((current) => ({ ...current, sheet: { ...current.sheet, [key]: value } }));
 
-  const setStep = (step: number) => update((current) => ({ ...current, step: Math.max(0, Math.min(steps.length - 1, step)) }));
+  const setStep = (step: number) => update((current) => ({ ...current, step: clampCreationStep(step) }));
+
+  const saveNow = async () => {
+    if (!draft) return;
+    const saved = await saveCreationDraft(draft);
+    setDraft(saved);
+    setStatus("Draft saved locally");
+  };
+
+  const skipForNow = () => {
+    dirtyVersion.current += 1;
+    setDraft((current) => current ? { ...current, step: nextCreationStep(current.step) } : current);
+    setStatus("Skipped for now. Draft saved locally.");
+  };
 
   const addEquipment = () => update((current) => ({
     ...current,
@@ -152,7 +201,11 @@ export function CreateCharacterWizardPage() {
   const spellSlotLevels = useMemo(() => Array.from({ length: 9 }, (_, index) => String(index + 1)), []);
 
   const create = async () => {
-    if (!draft || !canCreate) {
+    if (!draft || draft.step !== creationSteps.length - 1) {
+      setStatus("Review the character first, then press Create Character.");
+      return;
+    }
+    if (!canCreate) {
       setStatus("Name, class, species/ancestry, and level are required.");
       return;
     }
@@ -175,22 +228,29 @@ export function CreateCharacterWizardPage() {
 
   if (!draft) return <section className="page"><div className="loading-state">Opening character creator...</div></section>;
 
-  const step = draft.step;
+  const step = clampCreationStep(draft.step);
   const sheet = draft.sheet;
   const character = draft.character;
+  const allAbilitiesAreDefault = abilityIds.every((ability) => (sheet.abilityScores[ability] ?? 10) === 10);
+  const classDescription = optionDescription(classOptions, character.characterClass, character.characterClass ? "Custom class. You can enter or edit the details yourself." : "Pick a class, or type a custom/homebrew class.");
+  const speciesDescription = optionDescription(speciesOptions, character.ancestry, character.ancestry ? "Custom ancestry/species. You can keep the name here and fill in traits later." : "Pick a species/ancestry, or type a custom/homebrew one.");
+  const backgroundDescription = character.background
+    ? `${character.background} is saved as this character's origin. You can add the feature and story details later.`
+    : "Choose a background/origin, or type your own.";
+  const skipLabel = step === 5 ? "Skip for now: keep default 10s" : "Skip for now";
 
   return (
     <section className="page create-character-page">
       <PageHeader
         eyebrow="Guided creation"
         title="Create Character"
-        description="Build a playable character step by step, or import one from PDFs and photos."
+        description="Choose manual creation step by step, or import a character from PDFs and photos."
         actions={<div className="header-action-group"><a className="secondary-button button-link" href="#import">Import Character</a><a className="secondary-button button-link" href="#characters">Back</a></div>}
       />
 
       <div className="creation-layout">
         <aside className="panel creation-steps" aria-label="Character creation steps">
-          {steps.map((label, index) => (
+          {creationSteps.map((label, index) => (
             <button className={step === index ? "creation-step active" : "creation-step"} key={label} onClick={() => setStep(index)} type="button">
               <span>{index + 1}</span>{label}
             </button>
@@ -200,8 +260,11 @@ export function CreateCharacterWizardPage() {
 
         <article className="panel creation-panel">
           <div className="form-section-heading">
-            <div><span className="card-label">Step {step + 1} of {steps.length}</span><h2>{steps[step]}</h2></div>
-            <span className="save-state">{status}</span>
+            <div><span className="card-label">Step {step + 1} of {creationSteps.length}</span><h2>{creationSteps[step]}</h2></div>
+            <div className="creation-status-actions">
+              <span className="save-state">{status}</span>
+              <button className="secondary-button compact" onClick={() => void saveNow()} type="button">Save Draft</button>
+            </div>
           </div>
 
           {step === 0 && <div className="form-grid">
@@ -209,28 +272,52 @@ export function CreateCharacterWizardPage() {
             <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => updateCharacter("playerName", event.target.value)} value={character.playerName ?? ""} /></label>
             <label className="form-field"><span>Campaign</span><input maxLength={100} onChange={(event) => updateCharacter("campaign", event.target.value)} value={character.campaign ?? ""} /></label>
             <label className="form-field level-up-field"><span>Level * <LevelUpHint /></span><input max={20} min={1} onChange={(event) => updateCharacter("level", Number(event.target.value))} type="number" value={character.level ?? 1} /></label>
-            <label className="form-field"><span>Class *</span><input maxLength={100} onChange={(event) => updateCharacter("characterClass", event.target.value)} value={character.characterClass ?? ""} /></label>
-            <label className="form-field"><span>Species / Ancestry *</span><input maxLength={100} onChange={(event) => updateCharacter("ancestry", event.target.value)} value={character.ancestry ?? ""} /></label>
-            <label className="form-field full-width"><span>Background / Origin</span><input maxLength={100} onChange={(event) => updateCharacter("background", event.target.value)} value={character.background ?? ""} /></label>
+            <p className="inline-message full-width">You can move forward with blanks, but the final Create button requires name, class, species/ancestry, and level.</p>
           </div>}
 
-          {step === 1 && <div className="form-grid">
-            <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => updateCharacter("concept", event.target.value)} placeholder="Undead hunter, reluctant royal heir, sky pirate medic..." value={character.concept ?? ""} /></label>
-            <label className="form-field full-width"><span>Personality notes</span><textarea onChange={(event) => updateCharacter("personalityNotes", event.target.value)} rows={4} value={character.personalityNotes ?? ""} /></label>
+          {step === 1 && <div className="choice-step">
+            <div className="form-grid">
+              <label className="form-field"><span>Choose class *</span><select onChange={(event) => updateCharacter("characterClass", event.target.value)} value={classOptions.some((option) => option.name === character.characterClass) ? character.characterClass : ""}><option value="">Choose or type below</option>{classOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>
+              <label className="form-field"><span>Custom class</span><input maxLength={100} onChange={(event) => updateCharacter("characterClass", event.target.value)} placeholder="Soul Reaper, Gunbreaker, Blood Mage..." value={character.characterClass ?? ""} /></label>
+            </div>
+            <article className="choice-explainer"><h3>{character.characterClass || "Class"}</h3><p>{classDescription}</p><p className="inline-message">Required before final creation. You can still skip this page for now and come back.</p></article>
+          </div>}
+
+          {step === 2 && <div className="choice-step">
+            <div className="form-grid">
+              <label className="form-field"><span>Choose species / ancestry *</span><select onChange={(event) => updateCharacter("ancestry", event.target.value)} value={speciesOptions.some((option) => option.name === character.ancestry) ? character.ancestry : ""}><option value="">Choose or type below</option>{speciesOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>
+              <label className="form-field"><span>Custom species / ancestry</span><input maxLength={100} onChange={(event) => updateCharacter("ancestry", event.target.value)} placeholder="Shadar-kai, Viera, awakened construct..." value={character.ancestry ?? ""} /></label>
+            </div>
+            <article className="choice-explainer"><h3>{character.ancestry || "Species / Ancestry"}</h3><p>{speciesDescription}</p><p className="inline-message">Required before final creation. Traits can be filled in on the Features step or later on the sheet.</p></article>
+          </div>}
+
+          {step === 3 && <div className="choice-step">
+            <div className="form-grid">
+              <label className="form-field"><span>Choose background / origin</span><select onChange={(event) => updateCharacter("background", event.target.value)} value={backgroundOptions.includes(character.background ?? "") ? character.background ?? "" : ""}><option value="">Choose or type below</option>{backgroundOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+              <label className="form-field"><span>Custom origin</span><input maxLength={100} onChange={(event) => updateCharacter("background", event.target.value)} placeholder="Exiled guard, lab survivor, skyship orphan..." value={character.background ?? ""} /></label>
+            </div>
+            <article className="choice-explainer"><h3>{character.background || "Background / Origin"}</h3><p>{backgroundDescription}</p><p className="inline-message">Optional for now. You can create the character without this.</p></article>
+          </div>}
+
+          {step === 4 && <div className="form-grid">
+            <label className="form-field full-width"><span>Concept</span><input maxLength={500} onChange={(event) => updateCharacter("concept", event.target.value)} placeholder="Undead hunter, reluctant royal heir, sky pirate medic..." value={character.concept ?? ""} /></label>
+            <label className="form-field full-width"><span>Personality</span><textarea onChange={(event) => updateCharacter("personalityNotes", event.target.value)} rows={4} value={character.personalityNotes ?? ""} /></label>
             <label className="form-field full-width"><span>Backstory</span><textarea onChange={(event) => updateCharacter("backstory", event.target.value)} rows={8} value={character.backstory ?? ""} /></label>
             <label className="form-field"><span>Goals</span><textarea onChange={(event) => updateCharacter("goals", event.target.value)} rows={5} value={character.goals ?? ""} /></label>
-            <label className="form-field"><span>Important relationships</span><textarea onChange={(event) => updateCharacter("importantRelationships", event.target.value)} rows={5} value={character.importantRelationships ?? ""} /></label>
-            <label className="form-field full-width"><span>Roleplay notes</span><textarea onChange={(event) => updateCharacter("roleplayNotes", event.target.value)} rows={5} value={character.roleplayNotes ?? ""} /></label>
+            <label className="form-field"><span>Roleplay notes</span><textarea onChange={(event) => updateCharacter("roleplayNotes", event.target.value)} rows={5} value={character.roleplayNotes ?? ""} /></label>
           </div>}
 
-          {step === 2 && <div className="ability-grid creation-ability-grid">
-            {abilityIds.map((ability) => {
-              const score = sheet.abilityScores[ability] ?? 10;
-              return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]}</span><strong>{formatModifier(abilityModifier(score))}</strong><input min={1} max={30} onChange={(event) => updateSheet("abilityScores", { ...sheet.abilityScores, [ability]: Number(event.target.value) })} type="number" value={score} /><LevelUpHint /></label>;
-            })}
+          {step === 5 && <div className="ability-step">
+            <p className="inline-message">Ability scores start as <strong>Default placeholder: 10</strong>. Change them manually now, or skip and keep those placeholders until you edit the sheet later.</p>
+            <div className="ability-grid creation-ability-grid">
+              {abilityIds.map((ability) => {
+                const score = sheet.abilityScores[ability] ?? 10;
+                return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]}</span><strong>{formatModifier(abilityModifier(score))}</strong><input min={1} max={30} onChange={(event) => updateSheet("abilityScores", { ...sheet.abilityScores, [ability]: Number(event.target.value) })} type="number" value={score} />{score === 10 && <small>Default placeholder: 10</small>}<LevelUpHint /></label>;
+              })}
+            </div>
           </div>}
 
-          {step === 3 && <div className="proficiency-grid creation-proficiency-grid">
+          {step === 6 && <div className="proficiency-grid creation-proficiency-grid">
             <article>
               <h3>Proficiency bonus <span className="level-up-hint">Usually changed during level up.</span></h3>
               <label className="big-stat"><span>Bonus</span><input min={2} max={6} onChange={(event) => updateSheet("proficiencyBonus", Number(event.target.value))} type="number" value={sheet.proficiencyBonus} /></label>
@@ -243,7 +330,7 @@ export function CreateCharacterWizardPage() {
             </article>
           </div>}
 
-          {step === 4 && <div className="form-grid">
+          {step === 7 && <div className="form-grid">
             <label className="form-field"><span>Armor Class</span><input min={0} onChange={(event) => updateSheet("armorClass", Number(event.target.value))} type="number" value={sheet.armorClass} /></label>
             <label className="form-field"><span>Initiative</span><input onChange={(event) => updateSheet("initiative", Number(event.target.value))} type="number" value={sheet.initiative} /></label>
             <label className="form-field"><span>Speed</span><input min={0} onChange={(event) => updateSheet("speed", Number(event.target.value))} type="number" value={sheet.speed} /></label>
@@ -257,14 +344,8 @@ export function CreateCharacterWizardPage() {
             <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => updateSheet("damageNotes", event.target.value)} rows={4} value={sheet.damageNotes} /></label>
           </div>}
 
-          {step === 5 && <div className="form-grid">
-            <label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => updateSheet("armorProficiencies", event.target.value)} rows={6} value={sheet.armorProficiencies} /></label>
-            <label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => updateSheet("weaponProficiencies", event.target.value)} rows={6} value={sheet.weaponProficiencies} /></label>
-            <label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => updateSheet("toolProficiencies", event.target.value)} rows={6} value={sheet.toolProficiencies} /></label>
-            <label className="form-field"><span>Languages</span><textarea onChange={(event) => updateSheet("languages", event.target.value)} rows={6} value={sheet.languages} /></label>
-          </div>}
-
-          {step === 6 && <div className="creation-equipment-list">
+          {step === 8 && <div className="creation-equipment-list">
+            <p className="inline-message">Optional starter equipment. You can skip this and use the full inventory tools after creation.</p>
             <button className="secondary-button" onClick={addEquipment} type="button">Add equipment item</button>
             {draft.equipment.map((item) => <article className="creation-equipment-row" key={item.id}>
               <label className="form-field"><span>Item name</span><input onChange={(event) => updateEquipment(item.id, { name: event.target.value })} value={item.name} /></label>
@@ -275,7 +356,7 @@ export function CreateCharacterWizardPage() {
             </article>)}
           </div>}
 
-          {step === 7 && <div className="form-grid">
+          {step === 9 && <div className="form-grid">
             <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => updateSheet("spellcastingAbility", event.target.value ? event.target.value as AbilityId : null)} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
             <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => updateSheet("spellSaveDc", Number(event.target.value))} type="number" value={sheet.spellSaveDc} /></label>
             <label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => updateSheet("spellAttackBonus", Number(event.target.value))} type="number" value={sheet.spellAttackBonus} /></label>
@@ -285,24 +366,32 @@ export function CreateCharacterWizardPage() {
             <label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => updateSheet("spellNotes", event.target.value)} rows={5} value={sheet.spellNotes} /></label>
           </div>}
 
-          {step === 8 && <div className="form-grid">
+          {step === 10 && <div className="form-grid">
             <label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => updateSheet("classFeatures", event.target.value)} rows={7} value={sheet.classFeatures} /></label>
             <label className="form-field"><span>Species traits</span><textarea onChange={(event) => updateSheet("speciesTraits", event.target.value)} rows={7} value={sheet.speciesTraits} /></label>
             <label className="form-field"><span>Background feature</span><textarea onChange={(event) => updateSheet("backgroundFeature", event.target.value)} rows={5} value={sheet.backgroundFeature} /></label>
             <label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => updateSheet("feats", event.target.value)} rows={5} value={sheet.feats} /></label>
+            <label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => updateSheet("armorProficiencies", event.target.value)} rows={4} value={sheet.armorProficiencies} /></label>
+            <label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => updateSheet("weaponProficiencies", event.target.value)} rows={4} value={sheet.weaponProficiencies} /></label>
+            <label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => updateSheet("toolProficiencies", event.target.value)} rows={4} value={sheet.toolProficiencies} /></label>
+            <label className="form-field"><span>Languages</span><textarea onChange={(event) => updateSheet("languages", event.target.value)} rows={4} value={sheet.languages} /></label>
             <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => updateSheet("specialAbilities", event.target.value)} rows={6} value={sheet.specialAbilities} /></label>
           </div>}
 
-          {step === 9 && <div className="review-stack">
+          {step === 11 && <div className="review-stack">
             <section><h3>Required details</h3><p><strong>{character.name || "Unnamed"}</strong> · Level {character.level} {character.characterClass || "Class missing"} · {character.ancestry || "Ancestry missing"}</p>{!canCreate && <p className="inline-message">Name, class, species/ancestry, and level are required before creating.</p>}</section>
-            <section><h3>Concept</h3><p>{character.concept || character.backstory || "No concept or backstory yet."}</p></section>
-            <section><h3>Abilities</h3><div className="review-pill-row">{abilityIds.map((ability) => <span key={ability}>{abilityLabels[ability].slice(0, 3)} {sheet.abilityScores[ability]} ({formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))})</span>)}</div></section>
+            <section><h3>Origin and concept</h3><p>{character.background || "No background"} · {character.concept || "No concept yet"}</p><p>{character.backstory || "No backstory yet."}</p></section>
+            <section><h3>Abilities</h3>{allAbilitiesAreDefault && <p className="inline-message">All ability scores are still using <strong>Default placeholder: 10</strong>.</p>}<div className="review-pill-row">{abilityIds.map((ability) => <span key={ability}>{abilityLabels[ability].slice(0, 3)} {sheet.abilityScores[ability]} ({formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))})</span>)}</div></section>
+            <section><h3>Combat</h3><p>AC {sheet.armorClass} · HP {sheet.currentHp}/{sheet.maxHp} · Speed {sheet.speed} · Hit Dice {sheet.hitDice || "not set"}</p></section>
             <section><h3>Equipment and spells</h3><p>{draft.equipment.filter((item) => item.name.trim()).length} equipment items · {lines(sheet.cantrips).length} cantrips · {lines(sheet.preparedSpells).length} prepared spells</p></section>
           </div>}
 
           <div className="creation-nav">
-            <button className="secondary-button" disabled={step === 0} onClick={() => setStep(step - 1)} type="button">Back</button>
-            {step < steps.length - 1 ? <button className="primary-button" onClick={() => setStep(step + 1)} type="button">Next</button> : <button className="primary-button" disabled={!canCreate || creating} onClick={() => void create()} type="button">Create character</button>}
+            <button className="secondary-button" disabled={step === 0} onClick={() => setStep(previousCreationStep(step))} type="button">Back</button>
+            <div className="creation-nav-actions">
+              {step > 2 && step < creationSteps.length - 1 && <button className="secondary-button" onClick={skipForNow} type="button">{skipLabel}</button>}
+              {step < creationSteps.length - 1 ? <button className="primary-button" onClick={() => setStep(nextCreationStep(step))} type="button">Next</button> : <button className="primary-button" disabled={!canCreate || creating} onClick={() => void create()} type="button">Create Character</button>}
+            </div>
           </div>
         </article>
       </div>
