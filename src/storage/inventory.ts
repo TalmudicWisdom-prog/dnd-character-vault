@@ -82,6 +82,7 @@ export async function createInventoryItem(characterId: string, containerId: stri
     favorite: false,
     customRulesText: "",
     effectsAndStats: "",
+    source: "Manual",
     createdAt: timestamp,
     updatedAt: timestamp,
   });

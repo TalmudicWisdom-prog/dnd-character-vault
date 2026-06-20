@@ -14,6 +14,8 @@ src/
 ├── components/   Shared interface components
 ├── domain/       Zod schemas and domain types
 ├── features/     Page-level product features
+├── legal/        Attribution and legal copy
+├── rules/        Offline SRD helper data and non-automating rules utilities
 ├── storage/      IndexedDB and browser storage diagnostics
 └── styles/       Global responsive styles
 ```
@@ -69,6 +71,13 @@ Version 12 adds:
 - expanded `characterSheets` fields for proficiency bonus, hit dice, death saves, attacks, proficiencies, languages, spellcasting, spell slots, and features
 - `characterCreationDrafts`: one local in-progress guided creation draft
 
+Version 13 adds source labels to rules-like records:
+
+- `inventoryItems.source`: SRD, Manual, Imported PDF, or Homebrew
+- `spells.source`: SRD, Manual, Imported PDF, or Homebrew
+
+Existing records are migrated to safe defaults without changing character math or user-entered text.
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
 Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
@@ -76,6 +85,16 @@ Character-owned records always carry a required `characterId`. Inventory writes 
 Browser storage remains limited by device capacity and browser policy. The diagnostics page shows quota estimates and lets the user request persistent storage when supported. Large PDFs are stored directly as blobs rather than encoded into structured records or application caches.
 
 PDF.js renders uploaded files entirely inside the app. The original file remains local, and the PDF.js worker is part of the offline application shell.
+
+Uploaded PDFs remain reference documents. The app does not automatically apply PDF rules to a character; any future parsed rule import must present a review step and require user confirmation before changing stored character data.
+
+## SRD foundation
+
+`src/rules/srd.ts` contains a small offline SRD 5.2.1 helper layer for abilities, skills, core d20 terms, proficiency bonus by level, class/species/background lists, and spell metadata categories. It is not a complete rules automation engine.
+
+The Create Character Wizard uses this helper data for beginner explanations, primary ability hints, skill descriptions, and proficiency bonus display. Manual override remains available for all character fields.
+
+The About / Legal page includes SRD 5.2.1 Creative Commons attribution, states that SRD content belongs to Wizards of the Coast LLC and is licensed under CC BY 4.0, and makes clear that the app is not endorsed by Wizards of the Coast LLC.
 
 ## Offline import and backups
 

@@ -6,6 +6,8 @@ Implemented foundations, character management, and play tools include:
 
 - Responsive app shell for tablet and desktop
 - Guided 12-step character creation with locally saved draft progress
+- Commercial-safe SRD 5.2.1 helper foundation with attribution and source labels
+- Manual level-up preview that flags fields usually changed during level up
 - Character editing with overview, roleplay, abilities, skills, combat, proficiencies, spells, features, notes, archive, duplicate, restore, and delete
 - Ability scores, saving throws, skill proficiencies, combat stats, and character notes
 - Touch-sized HP damage and healing controls
@@ -24,6 +26,8 @@ Implemented foundations, character management, and play tools include:
 - Basic offline app shell and install manifest
 
 It intentionally does not include D&D rules automation, accounts, a backend, or cloud-dependent file storage. Optional static HTTPS deployment serves only the installable app files; vault data remains local.
+
+Bundled rules helper data is limited to SRD 5.2.1 foundation material with CC BY 4.0 attribution on the About / Legal screen. Non-SRD Player's Handbook content is not bundled.
 
 ## Run locally
 

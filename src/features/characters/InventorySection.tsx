@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { InventoryContainer, InventoryItem } from "../../domain/models";
+import { SourceBadge } from "../../components/SourceBadge";
+import type { InventoryContainer, InventoryItem, RulesSource } from "../../domain/models";
 import { db } from "../../storage/database";
 import {
   createInventoryContainer,
@@ -67,7 +68,7 @@ function InventoryItemCard({
     <article className="inventory-item-card">
       <div className="inventory-item-heading">
         <label className="form-field inventory-item-name"><span>Item name</span><input maxLength={200} onChange={(event) => edit("name", event.target.value)} value={draft.name} /></label>
-        <span className={status === "error" ? "save-state error" : "save-state"}>{statusLabel}</span>
+        <div className="item-source-status"><SourceBadge source={draft.source} /><span className={status === "error" ? "save-state error" : "save-state"}>{statusLabel}</span></div>
       </div>
 
       <div className="inventory-item-flags">
@@ -78,6 +79,7 @@ function InventoryItemCard({
       <div className="inventory-fields">
         <label className="form-field"><span>Quantity</span><input min={0} onChange={(event) => edit("quantity", Number(event.target.value))} type="number" value={draft.quantity} /></label>
         <label className="form-field"><span>Category / type</span><input maxLength={100} onChange={(event) => edit("category", event.target.value)} placeholder="Weapon, armor, augmentation..." value={draft.category} /></label>
+        <label className="form-field"><span>Rules source</span><select onChange={(event) => edit("source", event.target.value as RulesSource)} value={draft.source}><option value="Manual">Manual</option><option value="Imported PDF">Imported PDF</option><option value="Homebrew">Homebrew</option><option value="SRD">SRD</option></select></label>
         <label className="form-field"><span>Location / container</span><select onChange={(event) => edit("containerId", event.target.value)} value={draft.containerId}>{containers.map((container) => <option key={container.id} value={container.id}>{container.name}</option>)}</select></label>
       </div>
 

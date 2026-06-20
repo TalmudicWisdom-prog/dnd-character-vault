@@ -67,6 +67,9 @@ export const skillIdSchema = z.enum([
 ]);
 export type SkillId = z.infer<typeof skillIdSchema>;
 
+export const rulesSourceSchema = z.enum(["SRD", "Manual", "Imported PDF", "Homebrew"]);
+export type RulesSource = z.infer<typeof rulesSourceSchema>;
+
 const abilityScoresSchema = z.record(abilityIdSchema, z.number().int().min(1).max(30));
 const savingThrowsSchema = z.record(abilityIdSchema, z.boolean());
 const skillProficienciesSchema = z.record(skillIdSchema, z.boolean());
@@ -157,6 +160,7 @@ export const inventoryItemSchema = z.object({
   favorite: z.boolean(),
   customRulesText: z.string().max(30000),
   effectsAndStats: z.string().max(30000),
+  source: rulesSourceSchema.default("Manual"),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -199,6 +203,7 @@ export const spellSchema = z.object({
   description: z.string().max(50000),
   higherLevelScaling: z.string().max(20000),
   sourceNotes: z.string().max(10000),
+  source: rulesSourceSchema.default("Manual"),
   homebrew: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

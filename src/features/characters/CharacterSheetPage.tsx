@@ -7,6 +7,7 @@ import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } f
 import { db } from "../../storage/database";
 import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
+import { levelUpPreview } from "../../rules/levelUp";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
@@ -91,6 +92,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   if (loadError) return <section className="page"><div className="loading-state">Could not open character sheet: {loadError}</div></section>;
   if (!character || !sheet) return <section className="page"><div className="loading-state">Opening character sheet...</div></section>;
+  const levelPreview = levelUpPreview(character.level);
 
   return (
     <section className="page sheet-page">
@@ -114,6 +116,27 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field"><span>Species / Ancestry</span><input maxLength={100} onChange={(event) => void updateCharacterField({ ancestry: event.target.value })} value={character.ancestry} /></label>
           <label className="form-field full-width"><span>Background / Origin</span><input maxLength={100} onChange={(event) => void updateCharacterField({ background: event.target.value })} value={character.background} /></label>
           <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => void updateCharacterField({ concept: event.target.value })} value={character.concept} /></label>
+        </div>
+      </article>
+
+      <article className="panel sheet-section level-up-preview">
+        <div className="form-section-heading">
+          <div>
+            <span className="card-label">Level up foundation</span>
+            <h2>Next level preview</h2>
+            <p>This is a reminder panel only. It does not change your character automatically.</p>
+          </div>
+          <span className="status-badge">Manual control</span>
+        </div>
+        <div className="level-up-grid">
+          <div><small>Current level</small><strong>{levelPreview.currentLevel}</strong></div>
+          <div><small>Next level</small><strong>{levelPreview.nextLevel ?? "Max"}</strong></div>
+          <div><small>Proficiency now</small><strong>{formatModifier(levelPreview.currentProficiencyBonus)}</strong></div>
+          <div><small>Proficiency next</small><strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong></div>
+        </div>
+        {levelPreview.proficiencyChanges && <p className="inline-message">At level {levelPreview.nextLevel}, proficiency bonus changes to <strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong>.</p>}
+        <div className="level-up-field-list">
+          {levelPreview.fields.map((field) => <span key={field}>{field} <LevelUpHint /></span>)}
         </div>
       </article>
 

@@ -43,6 +43,7 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     description: "",
     higherLevelScaling: "",
     sourceNotes: "",
+    source: "Homebrew",
     homebrew: true,
     createdAt: timestamp,
     updatedAt: timestamp,

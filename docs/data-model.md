@@ -32,7 +32,7 @@ Related sheet and inventory tables keep character-owned data independent rather 
 Each character owns one `spellbooks` record and any number of `spells` records.
 
 - `spellbooks` stores the required `characterId` and the manually ordered `pinnedSpellIds` quick-access list.
-- `spells` stores the required `characterId`, complete editable spell metadata, rule text, source notes, and standard/homebrew flag.
+- `spells` stores the required `characterId`, complete editable spell metadata, rule text, source notes, source label, and standard/homebrew flag.
 - A pinned ID is valid only when its spell belongs to the same character.
 
 Deleting a character removes only that character's spellbook and spells. Duplicating a character creates new spell IDs and preserves the pinned order in the copy.
@@ -80,13 +80,24 @@ The record autosaves locally and can evolve independently from character identit
 Every inventory container and item has a required `characterId`. Storage operations validate that an item's selected container belongs to the same character before saving or moving it.
 
 - `inventoryContainers` stores the character owner, container name, and display order.
-- `inventoryItems` stores the character owner, container, name, quantity, category, equipped/favorite flags, description, custom rules, and freeform effects/stat notes.
+- `inventoryItems` stores the character owner, container, name, quantity, category, source label, equipped/favorite flags, description, custom rules, and freeform effects/stat notes.
 
 Body enhancements and custom abilities use the same editable inventory-item model and can live in a dedicated character-owned container. They remain freeform, do not automate rules math, and never affect another character.
 - Main Inventory, Bag of Holding, and Void Bag are initialized independently for each character.
 - Custom abilities and stat modifications granted by an item remain descriptive text; no rules math is automated.
 
 Deleting a character deletes only that character's sheet, containers, and items. Duplicating a character creates new container and item IDs owned by the copy.
+
+## Rules sources
+
+Rules-like records can carry one of four source labels:
+
+- `SRD`: bundled SRD 5.2.1 helper data
+- `Manual`: typed or edited by the user
+- `Imported PDF`: extracted from a user-selected local file and requiring review
+- `Homebrew`: custom or table-specific content
+
+Source labels are informational. They do not automate or apply rules by themselves.
 
 ## Soul Reaper progression
 

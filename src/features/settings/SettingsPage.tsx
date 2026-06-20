@@ -69,6 +69,14 @@ export function SettingsPage() {
           </div>
           <span className="status-badge good">Local only</span>
         </article>
+
+        <article className="panel setting-section">
+          <div>
+            <h2>About / Legal</h2>
+            <p>View SRD attribution, source labels, and the no-endorsement notice.</p>
+          </div>
+          <a className="secondary-button button-link" href="#legal">Open Legal</a>
+        </article>
       </div>
 
       {saved && <div className="save-toast" role="status">{saved}</div>}

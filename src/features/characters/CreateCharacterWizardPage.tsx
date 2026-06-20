@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "../../components/PageHeader";
+import { SourceBadge } from "../../components/SourceBadge";
 import type { AbilityId, CharacterCreationDraft, CreationEquipmentItem, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillModifier } from "../../domain/dndMath";
 import { abilityIds, skillIds } from "../../storage/characterSheets";
@@ -9,102 +10,13 @@ import {
   resetCreationDraft,
   saveCreationDraft,
 } from "../../storage/characterCreation";
+import { srdAbilities, srdBackgrounds, srdClass, srdClasses, srdSkill, srdSkills, srdSpecies } from "../../rules/srd";
 import { clampCreationStep, creationSteps, nextCreationStep, previousCreationStep } from "./createCharacterWizard";
 
-const classOptions = [
-  { name: "Barbarian", description: "A durable warrior powered by rage, instinct, and big physical moments." },
-  { name: "Bard", description: "A flexible magic-user and performer who supports allies with words, music, and skill." },
-  { name: "Cleric", description: "A divine caster with healing, protection, and strong themed powers from a domain." },
-  { name: "Druid", description: "A nature-focused caster who can control the battlefield and often change shape." },
-  { name: "Fighter", description: "A weapon master with reliable combat tools and room for many fighting styles." },
-  { name: "Monk", description: "A mobile martial artist who uses discipline, speed, and precise strikes." },
-  { name: "Paladin", description: "A holy warrior with armor, healing, protective magic, and powerful smites." },
-  { name: "Ranger", description: "A scout and hunter with weapons, exploration strengths, and nature magic." },
-  { name: "Rogue", description: "A precise expert who wins with skill, stealth, positioning, and sneak attacks." },
-  { name: "Sorcerer", description: "An innate spellcaster who shapes magic through bloodline, blessing, or raw power." },
-  { name: "Warlock", description: "A pact-bound caster with unusual magic, invocations, and a strong patron theme." },
-  { name: "Wizard", description: "A learned spellcaster with a broad spellbook and deep magical preparation." },
-  { name: "Custom / Homebrew", description: "Use this for Soul Reaper, Final Fantasy jobs, DM-made classes, or anything custom." },
-];
-
-const speciesOptions = [
-  { name: "Human", description: "Adaptable, flexible, and easy to fit into almost any campaign or origin." },
-  { name: "Elf", description: "Graceful, long-lived, and often tied to magic, perception, or ancient cultures." },
-  { name: "Dwarf", description: "Sturdy, resilient, and commonly connected to craft, clans, and endurance." },
-  { name: "Halfling", description: "Small, lucky, brave, and often underestimated in the best possible way." },
-  { name: "Dragonborn", description: "Draconic ancestry with a breath weapon and a strong elemental identity." },
-  { name: "Tiefling", description: "Fiendish heritage with striking presence and innate magical flavor." },
-  { name: "Aasimar", description: "Celestial influence, radiant themes, and an easy fit for chosen-one stories." },
-  { name: "Custom / Homebrew", description: "Use this for DM-made ancestries, setting-specific species, or reskins." },
-];
-
-const backgroundOptions = [
-  "Acolyte",
-  "Charlatan",
-  "Criminal",
-  "Entertainer",
-  "Folk Hero",
-  "Guild Artisan",
-  "Hermit",
-  "Noble",
-  "Outlander",
-  "Sage",
-  "Sailor",
-  "Soldier",
-  "Urchin",
-  "Custom / Homebrew",
-];
-
-const abilityLabels: Record<AbilityId, string> = {
-  str: "Strength",
-  dex: "Dexterity",
-  con: "Constitution",
-  int: "Intelligence",
-  wis: "Wisdom",
-  cha: "Charisma",
-};
-
-const skillLabels: Record<SkillId, string> = {
-  acrobatics: "Acrobatics",
-  animalHandling: "Animal Handling",
-  arcana: "Arcana",
-  athletics: "Athletics",
-  deception: "Deception",
-  history: "History",
-  insight: "Insight",
-  intimidation: "Intimidation",
-  investigation: "Investigation",
-  medicine: "Medicine",
-  nature: "Nature",
-  perception: "Perception",
-  performance: "Performance",
-  persuasion: "Persuasion",
-  religion: "Religion",
-  sleightOfHand: "Sleight of Hand",
-  stealth: "Stealth",
-  survival: "Survival",
-};
-
-const skillAbilityLabels: Record<SkillId, AbilityId> = {
-  acrobatics: "dex",
-  animalHandling: "wis",
-  arcana: "int",
-  athletics: "str",
-  deception: "cha",
-  history: "int",
-  insight: "wis",
-  intimidation: "cha",
-  investigation: "int",
-  medicine: "wis",
-  nature: "int",
-  perception: "wis",
-  performance: "cha",
-  persuasion: "cha",
-  religion: "int",
-  sleightOfHand: "dex",
-  stealth: "dex",
-  survival: "wis",
-};
+const abilityLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.label])) as Record<AbilityId, string>;
+const abilityShortLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.shortLabel])) as Record<AbilityId, string>;
+const skillLabels = Object.fromEntries(srdSkills.map((skill) => [skill.id, skill.label])) as Record<SkillId, string>;
+const skillAbilityLabels = Object.fromEntries(srdSkills.map((skill) => [skill.id, skill.ability])) as Record<SkillId, AbilityId>;
 
 function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
@@ -112,10 +24,6 @@ function LevelUpHint() {
 
 function lines(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-}
-
-function optionDescription(options: Array<{ name: string; description: string }>, value: string, fallback: string) {
-  return options.find((option) => option.name === value)?.description ?? fallback;
 }
 
 export function CreateCharacterWizardPage() {
@@ -232,12 +140,14 @@ export function CreateCharacterWizardPage() {
   const sheet = draft.sheet;
   const character = draft.character;
   const allAbilitiesAreDefault = abilityIds.every((ability) => (sheet.abilityScores[ability] ?? 10) === 10);
-  const classDescription = optionDescription(classOptions, character.characterClass, character.characterClass ? "Custom class. You can enter or edit the details yourself." : "Pick a class, or type a custom/homebrew class.");
-  const speciesDescription = optionDescription(speciesOptions, character.ancestry, character.ancestry ? "Custom ancestry/species. You can keep the name here and fill in traits later." : "Pick a species/ancestry, or type a custom/homebrew one.");
-  const backgroundDescription = character.background
-    ? `${character.background} is saved as this character's origin. You can add the feature and story details later.`
-    : "Choose a background/origin, or type your own.";
+  const selectedClass = srdClass(character.characterClass);
+  const selectedSpecies = srdSpecies.find((species) => species.name === character.ancestry);
+  const selectedBackground = srdBackgrounds.find((background) => background.name === character.background);
+  const classDescription = selectedClass?.description ?? (character.characterClass ? "Custom class. You can enter or edit the details yourself." : "Pick an SRD class, or type a custom/homebrew class.");
+  const speciesDescription = selectedSpecies?.description ?? (character.ancestry ? "Custom ancestry/species. You can keep the name here and fill in traits later." : "Pick an SRD species/ancestry, or type a custom/homebrew one.");
+  const backgroundDescription = selectedBackground?.description ?? (character.background ? `${character.background} is saved as this character's origin. You can add the feature and story details later.` : "Choose an SRD background/origin, or type your own.");
   const skipLabel = step === 5 ? "Skip for now: keep default 10s" : "Skip for now";
+  const currentProficiencyBonus = proficiencyBonusForLevel(character.level ?? 1);
 
   return (
     <section className="page create-character-page">
@@ -272,31 +182,32 @@ export function CreateCharacterWizardPage() {
             <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => updateCharacter("playerName", event.target.value)} value={character.playerName ?? ""} /></label>
             <label className="form-field"><span>Campaign</span><input maxLength={100} onChange={(event) => updateCharacter("campaign", event.target.value)} value={character.campaign ?? ""} /></label>
             <label className="form-field level-up-field"><span>Level * <LevelUpHint /></span><input max={20} min={1} onChange={(event) => updateCharacter("level", Number(event.target.value))} type="number" value={character.level ?? 1} /></label>
+            <p className="inline-message full-width">SRD helper: a level {character.level || 1} character has a proficiency bonus of <strong>{formatModifier(currentProficiencyBonus)}</strong>. You can still override it later.</p>
             <p className="inline-message full-width">You can move forward with blanks, but the final Create button requires name, class, species/ancestry, and level.</p>
           </div>}
 
           {step === 1 && <div className="choice-step">
             <div className="form-grid">
-              <label className="form-field"><span>Choose class *</span><select onChange={(event) => updateCharacter("characterClass", event.target.value)} value={classOptions.some((option) => option.name === character.characterClass) ? character.characterClass : ""}><option value="">Choose or type below</option>{classOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>
+              <label className="form-field"><span>Choose class *</span><select onChange={(event) => updateCharacter("characterClass", event.target.value)} value={srdClasses.some((option) => option.name === character.characterClass) ? character.characterClass : ""}><option value="">Choose or type below</option>{srdClasses.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}<option value="Custom / Homebrew">Custom / Homebrew</option></select></label>
               <label className="form-field"><span>Custom class</span><input maxLength={100} onChange={(event) => updateCharacter("characterClass", event.target.value)} placeholder="Soul Reaper, Gunbreaker, Blood Mage..." value={character.characterClass ?? ""} /></label>
             </div>
-            <article className="choice-explainer"><h3>{character.characterClass || "Class"}</h3><p>{classDescription}</p><p className="inline-message">Required before final creation. You can still skip this page for now and come back.</p></article>
+            <article className="choice-explainer"><h3>{character.characterClass || "Class"} {selectedClass ? <SourceBadge source={selectedClass.source} /> : character.characterClass ? <SourceBadge source="Homebrew" /> : null}</h3><p>{classDescription}</p>{selectedClass && <p><strong>Primary ability:</strong> {selectedClass.primaryAbilities.map((ability) => abilityLabels[ability]).join(" or ")}</p>}<p className="inline-message">SRD help is guidance only. Required before final creation, and you can still type a custom class.</p></article>
           </div>}
 
           {step === 2 && <div className="choice-step">
             <div className="form-grid">
-              <label className="form-field"><span>Choose species / ancestry *</span><select onChange={(event) => updateCharacter("ancestry", event.target.value)} value={speciesOptions.some((option) => option.name === character.ancestry) ? character.ancestry : ""}><option value="">Choose or type below</option>{speciesOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>
+              <label className="form-field"><span>Choose species / ancestry *</span><select onChange={(event) => updateCharacter("ancestry", event.target.value)} value={srdSpecies.some((option) => option.name === character.ancestry) ? character.ancestry : ""}><option value="">Choose or type below</option>{srdSpecies.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}<option value="Custom / Homebrew">Custom / Homebrew</option></select></label>
               <label className="form-field"><span>Custom species / ancestry</span><input maxLength={100} onChange={(event) => updateCharacter("ancestry", event.target.value)} placeholder="Shadar-kai, Viera, awakened construct..." value={character.ancestry ?? ""} /></label>
             </div>
-            <article className="choice-explainer"><h3>{character.ancestry || "Species / Ancestry"}</h3><p>{speciesDescription}</p><p className="inline-message">Required before final creation. Traits can be filled in on the Features step or later on the sheet.</p></article>
+            <article className="choice-explainer"><h3>{character.ancestry || "Species / Ancestry"} {selectedSpecies ? <SourceBadge source={selectedSpecies.source} /> : character.ancestry ? <SourceBadge source="Homebrew" /> : null}</h3><p>{speciesDescription}</p><p className="inline-message">SRD names here do not auto-apply traits yet. Traits can be filled in on the Features step or later on the sheet.</p></article>
           </div>}
 
           {step === 3 && <div className="choice-step">
             <div className="form-grid">
-              <label className="form-field"><span>Choose background / origin</span><select onChange={(event) => updateCharacter("background", event.target.value)} value={backgroundOptions.includes(character.background ?? "") ? character.background ?? "" : ""}><option value="">Choose or type below</option>{backgroundOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+              <label className="form-field"><span>Choose background / origin</span><select onChange={(event) => updateCharacter("background", event.target.value)} value={srdBackgrounds.some((option) => option.name === character.background) ? character.background ?? "" : ""}><option value="">Choose or type below</option>{srdBackgrounds.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}<option value="Custom / Homebrew">Custom / Homebrew</option></select></label>
               <label className="form-field"><span>Custom origin</span><input maxLength={100} onChange={(event) => updateCharacter("background", event.target.value)} placeholder="Exiled guard, lab survivor, skyship orphan..." value={character.background ?? ""} /></label>
             </div>
-            <article className="choice-explainer"><h3>{character.background || "Background / Origin"}</h3><p>{backgroundDescription}</p><p className="inline-message">Optional for now. You can create the character without this.</p></article>
+            <article className="choice-explainer"><h3>{character.background || "Background / Origin"} {selectedBackground ? <SourceBadge source={selectedBackground.source} /> : character.background ? <SourceBadge source="Homebrew" /> : null}</h3><p>{backgroundDescription}</p><p className="inline-message">Optional for now. You can create the character without this.</p></article>
           </div>}
 
           {step === 4 && <div className="form-grid">
@@ -312,7 +223,8 @@ export function CreateCharacterWizardPage() {
             <div className="ability-grid creation-ability-grid">
               {abilityIds.map((ability) => {
                 const score = sheet.abilityScores[ability] ?? 10;
-                return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]}</span><strong>{formatModifier(abilityModifier(score))}</strong><input min={1} max={30} onChange={(event) => updateSheet("abilityScores", { ...sheet.abilityScores, [ability]: Number(event.target.value) })} type="number" value={score} />{score === 10 && <small>Default placeholder: 10</small>}<LevelUpHint /></label>;
+                const abilityInfo = srdAbilities.find((item) => item.id === ability);
+                return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]} {abilityInfo && <SourceBadge source={abilityInfo.source} />}</span><strong>{formatModifier(abilityModifier(score))}</strong><input min={1} max={30} onChange={(event) => updateSheet("abilityScores", { ...sheet.abilityScores, [ability]: Number(event.target.value) })} type="number" value={score} />{abilityInfo && <small>{abilityInfo.description}</small>}{score === 10 && <small>Default placeholder: 10</small>}<LevelUpHint /></label>;
               })}
             </div>
           </div>}
@@ -326,7 +238,10 @@ export function CreateCharacterWizardPage() {
             </article>
             <article>
               <h3>Skill proficiencies</h3>
-              <div className="check-list skills-list">{skillIds.map((skill) => <label className="proficiency-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => updateSheet("skillProficiencies", { ...sheet.skillProficiencies, [skill]: event.target.checked })} type="checkbox" /><span>{skillLabels[skill]}</span><small>{abilityLabels[skillAbilityLabels[skill]].slice(0, 3)} {formatModifier(skillModifier(sheet, skill))}</small></label>)}</div>
+              <div className="check-list skills-list">{skillIds.map((skill) => {
+                const skillInfo = srdSkill(skill);
+                return <label className="proficiency-row skill-helper-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => updateSheet("skillProficiencies", { ...sheet.skillProficiencies, [skill]: event.target.checked })} type="checkbox" /><span>{skillLabels[skill]}{skillInfo && <small>{skillInfo.description}</small>}</span><small>{abilityShortLabels[skillAbilityLabels[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>;
+              })}</div>
             </article>
           </div>}
 

@@ -120,6 +120,7 @@ export async function createCharacterFromCreationDraft(draft: CharacterCreationD
         favorite: false,
         customRulesText: "",
         effectsAndStats: "",
+        source: "Manual",
         createdAt: timestamp,
         updatedAt: timestamp,
       }));

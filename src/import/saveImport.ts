@@ -69,7 +69,7 @@ export async function saveCharacterImport(draft: CharacterImportDraft, mode: Imp
       await db.inventoryItems.bulkAdd(draft.inventory.value.map((name) => name.trim()).filter(Boolean).map((name) => inventoryItemSchema.parse({
         id: crypto.randomUUID(), characterId, containerId: main.id, name: name.slice(0, 200), quantity: 1,
         category: "Imported", description: `Imported from ${draft.sourceName}`, equipped: false, favorite: false,
-        customRulesText: "", effectsAndStats: "", createdAt: timestamp, updatedAt: timestamp,
+        customRulesText: "", effectsAndStats: "", source: "Imported PDF", createdAt: timestamp, updatedAt: timestamp,
       })));
     }
   }

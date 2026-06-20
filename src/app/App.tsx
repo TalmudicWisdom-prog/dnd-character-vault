@@ -10,6 +10,7 @@ import { SettingsPage } from "../features/settings/SettingsPage";
 import { StorageDiagnosticsPage } from "../features/storage/StorageDiagnosticsPage";
 import { BackupRestorePage } from "../features/tools/BackupRestorePage";
 import { CharacterImportWizardPage } from "../features/import/CharacterImportWizardPage";
+import { AboutLegalPage } from "../features/legal/AboutLegalPage";
 import { SpellbookPage } from "../features/spells/SpellbookPage";
 import { getSettings } from "../storage/database";
 import type { PageId } from "./navigation";
@@ -20,7 +21,8 @@ type AppRoute =
   | { page: "sheet"; characterId: string }
   | { page: "spellbook"; characterId: string }
   | { page: "pdf"; documentId: string }
-  | { page: "import"; characterId?: never };
+  | { page: "import"; characterId?: never }
+  | { page: "legal"; characterId?: never };
 
 function routeFromHash(): AppRoute {
   const route = window.location.hash.slice(1);
@@ -37,6 +39,7 @@ function routeFromHash(): AppRoute {
     return { page: "pdf", documentId: route.replace("pdf/", "") };
   }
   if (route === "import") return { page: "import" };
+  if (route === "legal") return { page: "legal" };
   if (route === "library" || route === "storage" || route === "tools" || route === "settings") return { page: route };
   return { page: "characters" };
 }
@@ -57,7 +60,7 @@ export function App() {
   }, []);
 
   return (
-    <AppShell currentPage={route.page === "character" || route.page === "sheet" || route.page === "spellbook" ? "characters" : route.page === "pdf" ? "library" : route.page === "import" ? "tools" : route.page}>
+    <AppShell currentPage={route.page === "character" || route.page === "sheet" || route.page === "spellbook" ? "characters" : route.page === "pdf" ? "library" : route.page === "import" ? "tools" : route.page === "legal" ? "settings" : route.page}>
       {route.page === "characters" && <CharacterListPage />}
       {route.page === "character" && (route.characterId === "new" ? <CreateCharacterWizardPage /> : <CharacterEditorPage characterId={route.characterId} />)}
       {route.page === "sheet" && <CharacterSheetPage characterId={route.characterId} />}
@@ -68,6 +71,7 @@ export function App() {
       {route.page === "tools" && <BackupRestorePage />}
       {route.page === "import" && <CharacterImportWizardPage />}
       {route.page === "settings" && <SettingsPage />}
+      {route.page === "legal" && <AboutLegalPage />}
     </AppShell>
   );
 }

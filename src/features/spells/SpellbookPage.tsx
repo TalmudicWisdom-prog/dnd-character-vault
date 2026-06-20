@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PageHeader } from "../../components/PageHeader";
-import type { Spell, SpellActionType } from "../../domain/models";
+import { SourceBadge } from "../../components/SourceBadge";
+import type { RulesSource, Spell, SpellActionType } from "../../domain/models";
 import { db } from "../../storage/database";
 import {
   createSpell,
@@ -75,7 +76,7 @@ function SpellCard({
       <button className="spell-card-main" onClick={onOpen} type="button">
         <span className="spell-level-mark">{spell.level === 0 ? "C" : spell.level}</span>
         <span className="spell-card-copy">
-          <span className="spell-title-row"><strong>{spell.name}</strong>{spell.homebrew && <small>Homebrew</small>}</span>
+          <span className="spell-title-row"><strong>{spell.name}</strong><SourceBadge source={spell.source} />{spell.homebrew && <small>Homebrew</small>}</span>
           <span>{levelLabel(spell.level)} · {spell.school}</span>
           <span className="spell-tags">{spellTags(spell).map((tag) => <small key={tag}>{tag}</small>)}</span>
         </span>
@@ -143,6 +144,7 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
         <label className="form-field"><span>School of magic *</span><input maxLength={100} onChange={(event) => edit("school", event.target.value)} required value={draft.school} /></label>
         <label className="form-field"><span>Casting time *</span><input maxLength={200} onChange={(event) => edit("castingTime", event.target.value)} required value={draft.castingTime} /></label>
         <label className="form-field"><span>Action type</span><select onChange={(event) => edit("actionType", event.target.value as SpellActionType)} value={draft.actionType}>{Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="form-field"><span>Rules source</span><select onChange={(event) => edit("source", event.target.value as RulesSource)} value={draft.source}><option value="Manual">Manual</option><option value="SRD">SRD</option><option value="Imported PDF">Imported PDF</option><option value="Homebrew">Homebrew</option></select></label>
         <label className="form-field"><span>Range *</span><input maxLength={200} onChange={(event) => edit("range", event.target.value)} required value={draft.range} /></label>
         <label className="form-field"><span>Duration *</span><input maxLength={200} onChange={(event) => edit("duration", event.target.value)} required value={draft.duration} /></label>
         <fieldset className="spell-components"><legend>Components</legend><label><input checked={draft.verbalComponent} onChange={(event) => edit("verbalComponent", event.target.checked)} type="checkbox" /> V</label><label><input checked={draft.somaticComponent} onChange={(event) => edit("somaticComponent", event.target.checked)} type="checkbox" /> S</label><label><input checked={draft.materialComponent} onChange={(event) => edit("materialComponent", event.target.checked)} type="checkbox" /> M</label></fieldset>
