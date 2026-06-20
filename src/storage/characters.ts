@@ -29,7 +29,7 @@ export async function updateCharacter(id: string, draft: CharacterDraft): Promis
 
   const character = characterSchema.parse({
     ...current,
-    ...characterDraftSchema.parse(draft),
+    ...characterDraftSchema.parse({ ...current, ...draft }),
     updatedAt: now(),
   });
 
@@ -48,6 +48,13 @@ export async function duplicateCharacter(id: string): Promise<Character> {
     campaign: current.campaign,
     ancestry: current.ancestry,
     characterClass: current.characterClass,
+    background: current.background,
+    concept: current.concept,
+    personalityNotes: current.personalityNotes,
+    backstory: current.backstory,
+    goals: current.goals,
+    importantRelationships: current.importantRelationships,
+    roleplayNotes: current.roleplayNotes,
     level: current.level,
   });
   const sheet = await db.characterSheets.get(id);

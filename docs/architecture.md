@@ -63,6 +63,12 @@ Version 11 adds:
 - `importSessions`: resumable local multi-file import state, selected mode, per-file parse results, merged draft, and conflicts
 - `importSessionFiles`: temporary source-file blobs and ordering metadata
 
+Version 12 adds:
+
+- expanded character profile fields for concept, background/origin, backstory, goals, relationships, and roleplay notes
+- expanded `characterSheets` fields for proficiency bonus, hit dice, death saves, attacks, proficiencies, languages, spellcasting, spell slots, and features
+- `characterCreationDrafts`: one local in-progress guided creation draft
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
 Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.

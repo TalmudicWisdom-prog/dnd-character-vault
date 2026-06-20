@@ -8,6 +8,13 @@ export const characterSchema = z.object({
   campaign: z.string().max(100),
   ancestry: z.string().max(100),
   characterClass: z.string().max(100),
+  background: z.string().max(100).default(""),
+  concept: z.string().max(500).default(""),
+  personalityNotes: z.string().max(10000).default(""),
+  backstory: z.string().max(20000).default(""),
+  goals: z.string().max(10000).default(""),
+  importantRelationships: z.string().max(10000).default(""),
+  roleplayNotes: z.string().max(10000).default(""),
   level: z.number().int().min(1).max(20),
   archivedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
@@ -16,17 +23,24 @@ export const characterSchema = z.object({
 
 export type Character = z.infer<typeof characterSchema>;
 
-export const characterDraftSchema = characterSchema.pick({
-  name: true,
-  summary: true,
-  playerName: true,
-  campaign: true,
-  ancestry: true,
-  characterClass: true,
-  level: true,
+export const characterDraftSchema = z.object({
+  name: z.string().min(1).max(100),
+  summary: z.string().max(20000).default(""),
+  playerName: z.string().max(100).default(""),
+  campaign: z.string().max(100).default(""),
+  ancestry: z.string().max(100).default(""),
+  characterClass: z.string().max(100).default(""),
+  background: z.string().max(100).default(""),
+  concept: z.string().max(500).default(""),
+  personalityNotes: z.string().max(10000).default(""),
+  backstory: z.string().max(20000).default(""),
+  goals: z.string().max(10000).default(""),
+  importantRelationships: z.string().max(10000).default(""),
+  roleplayNotes: z.string().max(10000).default(""),
+  level: z.number().int().min(1).max(20).default(1),
 });
 
-export type CharacterDraft = z.infer<typeof characterDraftSchema>;
+export type CharacterDraft = z.input<typeof characterDraftSchema>;
 
 export const abilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof abilityIdSchema>;
@@ -60,18 +74,66 @@ const skillProficienciesSchema = z.record(skillIdSchema, z.boolean());
 export const characterSheetSchema = z.object({
   characterId: z.string().uuid(),
   abilityScores: abilityScoresSchema,
+  proficiencyBonus: z.number().int().min(2).max(6).default(2),
   currentHp: z.number().int().min(0),
   maxHp: z.number().int().min(0),
   temporaryHp: z.number().int().min(0),
   armorClass: z.number().int().min(0),
   initiative: z.number().int(),
   speed: z.number().int().min(0),
+  hitDice: z.string().max(100).default(""),
+  deathSaveSuccesses: z.number().int().min(0).max(3).default(0),
+  deathSaveFailures: z.number().int().min(0).max(3).default(0),
+  attacks: z.string().max(20000).default(""),
+  weapons: z.string().max(20000).default(""),
+  damageNotes: z.string().max(20000).default(""),
   savingThrows: savingThrowsSchema,
   skillProficiencies: skillProficienciesSchema,
+  armorProficiencies: z.string().max(10000).default(""),
+  weaponProficiencies: z.string().max(10000).default(""),
+  toolProficiencies: z.string().max(10000).default(""),
+  languages: z.string().max(10000).default(""),
+  spellcastingAbility: abilityIdSchema.nullable().default(null),
+  spellSaveDc: z.number().int().min(0).default(0),
+  spellAttackBonus: z.number().int().default(0),
+  cantrips: z.string().max(20000).default(""),
+  preparedSpells: z.string().max(30000).default(""),
+  spellSlots: z.record(z.string(), z.number().int().min(0)).default({}),
+  spellNotes: z.string().max(30000).default(""),
+  classFeatures: z.string().max(30000).default(""),
+  speciesTraits: z.string().max(30000).default(""),
+  backgroundFeature: z.string().max(20000).default(""),
+  feats: z.string().max(20000).default(""),
+  specialAbilities: z.string().max(30000).default(""),
   notes: z.string().max(50000),
   updatedAt: z.string().datetime(),
 });
 export type CharacterSheet = z.infer<typeof characterSheetSchema>;
+
+export const creationEquipmentItemSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().max(200),
+  quantity: z.number().int().min(0),
+  notes: z.string().max(20000),
+  equipped: z.boolean(),
+});
+export type CreationEquipmentItem = z.infer<typeof creationEquipmentItemSchema>;
+
+const characterCreationCharacterSchema = characterDraftSchema.extend({
+  name: z.string().max(100),
+  characterClass: z.string().max(100),
+  ancestry: z.string().max(100),
+});
+
+export const characterCreationDraftSchema = z.object({
+  id: z.literal("new-character"),
+  step: z.number().int().min(0).max(9),
+  character: characterCreationCharacterSchema,
+  sheet: characterSheetSchema.omit({ characterId: true, updatedAt: true }),
+  equipment: z.array(creationEquipmentItemSchema),
+  updatedAt: z.string().datetime(),
+});
+export type CharacterCreationDraft = z.infer<typeof characterCreationDraftSchema>;
 
 export const inventoryContainerSchema = z.object({
   id: z.string().uuid(),

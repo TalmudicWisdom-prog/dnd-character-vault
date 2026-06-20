@@ -31,11 +31,24 @@ describe("manual backup and restore", () => {
     const legacyPayload = structuredClone(backup.payload) as Partial<typeof backup.payload>;
     delete legacyPayload.spellbooks;
     delete legacyPayload.spells;
+    delete legacyPayload.characterCreationDrafts;
     const bytes = new TextEncoder().encode(JSON.stringify(legacyPayload));
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
     const upgraded = await validateVaultBackup({ ...backup, formatVersion: 1, payload: legacyPayload, checksum });
-    expect(upgraded.formatVersion).toBe(2);
+    expect(upgraded.formatVersion).toBe(3);
     expect(upgraded.payload.spells).toEqual([]);
+  });
+
+  it("upgrades version 2 backups with an empty creation draft collection", async () => {
+    const backup = await createVaultBackup(false);
+    const legacyPayload = structuredClone(backup.payload) as Partial<typeof backup.payload>;
+    delete legacyPayload.characterCreationDrafts;
+    const bytes = new TextEncoder().encode(JSON.stringify(legacyPayload));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const upgraded = await validateVaultBackup({ ...backup, formatVersion: 2, payload: legacyPayload, checksum });
+    expect(upgraded.formatVersion).toBe(3);
+    expect(upgraded.payload.characterCreationDrafts).toEqual([]);
   });
 });

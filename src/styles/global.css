@@ -207,6 +207,32 @@ h1, h2, strong { color: var(--ink); }
 .import-character-button { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .empty-create-actions { display: flex; gap: 8px; margin-top: 8px; }
 .import-alternative-panel { margin-top: 12px; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.level-up-hint { display: inline-block; color: var(--accent); font-size: 0.68rem; font-weight: 800; text-transform: none; }
+.level-up-field { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.compact-field { max-width: 120px; }
+.create-character-page { width: min(1320px, 100%); }
+.creation-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+.creation-steps { position: sticky; top: 28px; display: grid; gap: 7px; padding: 16px; }
+.creation-step { display: flex; gap: 9px; align-items: center; min-height: 42px; padding: 8px 10px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 10px; font-weight: 800; text-align: left; }
+.creation-step span { display: grid; place-items: center; width: 24px; height: 24px; color: var(--accent); border: 1px solid currentColor; border-radius: 7px; font-size: 0.72rem; }
+.creation-step.active { background: var(--accent); color: #fff8ef; border-color: var(--accent); }
+.creation-step.active span { color: inherit; }
+.creation-panel { min-width: 0; }
+.creation-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+.creation-ability-grid .ability-card { min-height: 160px; }
+.creation-proficiency-grid h3 { margin: 0 0 10px; font-family: Georgia, serif; font-weight: 500; }
+.combat-extra-grid { margin-top: 16px; }
+.slot-grid { display: grid; grid-template-columns: repeat(9, minmax(44px, 1fr)); gap: 6px; }
+.slot-grid label { display: grid; gap: 4px; color: var(--muted); text-align: center; }
+.slot-grid input { min-width: 0; padding: 7px; text-align: center; }
+.creation-equipment-list { display: grid; gap: 12px; }
+.creation-equipment-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
+.creation-equipment-row .full-width { grid-column: 1 / -1; }
+.review-stack { display: grid; gap: 12px; }
+.review-stack section { padding: 16px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
+.review-stack h3 { margin-top: 0; font-family: Georgia, serif; font-weight: 500; }
+.review-pill-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.review-pill-row span { padding: 6px 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
 
 .sheet-status { display: flex; align-items: center; gap: 9px; width: fit-content; margin: -24px 0 24px auto; color: var(--muted); font-size: 0.78rem; font-weight: 750; }
 .play-grid { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 16px; margin-bottom: 16px; }
@@ -473,6 +499,8 @@ h1, h2, strong { color: var(--ink); }
   .summary-card { min-height: 125px; }
   .diagnostic-grid { grid-template-columns: 1fr; }
   .editor-layout { grid-template-columns: 1fr; }
+  .creation-layout { grid-template-columns: 1fr; }
+  .creation-steps { position: static; grid-template-columns: repeat(2, 1fr); }
   .editor-side { position: static; }
   .character-card { display: block; }
   .character-actions { border-top: 1px solid var(--line); border-left: 0; }
@@ -512,6 +540,9 @@ h1, h2, strong { color: var(--ink); }
   .hp-values { grid-template-columns: 1fr auto 1fr; }
   .temp-hp { grid-column: 1 / -1; }
   .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar { grid-template-columns: 1fr; }
+  .creation-steps, .slot-grid, .creation-equipment-row { grid-template-columns: 1fr; }
+  .creation-nav { display: grid; }
+  .creation-equipment-row .full-width { grid-column: auto; }
   .ability-grid { grid-template-columns: repeat(2, 1fr); }
   .pdf-upload-panel > * { grid-column: auto; }
   .pdf-toolbar { flex-wrap: wrap; }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   characterSchema,
   characterSheetSchema,
+  characterCreationDraftSchema,
   inventoryContainerSchema,
   inventoryItemSchema,
   pdfBookmarkSchema,
@@ -14,13 +15,14 @@ import {
 } from "../domain/models";
 import { db } from "./database";
 
-export const BACKUP_FORMAT_VERSION = 2;
-export const APP_VERSION = "0.9.0";
+export const BACKUP_FORMAT_VERSION = 3;
+export const APP_VERSION = "1.0.0";
 export type RestoreMode = "new" | "merge-skip" | "merge-replace";
 
 const backupPayloadSchema = z.object({
   characters: z.array(characterSchema),
   characterSheets: z.array(characterSheetSchema),
+  characterCreationDrafts: z.array(characterCreationDraftSchema),
   inventoryContainers: z.array(inventoryContainerSchema),
   inventoryItems: z.array(inventoryItemSchema),
   spellbooks: z.array(spellbookSchema),
@@ -46,10 +48,11 @@ const vaultBackupSchema = z.object({
   payload: backupPayloadSchema,
 });
 
-const legacyBackupPayloadSchema = backupPayloadSchema.omit({ spellbooks: true, spells: true });
+const versionOneBackupPayloadSchema = backupPayloadSchema.omit({ spellbooks: true, spells: true, characterCreationDrafts: true });
+const versionTwoBackupPayloadSchema = backupPayloadSchema.omit({ characterCreationDrafts: true });
 const backupEnvelopeSchema = z.object({
   format: z.literal("dnd-character-vault-backup"),
-  formatVersion: z.union([z.literal(1), z.literal(BACKUP_FORMAT_VERSION)]),
+  formatVersion: z.union([z.literal(1), z.literal(2), z.literal(BACKUP_FORMAT_VERSION)]),
   appVersion: z.string(),
   createdAt: z.string().datetime(),
   includesPdfs: z.boolean(),
@@ -89,6 +92,7 @@ export async function createVaultBackup(includePdfs: boolean): Promise<VaultBack
   const payload = backupPayloadSchema.parse({
     characters: await db.characters.toArray(),
     characterSheets: await db.characterSheets.toArray(),
+    characterCreationDrafts: await db.characterCreationDrafts.toArray(),
     inventoryContainers: await db.inventoryContainers.toArray(),
     inventoryItems: await db.inventoryItems.toArray(),
     spellbooks: await db.spellbooks.toArray(),
@@ -114,8 +118,10 @@ export async function validateVaultBackup(value: unknown) {
   const envelope = backupEnvelopeSchema.parse(value);
   if (envelope.checksum !== await checksumPayload(envelope.payload)) throw new Error("Backup checksum does not match");
   const payload = envelope.formatVersion === 1
-    ? backupPayloadSchema.parse({ ...legacyBackupPayloadSchema.parse(envelope.payload), spellbooks: [], spells: [] })
-    : backupPayloadSchema.parse(envelope.payload);
+    ? backupPayloadSchema.parse({ ...versionOneBackupPayloadSchema.parse(envelope.payload), spellbooks: [], spells: [], characterCreationDrafts: [] })
+    : envelope.formatVersion === 2
+      ? backupPayloadSchema.parse({ ...versionTwoBackupPayloadSchema.parse(envelope.payload), characterCreationDrafts: [] })
+      : backupPayloadSchema.parse(envelope.payload);
   const backup = vaultBackupSchema.parse({
     ...envelope,
     formatVersion: BACKUP_FORMAT_VERSION,
@@ -149,13 +155,14 @@ async function putByMode<T>(table: { get(key: string): Promise<unknown>; put(val
 export async function restoreVaultBackup(backup: VaultBackup, mode: RestoreMode) {
   const validated = await validateVaultBackup(backup);
   const replace = mode !== "merge-skip";
-  const tables = [db.characters, db.characterSheets, db.inventoryContainers, db.inventoryItems, db.spellbooks, db.spells, db.soulReaperProgressions, db.pdfDocuments, db.pdfFiles, db.pdfBookmarks, db.settings];
+  const tables = [db.characters, db.characterSheets, db.characterCreationDrafts, db.inventoryContainers, db.inventoryItems, db.spellbooks, db.spells, db.soulReaperProgressions, db.pdfDocuments, db.pdfFiles, db.pdfBookmarks, db.settings];
   await db.transaction("rw", tables, async () => {
     if (mode === "new") {
       await Promise.all(tables.map((table) => table.clear()));
     }
     await putByMode(db.characters, validated.payload.characters, (record) => record.id!, replace);
     await putByMode(db.characterSheets, validated.payload.characterSheets, (record) => record.characterId!, replace);
+    await putByMode(db.characterCreationDrafts, validated.payload.characterCreationDrafts, (record) => record.id!, replace);
     await putByMode(db.inventoryContainers, validated.payload.inventoryContainers, (record) => record.id!, replace);
     await putByMode(db.inventoryItems, validated.payload.inventoryItems, (record) => record.id!, replace);
     await putByMode(db.spellbooks, validated.payload.spellbooks, (record) => record.characterId!, replace);

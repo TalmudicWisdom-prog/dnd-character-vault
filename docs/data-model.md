@@ -13,6 +13,13 @@ The character record stores identity and organization details without implementi
 | `campaign` | string | Optional campaign name |
 | `ancestry` | string | Optional ancestry label |
 | `characterClass` | string | Optional class label |
+| `background` | string | Background or origin label |
+| `concept` | string | Short character concept |
+| `personalityNotes` | string | Roleplay personality details |
+| `backstory` | string | Long-form backstory |
+| `goals` | string | Character goals |
+| `importantRelationships` | string | Allies, rivals, family, patrons, and other bonds |
+| `roleplayNotes` | string | Voice, mannerisms, reminders, and table notes |
 | `level` | integer | Manually entered level from 1-20 |
 | `archivedAt` | ISO timestamp or `null` | Archive state |
 | `createdAt` | ISO timestamp | Record creation time |
@@ -41,14 +48,29 @@ Deleting a character removes only that character's spellbook and spells. Duplica
 
 Stored settings are validated with Zod. Invalid or missing settings are replaced with defaults.
 
+## Guided creation draft
+
+The guided creator stores one local `characterCreationDrafts` record with:
+
+- current wizard step
+- editable character profile draft
+- unsaved sheet draft
+- starting equipment draft
+
+Drafts may be incomplete. Final creation requires name, class, ancestry/species, and level. Creating the character writes the character record, character sheet, starting inventory, and starter spell entries, then removes the draft.
+
 ## Character sheet
 
 Each character has one independently stored sheet record containing:
 
 - Six ability scores
+- Proficiency bonus
 - Current, maximum, and temporary HP
-- Armor Class, initiative, and speed
+- Armor Class, initiative, speed, hit dice, death saves, attacks, weapons, and damage notes
 - Saving throw and skill proficiency flags
+- Armor, weapon, tool, and language proficiencies
+- Spellcasting ability, spell save DC, spell attack bonus, cantrips, prepared spells, spell slots, and spell notes
+- Class features, species traits, background feature, feats, and special abilities
 - Long-form character notes
 
 The record autosaves locally and can evolve independently from character identity.
@@ -91,4 +113,4 @@ This separation keeps large PDF blobs out of metadata queries and future structu
 
 ## Manual backup file
 
-Backups contain a format version, app version, creation timestamp, PDF inclusion flag, SHA-256 payload checksum, and arrays for every current IndexedDB table, including spellbooks and spells. Full backups additionally include PDF blobs encoded as base64. Backup files are never stored or transmitted automatically. Version 1 backups remain restorable and are upgraded with empty spellbook collections.
+Backups contain a format version, app version, creation timestamp, PDF inclusion flag, SHA-256 payload checksum, and arrays for every current IndexedDB table, including spellbooks, spells, and the saved character-creation draft. Full backups additionally include PDF blobs encoded as base64. Backup files are never stored or transmitted automatically. Older version 1 and version 2 backups remain restorable and are upgraded with empty newer collections.

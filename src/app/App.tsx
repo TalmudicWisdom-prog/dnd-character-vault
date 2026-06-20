@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { CharacterEditorPage } from "../features/characters/CharacterEditorPage";
+import { CreateCharacterWizardPage } from "../features/characters/CreateCharacterWizardPage";
 import { CharacterListPage } from "../features/characters/CharacterListPage";
 import { CharacterSheetPage } from "../features/characters/CharacterSheetPage";
 import { PdfLibraryPage } from "../features/pdfs/PdfLibraryPage";
@@ -58,7 +59,7 @@ export function App() {
   return (
     <AppShell currentPage={route.page === "character" || route.page === "sheet" || route.page === "spellbook" ? "characters" : route.page === "pdf" ? "library" : route.page === "import" ? "tools" : route.page}>
       {route.page === "characters" && <CharacterListPage />}
-      {route.page === "character" && <CharacterEditorPage characterId={route.characterId} />}
+      {route.page === "character" && (route.characterId === "new" ? <CreateCharacterWizardPage /> : <CharacterEditorPage characterId={route.characterId} />)}
       {route.page === "sheet" && <CharacterSheetPage characterId={route.characterId} />}
       {route.page === "spellbook" && <SpellbookPage characterId={route.characterId} />}
       {route.page === "library" && <PdfLibraryPage />}

@@ -5,8 +5,8 @@ An offline-first, local-only Progressive Web App foundation for keeping D&D char
 Implemented foundations, character management, and play tools include:
 
 - Responsive app shell for tablet and desktop
-- Character creation and editing with local autosave
-- Search, recent-character view, archive, duplicate, restore, and delete
+- Guided 10-step character creation with locally saved draft progress
+- Character editing with overview, roleplay, abilities, skills, combat, proficiencies, spells, features, notes, archive, duplicate, restore, and delete
 - Ability scores, saving throws, skill proficiencies, combat stats, and character notes
 - Touch-sized HP damage and healing controls
 - Character-scoped inventory, equipment, custom containers, and freeform item effects
