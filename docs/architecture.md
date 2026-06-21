@@ -69,7 +69,7 @@ Version 12 adds:
 
 - expanded character profile fields for concept, background/origin, backstory, goals, relationships, and roleplay notes
 - expanded `characterSheets` fields for proficiency bonus, hit dice, death saves, attacks, proficiencies, languages, spellcasting, spell slots, and features
-- `characterCreationDrafts`: one local in-progress guided creation draft
+- `characterCreationDrafts`: one local in-progress creation draft, including Guided or Manual mode
 
 Version 13 adds source labels to rules-like records:
 

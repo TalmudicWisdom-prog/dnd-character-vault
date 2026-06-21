@@ -48,11 +48,12 @@ Deleting a character removes only that character's spellbook and spells. Duplica
 
 Stored settings are validated with Zod. Invalid or missing settings are replaced with defaults.
 
-## Guided creation draft
+## Character creation draft
 
-The guided creator stores one local `characterCreationDrafts` record with:
+The character creator stores one local `characterCreationDrafts` record with:
 
 - current wizard step
+- creation mode, either Guided or Manual
 - editable character profile draft
 - unsaved sheet draft
 - starting equipment draft

@@ -4,6 +4,7 @@ import { clampCreationStep, creationSteps, nextCreationStep, previousCreationSte
 describe("create character wizard navigation", () => {
   it("uses the full guided creation flow", () => {
     expect(creationSteps).toEqual([
+      "Creation Mode",
       "Essentials",
       "Class",
       "Species / Ancestry",
@@ -24,7 +25,7 @@ describe("create character wizard navigation", () => {
     expect(nextCreationStep(0)).toBe(1);
     expect(previousCreationStep(1)).toBe(0);
     expect(previousCreationStep(0)).toBe(0);
-    expect(nextCreationStep(12)).toBe(12);
-    expect(clampCreationStep(99)).toBe(12);
+    expect(nextCreationStep(13)).toBe(13);
+    expect(clampCreationStep(99)).toBe(13);
   });
 });

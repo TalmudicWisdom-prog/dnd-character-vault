@@ -18,6 +18,7 @@ export function createEmptyCreationDraft(): CharacterCreationDraft {
   return characterCreationDraftSchema.parse({
     id: draftId,
     step: 0,
+    creationMode: "guided",
     character: {
       name: "",
       playerName: "",
@@ -59,11 +60,13 @@ export async function getOrCreateCreationDraft() {
 export async function saveCreationDraft(draft: CharacterCreationDraft) {
   const level = Math.max(1, Math.min(20, Math.round(Number(draft.character.level) || 1)));
   const calculatedProficiency = proficiencyBonusForLevel(level);
-  const proficiencyBonus = draft.sheet.proficiencyBonus === 2 && calculatedProficiency > 2
+  const creationMode = draft.creationMode ?? "guided";
+  const proficiencyBonus = creationMode === "guided"
     ? calculatedProficiency
     : draft.sheet.proficiencyBonus || calculatedProficiency;
   const normalized = characterCreationDraftSchema.parse({
     ...draft,
+    creationMode,
     character: {
       ...draft.character,
       level,

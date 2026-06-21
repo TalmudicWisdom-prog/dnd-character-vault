@@ -22,12 +22,25 @@ export type SrdClass = {
   name: string;
   primaryAbilities: AbilityId[];
   description: string;
+  complexity: "Low" | "Medium" | "High";
+  savingThrows: AbilityId[];
+  skillChoiceCount: number;
+  hitDie: number;
+  spellcastingAbility?: AbilityId;
   source: RulesSource;
 };
 
 export type SrdNamedOption = {
   name: string;
   description: string;
+  speed?: number;
+  size?: string;
+  traits?: string[];
+  languages?: string[];
+  skills?: SkillId[];
+  tools?: string[];
+  feat?: string;
+  abilitySuggestions?: AbilityId[];
   source: RulesSource;
 };
 
@@ -77,18 +90,18 @@ export const srdProficiencyBonusByLevel = Array.from({ length: 20 }, (_, index) 
 });
 
 export const srdClasses: SrdClass[] = [
-  { name: "Barbarian", primaryAbilities: ["str"], description: "A fierce warrior who relies on rage, toughness, and physical power.", source: srdRulesSource },
-  { name: "Bard", primaryAbilities: ["cha"], description: "A performer and spellcaster who inspires allies and solves problems with skill.", source: srdRulesSource },
-  { name: "Cleric", primaryAbilities: ["wis"], description: "A divine spellcaster shaped by faith, healing, protection, and sacred power.", source: srdRulesSource },
-  { name: "Druid", primaryAbilities: ["wis"], description: "A nature-focused spellcaster connected to beasts, terrain, and primal magic.", source: srdRulesSource },
-  { name: "Fighter", primaryAbilities: ["str", "dex"], description: "A flexible weapon expert built around martial training and reliable combat.", source: srdRulesSource },
-  { name: "Monk", primaryAbilities: ["dex", "wis"], description: "A disciplined martial artist who uses speed, focus, and precise strikes.", source: srdRulesSource },
-  { name: "Paladin", primaryAbilities: ["str", "cha"], description: "An oath-bound warrior with protective magic, healing, and powerful strikes.", source: srdRulesSource },
-  { name: "Ranger", primaryAbilities: ["dex", "wis"], description: "A skilled explorer, hunter, and warrior with nature-flavored magic.", source: srdRulesSource },
-  { name: "Rogue", primaryAbilities: ["dex"], description: "A precise expert who depends on skill, stealth, and well-placed attacks.", source: srdRulesSource },
-  { name: "Sorcerer", primaryAbilities: ["cha"], description: "A spellcaster whose magic comes from innate power.", source: srdRulesSource },
-  { name: "Warlock", primaryAbilities: ["cha"], description: "A pact-based spellcaster with unusual magic and customizable invocations.", source: srdRulesSource },
-  { name: "Wizard", primaryAbilities: ["int"], description: "A studied spellcaster who prepares magic from a spellbook.", source: srdRulesSource },
+  { name: "Barbarian", primaryAbilities: ["str"], complexity: "Low", savingThrows: ["str", "con"], skillChoiceCount: 2, hitDie: 12, description: "A fierce warrior who relies on rage, toughness, and physical power.", source: srdRulesSource },
+  { name: "Bard", primaryAbilities: ["cha"], complexity: "High", savingThrows: ["dex", "cha"], skillChoiceCount: 3, hitDie: 8, spellcastingAbility: "cha", description: "A performer and spellcaster who inspires allies and solves problems with skill.", source: srdRulesSource },
+  { name: "Cleric", primaryAbilities: ["wis"], complexity: "Medium", savingThrows: ["wis", "cha"], skillChoiceCount: 2, hitDie: 8, spellcastingAbility: "wis", description: "A divine spellcaster shaped by faith, healing, protection, and sacred power.", source: srdRulesSource },
+  { name: "Druid", primaryAbilities: ["wis"], complexity: "High", savingThrows: ["int", "wis"], skillChoiceCount: 2, hitDie: 8, spellcastingAbility: "wis", description: "A nature-focused spellcaster connected to beasts, terrain, and primal magic.", source: srdRulesSource },
+  { name: "Fighter", primaryAbilities: ["str", "dex"], complexity: "Low", savingThrows: ["str", "con"], skillChoiceCount: 2, hitDie: 10, description: "A flexible weapon expert built around martial training and reliable combat.", source: srdRulesSource },
+  { name: "Monk", primaryAbilities: ["dex", "wis"], complexity: "Medium", savingThrows: ["str", "dex"], skillChoiceCount: 2, hitDie: 8, description: "A disciplined martial artist who uses speed, focus, and precise strikes.", source: srdRulesSource },
+  { name: "Paladin", primaryAbilities: ["str", "cha"], complexity: "Medium", savingThrows: ["wis", "cha"], skillChoiceCount: 2, hitDie: 10, spellcastingAbility: "cha", description: "An oath-bound warrior with protective magic, healing, and powerful strikes.", source: srdRulesSource },
+  { name: "Ranger", primaryAbilities: ["dex", "wis"], complexity: "Medium", savingThrows: ["str", "dex"], skillChoiceCount: 3, hitDie: 10, spellcastingAbility: "wis", description: "A skilled explorer, hunter, and warrior with nature-flavored magic.", source: srdRulesSource },
+  { name: "Rogue", primaryAbilities: ["dex"], complexity: "Medium", savingThrows: ["dex", "int"], skillChoiceCount: 4, hitDie: 8, description: "A precise expert who depends on skill, stealth, and well-placed attacks.", source: srdRulesSource },
+  { name: "Sorcerer", primaryAbilities: ["cha"], complexity: "High", savingThrows: ["con", "cha"], skillChoiceCount: 2, hitDie: 6, spellcastingAbility: "cha", description: "A spellcaster whose magic comes from innate power.", source: srdRulesSource },
+  { name: "Warlock", primaryAbilities: ["cha"], complexity: "High", savingThrows: ["wis", "cha"], skillChoiceCount: 2, hitDie: 8, spellcastingAbility: "cha", description: "A pact-based spellcaster with unusual magic and customizable invocations.", source: srdRulesSource },
+  { name: "Wizard", primaryAbilities: ["int"], complexity: "High", savingThrows: ["int", "wis"], skillChoiceCount: 2, hitDie: 6, spellcastingAbility: "int", description: "A studied spellcaster who prepares magic from a spellbook.", source: srdRulesSource },
 ];
 
 export const srdSpecies: SrdNamedOption[] = [

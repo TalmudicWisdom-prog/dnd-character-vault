@@ -243,7 +243,10 @@ h1, h2, strong { color: var(--ink); }
 .choice-step, .ability-step { display: grid; gap: 16px; }
 .choice-explainer { padding: 18px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; }
 .choice-explainer h3 { margin: 0 0 8px; font-family: Georgia, serif; font-size: 1.25rem; font-weight: 500; }
+.creation-panel .full-width { grid-column: 1 / -1; }
 .creation-panel .inline-message.full-width { grid-column: 1 / -1; }
+.mode-pill { width: fit-content; justify-self: end; padding: 4px 8px; background: color-mix(in srgb, var(--good) 10%, transparent); border: 1px solid color-mix(in srgb, var(--good) 35%, var(--line)); border-radius: 999px; }
+.mode-pill.manual { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
 .ability-score-setup, .guided-methods, .assignment-panel { display: grid; gap: 16px; }
 .ability-method-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .guided-methods .ability-method-grid { grid-template-columns: repeat(3, 1fr); }
@@ -251,6 +254,7 @@ h1, h2, strong { color: var(--ink); }
 .method-card strong { font-family: Georgia, serif; font-size: 1.25rem; font-weight: 500; }
 .method-card span { color: var(--muted); line-height: 1.45; }
 .method-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); }
+.method-card:disabled { cursor: not-allowed; opacity: 0.58; }
 .ability-assignment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .score-button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
 .score-button-row button { min-height: 36px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; font-weight: 900; }

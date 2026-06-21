@@ -1,4 +1,5 @@
 export const creationSteps = [
+  "Creation Mode",
   "Essentials",
   "Class",
   "Species / Ancestry",

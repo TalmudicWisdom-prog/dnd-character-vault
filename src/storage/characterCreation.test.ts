@@ -57,7 +57,7 @@ describe("guided character creation", () => {
     const draft = await getOrCreateCreationDraft();
     await saveCreationDraft({
       ...draft,
-      step: 12,
+      step: 13,
       character: {
         ...draft.character,
         name: "Saved Draft",
@@ -69,9 +69,38 @@ describe("guided character creation", () => {
     const reloaded = await getOrCreateCreationDraft();
     const createdCharacters = await db.characters.toArray();
 
-    expect(reloaded.step).toBe(12);
+    expect(reloaded.step).toBe(13);
     expect(reloaded.character.name).toBe("Saved Draft");
     expect(createdCharacters).toEqual([]);
+  });
+
+  it("preserves creation mode changes without losing draft data", async () => {
+    const draft = await getOrCreateCreationDraft();
+    const manual = await saveCreationDraft({
+      ...draft,
+      creationMode: "manual",
+      character: {
+        ...draft.character,
+        name: "Mode Keeper",
+        characterClass: "Soul Reaper",
+        ancestry: "Human",
+        level: 9,
+      },
+      sheet: {
+        ...draft.sheet,
+        proficiencyBonus: 5,
+        abilityScores: { ...draft.sheet.abilityScores, wis: 16 },
+      },
+    });
+    const guided = await saveCreationDraft({ ...manual, creationMode: "guided" });
+
+    expect(manual.creationMode).toBe("manual");
+    expect(manual.character.name).toBe("Mode Keeper");
+    expect(manual.sheet.proficiencyBonus).toBe(5);
+    expect(guided.creationMode).toBe("guided");
+    expect(guided.character.name).toBe("Mode Keeper");
+    expect(guided.sheet.abilityScores.wis).toBe(16);
+    expect(guided.sheet.proficiencyBonus).toBe(4);
   });
 
   it("persists ability score setup choices in the local draft", async () => {

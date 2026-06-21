@@ -134,6 +134,9 @@ export const abilityScoreSetupSchema = z.object({
 }).default({});
 export type AbilityScoreSetup = z.infer<typeof abilityScoreSetupSchema>;
 
+export const creationModeSchema = z.enum(["guided", "manual"]);
+export type CreationMode = z.infer<typeof creationModeSchema>;
+
 const characterCreationCharacterSchema = characterDraftSchema.extend({
   name: z.string().max(100),
   characterClass: z.string().max(100),
@@ -142,7 +145,8 @@ const characterCreationCharacterSchema = characterDraftSchema.extend({
 
 export const characterCreationDraftSchema = z.object({
   id: z.literal("new-character"),
-  step: z.number().int().min(0).max(12),
+  step: z.number().int().min(0).max(13),
+  creationMode: creationModeSchema.default("guided"),
   character: characterCreationCharacterSchema,
   sheet: characterSheetSchema.omit({ characterId: true, updatedAt: true }),
   abilityScoreSetup: abilityScoreSetupSchema,
