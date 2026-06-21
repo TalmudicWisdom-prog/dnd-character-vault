@@ -5,7 +5,7 @@ An offline-first, local-only Progressive Web App foundation for keeping D&D char
 Implemented foundations, character management, and play tools include:
 
 - Responsive app shell for tablet and desktop
-- Guided 12-step character creation with locally saved draft progress
+- Guided 13-step character creation with locally saved draft progress
 - Commercial-safe SRD 5.2.1 helper foundation with attribution and source labels
 - Manual level-up preview that flags fields usually changed during level up
 - Character editing with overview, roleplay, abilities, skills, combat, proficiencies, spells, features, notes, archive, duplicate, restore, and delete

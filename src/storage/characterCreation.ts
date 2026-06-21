@@ -35,6 +35,13 @@ export function createEmptyCreationDraft(): CharacterCreationDraft {
       roleplayNotes: "",
     },
     sheet: createCharacterSheetDraft(1),
+    abilityScoreSetup: {
+      mode: "guided",
+      guidedMethod: "standardArray",
+      standardArrayAssignments: {},
+      rolledScores: [],
+      rolledAssignments: {},
+    },
     equipment: [],
     updatedAt: timestamp,
   });
@@ -65,6 +72,7 @@ export async function saveCreationDraft(draft: CharacterCreationDraft) {
       ...draft.sheet,
       proficiencyBonus,
     },
+    abilityScoreSetup: draft.abilityScoreSetup ?? {},
     updatedAt: now(),
   });
   await db.characterCreationDrafts.put(normalized);

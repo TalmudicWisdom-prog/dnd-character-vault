@@ -122,6 +122,17 @@ export const creationEquipmentItemSchema = z.object({
 });
 export type CreationEquipmentItem = z.infer<typeof creationEquipmentItemSchema>;
 
+const abilityScoreAssignmentSchema = z.record(abilityIdSchema, z.number().int().min(3).max(30).nullable());
+
+export const abilityScoreSetupSchema = z.object({
+  mode: z.enum(["guided", "manual"]).default("guided"),
+  guidedMethod: z.enum(["standardArray", "pointBuy", "rollDice"]).default("standardArray"),
+  standardArrayAssignments: abilityScoreAssignmentSchema.default({}),
+  rolledScores: z.array(z.number().int().min(3).max(18)).default([]),
+  rolledAssignments: abilityScoreAssignmentSchema.default({}),
+}).default({});
+export type AbilityScoreSetup = z.infer<typeof abilityScoreSetupSchema>;
+
 const characterCreationCharacterSchema = characterDraftSchema.extend({
   name: z.string().max(100),
   characterClass: z.string().max(100),
@@ -130,9 +141,10 @@ const characterCreationCharacterSchema = characterDraftSchema.extend({
 
 export const characterCreationDraftSchema = z.object({
   id: z.literal("new-character"),
-  step: z.number().int().min(0).max(11),
+  step: z.number().int().min(0).max(12),
   character: characterCreationCharacterSchema,
   sheet: characterSheetSchema.omit({ characterId: true, updatedAt: true }),
+  abilityScoreSetup: abilityScoreSetupSchema,
   equipment: z.array(creationEquipmentItemSchema),
   updatedAt: z.string().datetime(),
 });

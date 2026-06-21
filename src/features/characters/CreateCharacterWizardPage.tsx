@@ -11,6 +11,14 @@ import {
   saveCreationDraft,
 } from "../../storage/characterCreation";
 import { srdAbilities, srdBackgrounds, srdClass, srdClasses, srdSkill, srdSkills, srdSpecies } from "../../rules/srd";
+import {
+  clampPointBuyScore,
+  isLegalPointBuy,
+  pointBuyRemaining,
+  rollSixAbilityScores,
+  scoreIsAvailable,
+  standardArrayScores,
+} from "./abilityScoreSetup";
 import { clampCreationStep, creationSteps, nextCreationStep, previousCreationStep } from "./createCharacterWizard";
 
 const abilityLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.label])) as Record<AbilityId, string>;
@@ -24,6 +32,10 @@ function LevelUpHint() {
 
 function lines(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+function fullAbilityScores(scores: Partial<Record<AbilityId, number>>, fallback = 10): Record<AbilityId, number> {
+  return Object.fromEntries(abilityIds.map((ability) => [ability, scores[ability] ?? fallback])) as Record<AbilityId, number>;
 }
 
 export function CreateCharacterWizardPage() {
@@ -74,6 +86,56 @@ export function CreateCharacterWizardPage() {
 
   const updateSheet = <Key extends keyof CharacterCreationDraft["sheet"]>(key: Key, value: CharacterCreationDraft["sheet"][Key]) =>
     update((current) => ({ ...current, sheet: { ...current.sheet, [key]: value } }));
+
+  const setAbilitySetupMode = (mode: "guided" | "manual") =>
+    update((current) => ({ ...current, abilityScoreSetup: { ...current.abilityScoreSetup, mode } }));
+
+  const setGuidedAbilityMethod = (guidedMethod: "standardArray" | "pointBuy" | "rollDice") =>
+    update((current) => ({
+      ...current,
+      abilityScoreSetup: { ...current.abilityScoreSetup, mode: "guided", guidedMethod },
+      sheet: guidedMethod === "pointBuy" ? { ...current.sheet, abilityScores: fullAbilityScores({}, 8) } : current.sheet,
+    }));
+
+  const assignStandardArrayScore = (ability: AbilityId, scoreText: string) =>
+    update((current) => {
+      const score = scoreText ? Number(scoreText) : null;
+      const standardArrayAssignments = { ...current.abilityScoreSetup.standardArrayAssignments, [ability]: score };
+      return {
+        ...current,
+        abilityScoreSetup: { ...current.abilityScoreSetup, standardArrayAssignments },
+        sheet: score == null ? current.sheet : { ...current.sheet, abilityScores: { ...current.sheet.abilityScores, [ability]: score } },
+      };
+    });
+
+  const assignRolledScore = (ability: AbilityId, scoreText: string) =>
+    update((current) => {
+      const score = scoreText ? Number(scoreText) : null;
+      const rolledAssignments = { ...current.abilityScoreSetup.rolledAssignments, [ability]: score };
+      return {
+        ...current,
+        abilityScoreSetup: { ...current.abilityScoreSetup, rolledAssignments },
+        sheet: score == null ? current.sheet : { ...current.sheet, abilityScores: { ...current.sheet.abilityScores, [ability]: score } },
+      };
+    });
+
+  const rollAbilityScores = () =>
+    update((current) => ({
+      ...current,
+      abilityScoreSetup: { ...current.abilityScoreSetup, mode: "guided", guidedMethod: "rollDice", rolledScores: rollSixAbilityScores(), rolledAssignments: {} },
+    }));
+
+  const setPointBuyScore = (ability: AbilityId, requestedScore: number) =>
+    update((current) => {
+      const score = clampPointBuyScore(requestedScore);
+      const nextScores = { ...fullAbilityScores(current.sheet.abilityScores, 8), [ability]: score };
+      if (!isLegalPointBuy(nextScores)) return current;
+      return {
+        ...current,
+        abilityScoreSetup: { ...current.abilityScoreSetup, mode: "guided", guidedMethod: "pointBuy" },
+        sheet: { ...current.sheet, abilityScores: nextScores },
+      };
+    });
 
   const setStep = (step: number) => update((current) => ({ ...current, step: clampCreationStep(step) }));
 
@@ -139,6 +201,7 @@ export function CreateCharacterWizardPage() {
   const step = clampCreationStep(draft.step);
   const sheet = draft.sheet;
   const character = draft.character;
+  const abilitySetup = draft.abilityScoreSetup;
   const allAbilitiesAreDefault = abilityIds.every((ability) => (sheet.abilityScores[ability] ?? 10) === 10);
   const selectedClass = srdClass(character.characterClass);
   const selectedSpecies = srdSpecies.find((species) => species.name === character.ancestry);
@@ -146,8 +209,11 @@ export function CreateCharacterWizardPage() {
   const classDescription = selectedClass?.description ?? (character.characterClass ? "Custom class. You can enter or edit the details yourself." : "Pick an SRD class, or type a custom/homebrew class.");
   const speciesDescription = selectedSpecies?.description ?? (character.ancestry ? "Custom ancestry/species. You can keep the name here and fill in traits later." : "Pick an SRD species/ancestry, or type a custom/homebrew one.");
   const backgroundDescription = selectedBackground?.description ?? (character.background ? `${character.background} is saved as this character's origin. You can add the feature and story details later.` : "Choose an SRD background/origin, or type your own.");
-  const skipLabel = step === 5 ? "Skip for now: keep default 10s" : "Skip for now";
+  const skipLabel = step === 6 ? "Skip for now: keep default 10s" : "Skip for now";
   const currentProficiencyBonus = proficiencyBonusForLevel(character.level ?? 1);
+  const pointBuyScores = fullAbilityScores(sheet.abilityScores, 8);
+  const pointBuyPointsLeft = pointBuyRemaining(pointBuyScores);
+  const recommendedAbilities = selectedClass?.primaryAbilities ?? [];
 
   return (
     <section className="page create-character-page">
@@ -218,18 +284,92 @@ export function CreateCharacterWizardPage() {
             <label className="form-field"><span>Roleplay notes</span><textarea onChange={(event) => updateCharacter("roleplayNotes", event.target.value)} rows={5} value={character.roleplayNotes ?? ""} /></label>
           </div>}
 
-          {step === 5 && <div className="ability-step">
+          {step === 5 && <div className="ability-score-setup">
+            <section className="choice-explainer">
+              <h3>What are ability scores?</h3>
+              <p>Ability scores are the six core numbers that describe what your character is naturally good at: Strength, Dexterity, Constitution, Intelligence, Wisdom, and Charisma.</p>
+              <p>They matter because they create modifiers like +2 or -1, and those modifiers affect attacks, skills, saving throws, spellcasting, and many table rulings.</p>
+              {selectedClass && <p><strong>{selectedClass.name} recommendation:</strong> Primary Ability: {recommendedAbilities.map((ability) => abilityLabels[ability]).join(" or ")}.</p>}
+            </section>
+
+            <div className="ability-method-grid">
+              <button className={abilitySetup.mode === "guided" ? "method-card active" : "method-card"} onClick={() => setAbilitySetupMode("guided")} type="button">
+                <strong>Guided</strong>
+                <span>Recommended for new players. Choose Standard Array, Point Buy, or Roll Dice.</span>
+              </button>
+              <button className={abilitySetup.mode === "manual" ? "method-card active" : "method-card"} onClick={() => setAbilitySetupMode("manual")} type="button">
+                <strong>Manual Entry</strong>
+                <span>Fastest for experienced users. Type any table-approved values directly.</span>
+              </button>
+            </div>
+
+            {abilitySetup.mode === "guided" && <div className="guided-methods">
+              <h3>Choose a guided method</h3>
+              <div className="ability-method-grid">
+                <button className={abilitySetup.guidedMethod === "standardArray" ? "method-card active" : "method-card"} onClick={() => setGuidedAbilityMethod("standardArray")} type="button">
+                  <strong>Standard Array</strong>
+                  <span>Use the fixed legal set: 15, 14, 13, 12, 10, 8. Assign each number once.</span>
+                </button>
+                <button className={abilitySetup.guidedMethod === "pointBuy" ? "method-card active" : "method-card"} onClick={() => setGuidedAbilityMethod("pointBuy")} type="button">
+                  <strong>Point Buy</strong>
+                  <span>Start at 8 in every ability, then spend 27 points. Scores stay between 8 and 15.</span>
+                </button>
+                <button className={abilitySetup.guidedMethod === "rollDice" ? "method-card active" : "method-card"} onClick={() => setGuidedAbilityMethod("rollDice")} type="button">
+                  <strong>Roll Dice</strong>
+                  <span>Roll 4d6, drop the lowest die, repeat six times, then assign the results.</span>
+                </button>
+              </div>
+              <p className="inline-message">Your DM may prefer one method. When in doubt, ask them. This vault keeps everything editable.</p>
+            </div>}
+          </div>}
+
+          {step === 6 && <div className="ability-step">
             <p className="inline-message">Ability scores start as <strong>Default placeholder: 10</strong>. Change them manually now, or skip and keep those placeholders until you edit the sheet later.</p>
-            <div className="ability-grid creation-ability-grid">
+            {selectedClass && <p className="inline-message">{selectedClass.name} usually wants <strong>{recommendedAbilities.map((ability) => abilityLabels[ability]).join(" or ")}</strong> to be strong.</p>}
+
+            {abilitySetup.mode === "guided" && abilitySetup.guidedMethod === "standardArray" && <div className="assignment-panel">
+              <div className="form-section-heading"><div><span className="card-label">Standard Array</span><h3>Assign 15, 14, 13, 12, 10, 8</h3><p>Each number can be used once. Pick where each score goes.</p></div></div>
+              <div className="ability-assignment-grid">
+                {abilityIds.map((ability) => {
+                  const assigned = abilitySetup.standardArrayAssignments[ability] ?? null;
+                  const score = sheet.abilityScores[ability] ?? assigned ?? 10;
+                  return <label className="form-field" key={ability}><span>{abilityLabels[ability]} {recommendedAbilities.includes(ability) && <small>Class pick</small>}</span><select onChange={(event) => assignStandardArrayScore(ability, event.target.value)} value={assigned ?? ""}><option value="">Choose score</option>{standardArrayScores.map((value, index) => <option disabled={!scoreIsAvailable(value, standardArrayScores, abilitySetup.standardArrayAssignments, ability)} key={`${value}-${index}`} value={value}>{value}</option>)}</select><small>Modifier {formatModifier(abilityModifier(score))}</small></label>;
+                })}
+              </div>
+            </div>}
+
+            {abilitySetup.mode === "guided" && abilitySetup.guidedMethod === "pointBuy" && <div className="assignment-panel">
+              <div className="form-section-heading"><div><span className="card-label">Point Buy</span><h3>{pointBuyPointsLeft} points remaining</h3><p>Scores must stay between 8 and 15. The app prevents spending more than 27 points.</p></div></div>
+              <div className="ability-grid creation-ability-grid">
+                {abilityIds.map((ability) => {
+                  const score = pointBuyScores[ability];
+                  const canIncrease = isLegalPointBuy({ ...pointBuyScores, [ability]: Math.min(15, score + 1) }) && score < 15;
+                  return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]} {recommendedAbilities.includes(ability) && <small>Class pick</small>}</span><strong>{formatModifier(abilityModifier(score))}</strong><input max={15} min={8} onChange={(event) => setPointBuyScore(ability, Number(event.target.value))} type="number" value={score} /><div className="score-button-row"><button disabled={score <= 8} onClick={() => setPointBuyScore(ability, score - 1)} type="button">-</button><button disabled={!canIncrease} onClick={() => setPointBuyScore(ability, score + 1)} type="button">+</button></div><LevelUpHint /></label>;
+                })}
+              </div>
+            </div>}
+
+            {abilitySetup.mode === "guided" && abilitySetup.guidedMethod === "rollDice" && <div className="assignment-panel">
+              <div className="form-section-heading"><div><span className="card-label">Roll Dice</span><h3>4d6, drop the lowest</h3><p>Roll six scores, then assign each generated number once.</p></div><button className="secondary-button" onClick={rollAbilityScores} type="button">{abilitySetup.rolledScores.length ? "Roll again" : "Roll scores"}</button></div>
+              {abilitySetup.rolledScores.length ? <><div className="review-pill-row">{abilitySetup.rolledScores.map((score, index) => <span key={`${score}-${index}`}>{score}</span>)}</div><div className="ability-assignment-grid">
+                {abilityIds.map((ability) => {
+                  const assigned = abilitySetup.rolledAssignments[ability] ?? null;
+                  const score = sheet.abilityScores[ability] ?? assigned ?? 10;
+                  return <label className="form-field" key={ability}><span>{abilityLabels[ability]} {recommendedAbilities.includes(ability) && <small>Class pick</small>}</span><select onChange={(event) => assignRolledScore(ability, event.target.value)} value={assigned ?? ""}><option value="">Choose roll</option>{abilitySetup.rolledScores.map((value, index) => <option disabled={!scoreIsAvailable(value, abilitySetup.rolledScores, abilitySetup.rolledAssignments, ability)} key={`${value}-${index}`} value={value}>{value}</option>)}</select><small>Modifier {formatModifier(abilityModifier(score))}</small></label>;
+                })}
+              </div></> : <div className="spell-empty compact-empty"><strong>No rolls yet</strong><span>Tap Roll scores to generate six offline rolls on this device.</span></div>}
+            </div>}
+
+            {abilitySetup.mode === "manual" && <div className="ability-grid creation-ability-grid">
               {abilityIds.map((ability) => {
                 const score = sheet.abilityScores[ability] ?? 10;
                 const abilityInfo = srdAbilities.find((item) => item.id === ability);
                 return <label className="ability-card level-up-field" key={ability}><span>{abilityLabels[ability]} {abilityInfo && <SourceBadge source={abilityInfo.source} />}</span><strong>{formatModifier(abilityModifier(score))}</strong><input min={1} max={30} onChange={(event) => updateSheet("abilityScores", { ...sheet.abilityScores, [ability]: Number(event.target.value) })} type="number" value={score} />{abilityInfo && <small>{abilityInfo.description}</small>}{score === 10 && <small>Default placeholder: 10</small>}<LevelUpHint /></label>;
               })}
-            </div>
+            </div>}
           </div>}
 
-          {step === 6 && <div className="proficiency-grid creation-proficiency-grid">
+          {step === 7 && <div className="proficiency-grid creation-proficiency-grid">
             <article>
               <h3>Proficiency bonus <span className="level-up-hint">Usually changed during level up.</span></h3>
               <label className="big-stat"><span>Bonus</span><input min={2} max={6} onChange={(event) => updateSheet("proficiencyBonus", Number(event.target.value))} type="number" value={sheet.proficiencyBonus} /></label>
@@ -245,7 +385,7 @@ export function CreateCharacterWizardPage() {
             </article>
           </div>}
 
-          {step === 7 && <div className="form-grid">
+          {step === 8 && <div className="form-grid">
             <label className="form-field"><span>Armor Class</span><input min={0} onChange={(event) => updateSheet("armorClass", Number(event.target.value))} type="number" value={sheet.armorClass} /></label>
             <label className="form-field"><span>Initiative</span><input onChange={(event) => updateSheet("initiative", Number(event.target.value))} type="number" value={sheet.initiative} /></label>
             <label className="form-field"><span>Speed</span><input min={0} onChange={(event) => updateSheet("speed", Number(event.target.value))} type="number" value={sheet.speed} /></label>
@@ -259,7 +399,7 @@ export function CreateCharacterWizardPage() {
             <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => updateSheet("damageNotes", event.target.value)} rows={4} value={sheet.damageNotes} /></label>
           </div>}
 
-          {step === 8 && <div className="creation-equipment-list">
+          {step === 9 && <div className="creation-equipment-list">
             <p className="inline-message">Optional starter equipment. You can skip this and use the full inventory tools after creation.</p>
             <button className="secondary-button" onClick={addEquipment} type="button">Add equipment item</button>
             {draft.equipment.map((item) => <article className="creation-equipment-row" key={item.id}>
@@ -271,7 +411,7 @@ export function CreateCharacterWizardPage() {
             </article>)}
           </div>}
 
-          {step === 9 && <div className="form-grid">
+          {step === 10 && <div className="form-grid">
             <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => updateSheet("spellcastingAbility", event.target.value ? event.target.value as AbilityId : null)} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
             <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => updateSheet("spellSaveDc", Number(event.target.value))} type="number" value={sheet.spellSaveDc} /></label>
             <label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => updateSheet("spellAttackBonus", Number(event.target.value))} type="number" value={sheet.spellAttackBonus} /></label>
@@ -281,7 +421,7 @@ export function CreateCharacterWizardPage() {
             <label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => updateSheet("spellNotes", event.target.value)} rows={5} value={sheet.spellNotes} /></label>
           </div>}
 
-          {step === 10 && <div className="form-grid">
+          {step === 11 && <div className="form-grid">
             <label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => updateSheet("classFeatures", event.target.value)} rows={7} value={sheet.classFeatures} /></label>
             <label className="form-field"><span>Species traits</span><textarea onChange={(event) => updateSheet("speciesTraits", event.target.value)} rows={7} value={sheet.speciesTraits} /></label>
             <label className="form-field"><span>Background feature</span><textarea onChange={(event) => updateSheet("backgroundFeature", event.target.value)} rows={5} value={sheet.backgroundFeature} /></label>
@@ -293,7 +433,7 @@ export function CreateCharacterWizardPage() {
             <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => updateSheet("specialAbilities", event.target.value)} rows={6} value={sheet.specialAbilities} /></label>
           </div>}
 
-          {step === 11 && <div className="review-stack">
+          {step === 12 && <div className="review-stack">
             <section><h3>Required details</h3><p><strong>{character.name || "Unnamed"}</strong> · Level {character.level} {character.characterClass || "Class missing"} · {character.ancestry || "Ancestry missing"}</p>{!canCreate && <p className="inline-message">Name, class, species/ancestry, and level are required before creating.</p>}</section>
             <section><h3>Origin and concept</h3><p>{character.background || "No background"} · {character.concept || "No concept yet"}</p><p>{character.backstory || "No backstory yet."}</p></section>
             <section><h3>Abilities</h3>{allAbilitiesAreDefault && <p className="inline-message">All ability scores are still using <strong>Default placeholder: 10</strong>.</p>}<div className="review-pill-row">{abilityIds.map((ability) => <span key={ability}>{abilityLabels[ability].slice(0, 3)} {sheet.abilityScores[ability]} ({formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))})</span>)}</div></section>

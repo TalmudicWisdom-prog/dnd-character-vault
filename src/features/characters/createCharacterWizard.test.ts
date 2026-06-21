@@ -9,6 +9,7 @@ describe("create character wizard navigation", () => {
       "Species / Ancestry",
       "Background / Origin",
       "Character Concept",
+      "Ability Score Setup",
       "Ability Scores",
       "Skills and Saves",
       "Combat",
@@ -23,7 +24,7 @@ describe("create character wizard navigation", () => {
     expect(nextCreationStep(0)).toBe(1);
     expect(previousCreationStep(1)).toBe(0);
     expect(previousCreationStep(0)).toBe(0);
-    expect(nextCreationStep(11)).toBe(11);
-    expect(clampCreationStep(99)).toBe(11);
+    expect(nextCreationStep(12)).toBe(12);
+    expect(clampCreationStep(99)).toBe(12);
   });
 });

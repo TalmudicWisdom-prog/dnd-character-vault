@@ -57,7 +57,7 @@ describe("guided character creation", () => {
     const draft = await getOrCreateCreationDraft();
     await saveCreationDraft({
       ...draft,
-      step: 11,
+      step: 12,
       character: {
         ...draft.character,
         name: "Saved Draft",
@@ -69,9 +69,27 @@ describe("guided character creation", () => {
     const reloaded = await getOrCreateCreationDraft();
     const createdCharacters = await db.characters.toArray();
 
-    expect(reloaded.step).toBe(11);
+    expect(reloaded.step).toBe(12);
     expect(reloaded.character.name).toBe("Saved Draft");
     expect(createdCharacters).toEqual([]);
+  });
+
+  it("persists ability score setup choices in the local draft", async () => {
+    const draft = await getOrCreateCreationDraft();
+    await saveCreationDraft({
+      ...draft,
+      abilityScoreSetup: {
+        mode: "guided",
+        guidedMethod: "standardArray",
+        standardArrayAssignments: { str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8 },
+        rolledScores: [],
+        rolledAssignments: {},
+      },
+    });
+
+    const reloaded = await getOrCreateCreationDraft();
+    expect(reloaded.abilityScoreSetup.guidedMethod).toBe("standardArray");
+    expect(reloaded.abilityScoreSetup.standardArrayAssignments.str).toBe(15);
   });
 
   it("applies defaults for older minimal character drafts", async () => {

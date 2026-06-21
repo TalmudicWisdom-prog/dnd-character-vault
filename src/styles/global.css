@@ -244,6 +244,16 @@ h1, h2, strong { color: var(--ink); }
 .choice-explainer { padding: 18px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; }
 .choice-explainer h3 { margin: 0 0 8px; font-family: Georgia, serif; font-size: 1.25rem; font-weight: 500; }
 .creation-panel .inline-message.full-width { grid-column: 1 / -1; }
+.ability-score-setup, .guided-methods, .assignment-panel { display: grid; gap: 16px; }
+.ability-method-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.guided-methods .ability-method-grid { grid-template-columns: repeat(3, 1fr); }
+.method-card { min-height: 118px; display: grid; gap: 8px; align-content: start; padding: 16px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; text-align: left; }
+.method-card strong { font-family: Georgia, serif; font-size: 1.25rem; font-weight: 500; }
+.method-card span { color: var(--muted); line-height: 1.45; }
+.method-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); }
+.ability-assignment-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.score-button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+.score-button-row button { min-height: 36px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; font-weight: 900; }
 .skill-helper-row span small { display: block; margin-top: 2px; color: var(--muted); font-weight: 500; line-height: 1.35; }
 .creation-ability-grid .ability-card { min-height: 160px; }
 .creation-proficiency-grid h3 { margin: 0 0 10px; font-family: Georgia, serif; font-weight: 500; }
@@ -573,7 +583,7 @@ h1, h2, strong { color: var(--ink); }
   .hp-values { grid-template-columns: 1fr auto 1fr; }
   .temp-hp { grid-column: 1 / -1; }
   .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar, .level-up-grid { grid-template-columns: 1fr; }
-  .creation-steps, .slot-grid, .creation-equipment-row { grid-template-columns: 1fr; }
+  .creation-steps, .slot-grid, .creation-equipment-row, .ability-method-grid, .guided-methods .ability-method-grid, .ability-assignment-grid { grid-template-columns: 1fr; }
   .creation-nav, .creation-nav-actions, .creation-status-actions { display: grid; justify-items: stretch; }
   .creation-equipment-row .full-width { grid-column: auto; }
   .ability-grid { grid-template-columns: repeat(2, 1fr); }

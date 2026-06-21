@@ -4,6 +4,7 @@ export const creationSteps = [
   "Species / Ancestry",
   "Background / Origin",
   "Character Concept",
+  "Ability Score Setup",
   "Ability Scores",
   "Skills and Saves",
   "Combat",
