@@ -133,6 +133,7 @@ describe("guided character creation", () => {
       cantrips: "",
       preparedSpells: "",
       spellSlots: {},
+      spellSlotsUsed: {},
       spellNotes: "",
       classFeatures: "",
       speciesTraits: "",

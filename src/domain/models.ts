@@ -102,6 +102,7 @@ export const characterSheetSchema = z.object({
   cantrips: z.string().max(20000).default(""),
   preparedSpells: z.string().max(30000).default(""),
   spellSlots: z.record(z.string(), z.number().int().min(0)).default({}),
+  spellSlotsUsed: z.record(z.string(), z.number().int().min(0)).default({}),
   spellNotes: z.string().max(30000).default(""),
   classFeatures: z.string().max(30000).default(""),
   speciesTraits: z.string().max(30000).default(""),

@@ -271,6 +271,24 @@ h1, h2, strong { color: var(--ink); }
 .review-pill-row span { padding: 6px 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
 
 .sheet-status { display: flex; align-items: center; gap: 9px; width: fit-content; margin: -24px 0 24px auto; color: var(--muted); font-size: 0.78rem; font-weight: 750; }
+.dice-tools-panel { margin-bottom: 16px; }
+.dice-roller { display: grid; gap: 12px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; }
+.compact-dice-roller { padding: 12px; box-shadow: none; }
+.dice-roller-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dice-roller-heading strong, .dice-roller-heading small { display: block; }
+.dice-roller-heading small { margin-top: 3px; color: var(--muted); font-size: 0.78rem; }
+.dice-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.dice-controls input { min-height: 44px; padding: 9px 11px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 9px; }
+.dice-quick-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.dice-result { display: grid; gap: 4px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.dice-result strong { font-family: Georgia, serif; font-size: 2rem; font-weight: 500; }
+.dice-result span, .dice-history li { color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+.dice-history summary { color: var(--accent); cursor: pointer; font-weight: 850; }
+.dice-history ol { margin: 8px 0 0; padding-left: 20px; }
+.spell-slot-tracker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.slot-tracker-card { display: grid; gap: 6px; padding: 12px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
+.slot-tracker-card strong { font-family: Georgia, serif; font-size: 1.05rem; font-weight: 500; }
+.slot-tracker-card span { color: var(--muted); font-size: 0.78rem; font-weight: 750; }
 .level-up-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .level-up-grid div { display: grid; gap: 4px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
 .level-up-grid small { color: var(--muted); font-size: 0.7rem; font-weight: 850; text-transform: uppercase; }
@@ -582,7 +600,7 @@ h1, h2, strong { color: var(--ink); }
   .sheet-status { margin: -15px 0 20px; }
   .hp-values { grid-template-columns: 1fr auto 1fr; }
   .temp-hp { grid-column: 1 / -1; }
-  .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar, .level-up-grid { grid-template-columns: 1fr; }
+  .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar, .level-up-grid, .dice-controls, .spell-slot-tracker { grid-template-columns: 1fr; }
   .creation-steps, .slot-grid, .creation-equipment-row, .ability-method-grid, .guided-methods .ability-method-grid, .ability-assignment-grid { grid-template-columns: 1fr; }
   .creation-nav, .creation-nav-actions, .creation-status-actions { display: grid; justify-items: stretch; }
   .creation-equipment-row .full-width { grid-column: auto; }

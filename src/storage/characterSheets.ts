@@ -39,6 +39,7 @@ export function createEmptyCharacterSheet(characterId: string): CharacterSheet {
     cantrips: "",
     preparedSpells: "",
     spellSlots: {},
+    spellSlotsUsed: {},
     spellNotes: "",
     classFeatures: "",
     speciesTraits: "",

@@ -8,6 +8,7 @@ Implemented foundations, character management, and play tools include:
 - Guided 13-step character creation with locally saved draft progress
 - Commercial-safe SRD 5.2.1 helper foundation with attribution and source labels
 - Manual level-up preview that flags fields usually changed during level up
+- Contextual dice roller foundation with local roll history and manual spell slot tracking
 - Character editing with overview, roleplay, abilities, skills, combat, proficiencies, spells, features, notes, archive, duplicate, restore, and delete
 - Ability scores, saving throws, skill proficiencies, combat stats, and character notes
 - Touch-sized HP damage and healing controls

@@ -78,6 +78,12 @@ Version 13 adds source labels to rules-like records:
 
 Existing records are migrated to safe defaults without changing character math or user-entered text.
 
+Version 14 adds manual spell slot usage tracking:
+
+- `characterSheets.spellSlotsUsed`: per-level used-slot counts, stored separately from maximum slots
+
+Long Rest reset is user-confirmed and manual. No spell slot is spent automatically by casting or rolling a spell.
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
 Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
@@ -93,6 +99,8 @@ Uploaded PDFs remain reference documents. The app does not automatically apply P
 `src/rules/srd.ts` contains a small offline SRD 5.2.1 helper layer for abilities, skills, core d20 terms, proficiency bonus by level, class/species/background lists, and spell metadata categories. It is not a complete rules automation engine.
 
 The Create Character Wizard uses this helper data for beginner explanations, primary ability hints, skill descriptions, and proficiency bonus display. Manual override remains available for all character fields.
+
+`src/dice/dice.ts` contains a local dice roller foundation for common dice and simple formulas such as `2d6+3`. Dice results are UI-local history, not synced or sent anywhere. The same utility powers 4d6-drop-lowest ability score generation.
 
 The About / Legal page includes SRD 5.2.1 Creative Commons attribution, states that SRD content belongs to Wizards of the Coast LLC and is licensed under CC BY 4.0, and makes clear that the app is not endorsed by Wizards of the Coast LLC.
 

@@ -1,4 +1,5 @@
 import type { AbilityId } from "../../domain/models";
+import { roll4d6DropLowest as rollAbilityDice, rollSixAbilityScores as rollSixAbilityDiceScores } from "../../dice/dice";
 
 export const standardArrayScores = [15, 14, 13, 12, 10, 8] as const;
 export const pointBuyBudget = 27;
@@ -34,12 +35,11 @@ export function clampPointBuyScore(score: number) {
 }
 
 export function roll4d6DropLowest(random: () => number = Math.random) {
-  const dice = Array.from({ length: 4 }, () => Math.floor(random() * 6) + 1).sort((a, b) => a - b);
-  return dice.slice(1).reduce((total, die) => total + die, 0);
+  return rollAbilityDice(random).total;
 }
 
 export function rollSixAbilityScores(random: () => number = Math.random) {
-  return Array.from({ length: 6 }, () => roll4d6DropLowest(random));
+  return rollSixAbilityDiceScores(random).map((roll) => roll.total);
 }
 
 export function usedAssignedScores(assignments: Partial<Record<AbilityId, number | null>>) {

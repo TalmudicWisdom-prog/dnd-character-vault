@@ -3,11 +3,14 @@ import { useLiveQuery } from "dexie-react-hooks";
 import type { AbilityId, CharacterSheet, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
 import { PageHeader } from "../../components/PageHeader";
+import { DiceRoller } from "../../components/DiceRoller";
 import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } from "../../storage/characterSheets";
 import { db } from "../../storage/database";
 import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
 import { levelUpPreview } from "../../rules/levelUp";
+import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
+import { rollFormula } from "../../dice/dice";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
@@ -31,6 +34,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState("Saved locally");
   const [hpAmount, setHpAmount] = useState(1);
+  const [quickRoll, setQuickRoll] = useState("");
   const editVersion = useRef(0);
 
   useEffect(() => {
@@ -90,6 +94,35 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     await db.characters.update(characterId, { ...changes, updatedAt: new Date().toISOString() });
   };
 
+  const rollNow = (label: string, formula: string) => {
+    try {
+      const result = rollFormula(formula);
+      setQuickRoll(`${label}: ${result.breakdown}`);
+    } catch (error) {
+      setQuickRoll(error instanceof Error ? error.message : "Could not roll");
+    }
+  };
+
+  const changeSlotUse = (level: string, change: number) => edit((current) => ({
+    ...current,
+    spellSlotsUsed: {
+      ...current.spellSlotsUsed,
+      [level]: changeUsedSpellSlots(current.spellSlots[level] ?? 0, current.spellSlotsUsed[level] ?? 0, change),
+    },
+  }));
+
+  const longRest = () => {
+    if (!sheet) return;
+    const hasUsedSlots = Object.values(sheet.spellSlotsUsed).some((used) => used > 0);
+    if (!shouldConfirmLongRest(hasUsedSlots, (message) => window.confirm(message))) return;
+    edit((current) => ({ ...current, spellSlotsUsed: resetUsedSpellSlots(current.spellSlotsUsed) }));
+    setQuickRoll("Long Rest: used spell slots reset.");
+  };
+
+  const shortRest = () => {
+    setQuickRoll("Short Rest noted. No spell slots were reset automatically.");
+  };
+
   if (loadError) return <section className="page"><div className="loading-state">Could not open character sheet: {loadError}</div></section>;
   if (!character || !sheet) return <section className="page"><div className="loading-state">Opening character sheet...</div></section>;
   const levelPreview = levelUpPreview(character.level);
@@ -104,6 +137,12 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       />
 
       <div className="sheet-status"><span className="status-dot" />{status}</div>
+      {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
+
+      <article className="panel sheet-section dice-tools-panel">
+        <div className="form-section-heading"><div><span className="card-label">Optional rolling</span><h2>Dice</h2><p>Roll here when useful, or keep using physical dice.</p></div></div>
+        <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />
+      </article>
 
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Overview</span><h2>Character identity</h2></div></div>
@@ -184,6 +223,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label>
             <label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label>
             <label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label>
+            <button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice)} type="button">Roll hit dice</button>
           </div>
         </article>
       </div>
@@ -196,6 +236,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
               <span>{abilityLabels[ability]}</span>
               <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
               <input min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
+              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">Roll</button>
               <LevelUpHint />
             </label>
           ))}
@@ -206,7 +247,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         <article className="panel sheet-section">
           <div className="form-section-heading"><div><span className="card-label">Proficiencies</span><h2>Saving throws</h2><p>Proficiency bonus: <strong>{formatModifier(sheet.proficiencyBonus)}</strong> <span className="level-up-hint">Usually changed during level up.</span></p></div><label className="form-field compact-field"><span>Override</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label></div>
           <div className="check-list">
-            {abilityIds.map((ability) => <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0))}</small></label>)}
+            {abilityIds.map((ability) => {
+              const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
+              return <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`)} type="button">Roll</button></label>;
+            })}
           </div>
         </article>
         <article className="panel sheet-section">
@@ -223,6 +267,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field"><span>Attacks</span><textarea onChange={(event) => edit((current) => ({ ...current, attacks: event.target.value }))} rows={5} value={sheet.attacks} /></label>
           <label className="form-field"><span>Weapons</span><textarea onChange={(event) => edit((current) => ({ ...current, weapons: event.target.value }))} rows={5} value={sheet.weapons} /></label>
           <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => edit((current) => ({ ...current, damageNotes: event.target.value }))} rows={4} value={sheet.damageNotes} /></label>
+          <div className="full-width"><DiceRoller compact context="Use this for attack or damage formulas from your notes." initialFormula="d20" label="Attack roller" /></div>
         </div>
       </article>
 
@@ -237,7 +282,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       </article>
 
       <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Magic</span><h2>Spells</h2><p>Use this quick section for casting stats and prepared notes, or open the full spellbook.</p></div><a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></div>
+        <div className="form-section-heading"><div><span className="card-label">Magic</span><h2>Spells</h2><p>Use this quick section for casting stats and prepared notes, or open the full spellbook.</p></div><div className="header-action-group"><button className="secondary-button" onClick={shortRest} type="button">Short Rest</button><button className="primary-button" onClick={longRest} type="button">Long Rest</button><a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></div></div>
         <div className="form-grid">
           <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
           <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label>
@@ -246,6 +291,13 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field"><span>Cantrips</span><textarea onChange={(event) => edit((current) => ({ ...current, cantrips: event.target.value }))} rows={5} value={sheet.cantrips} /></label>
           <label className="form-field"><span>Prepared spells</span><textarea onChange={(event) => edit((current) => ({ ...current, preparedSpells: event.target.value }))} rows={5} value={sheet.preparedSpells} /></label>
           <label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => edit((current) => ({ ...current, spellNotes: event.target.value }))} rows={5} value={sheet.spellNotes} /></label>
+        </div>
+        <div className="spell-slot-tracker">
+          {Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => {
+            const maximum = sheet.spellSlots[level] ?? 0;
+            const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum);
+            return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>;
+          })}
         </div>
       </article>
 

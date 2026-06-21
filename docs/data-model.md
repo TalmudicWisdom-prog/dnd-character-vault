@@ -70,6 +70,7 @@ Each character has one independently stored sheet record containing:
 - Saving throw and skill proficiency flags
 - Armor, weapon, tool, and language proficiencies
 - Spellcasting ability, spell save DC, spell attack bonus, cantrips, prepared spells, spell slots, and spell notes
+- Used spell slots are tracked separately from maximum slots for manual +/- controls and Long Rest reset
 - Class features, species traits, background feature, feats, and special abilities
 - Long-form character notes
 

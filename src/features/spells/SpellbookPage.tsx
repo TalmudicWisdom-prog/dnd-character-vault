@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PageHeader } from "../../components/PageHeader";
 import { SourceBadge } from "../../components/SourceBadge";
+import { DiceRoller } from "../../components/DiceRoller";
 import type { RulesSource, Spell, SpellActionType } from "../../domain/models";
 import { db } from "../../storage/database";
+import { saveCharacterSheet } from "../../storage/characterSheets";
+import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import {
   createSpell,
   deleteSpell,
@@ -155,6 +158,7 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
         <label className="form-field"><span>Damage type</span><input maxLength={100} onChange={(event) => edit("damageType", event.target.value)} placeholder="Fire, force, radiant..." value={draft.damageType} /></label>
         <label className="form-field"><span>Damage formula / dice</span><input maxLength={200} onChange={(event) => edit("damageFormula", event.target.value)} placeholder="8d6 fire damage" value={draft.damageFormula} /></label>
         <label className="form-field"><span>Healing formula</span><input maxLength={200} onChange={(event) => edit("healingFormula", event.target.value)} placeholder="1d8 + spellcasting modifier" value={draft.healingFormula} /></label>
+        <div className="full-width"><DiceRoller compact context="Roll damage or healing here. Slots are not spent automatically." initialFormula={draft.damageFormula || draft.healingFormula || "d20"} label={`${draft.name} roll`} /></div>
         <label className="form-field"><span>Saving throw type</span><input maxLength={100} onChange={(event) => edit("savingThrowType", event.target.value)} placeholder="DEX, WIS..." value={draft.savingThrowType} /></label>
         <label className="form-field"><span>Area of effect type</span><input maxLength={100} onChange={(event) => edit("areaOfEffectType", event.target.value)} placeholder="Sphere, cone, line..." value={draft.areaOfEffectType} /></label>
         <label className="form-field"><span>Area of effect size</span><input maxLength={100} onChange={(event) => edit("areaOfEffectSize", event.target.value)} placeholder="20-foot radius" value={draft.areaOfEffectSize} /></label>
@@ -169,6 +173,7 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
 
 export function SpellbookPage({ characterId }: { characterId: string }) {
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
+  const sheet = useLiveQuery(() => db.characterSheets.get(characterId), [characterId]);
   const spellbook = useLiveQuery(() => db.spellbooks.get(characterId), [characterId]);
   const spells = useLiveQuery(() => db.spells.where("characterId").equals(characterId).toArray(), [characterId]) ?? [];
   const [filters, setFilters] = useState(emptyFilters);
@@ -220,6 +225,25 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
     if (selectedSpellId === spell.id) setSelectedSpellId("");
   };
 
+  const changeSlotUse = async (level: string, change: number) => {
+    if (!sheet) return;
+    await saveCharacterSheet({
+      ...sheet,
+      spellSlotsUsed: {
+        ...sheet.spellSlotsUsed,
+        [level]: changeUsedSpellSlots(sheet.spellSlots[level] ?? 0, sheet.spellSlotsUsed[level] ?? 0, change),
+      },
+    });
+  };
+
+  const longRest = async () => {
+    if (!sheet) return;
+    const hasUsedSlots = Object.values(sheet.spellSlotsUsed).some((used) => used > 0);
+    if (!shouldConfirmLongRest(hasUsedSlots, (message) => window.confirm(message))) return;
+    await saveCharacterSheet({ ...sheet, spellSlotsUsed: resetUsedSpellSlots(sheet.spellSlotsUsed) });
+    setMessage("Long Rest complete. Used spell slots reset.");
+  };
+
   if (!character) return <section className="page"><div className="loading-state">Opening spellbook...</div></section>;
 
   return (
@@ -230,6 +254,17 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         <div className="form-section-heading"><div><span className="card-label">Quick access</span><h2>Pinned spells</h2><p>Pin your most-used spells, then use the arrows to set their table order.</p></div></div>
         {pinnedSpells.length ? <div className="pinned-spell-list">{pinnedSpells.map((spell) => <SpellCard compact key={spell.id} onMove={(direction) => void movePinnedSpell(characterId, spell.id, direction)} onOpen={() => setSelectedSpellId(spell.id)} onPin={() => void setSpellPinned(characterId, spell.id, false)} pinned spell={spell} />)}</div> : <div className="spell-empty compact-empty"><strong>No pinned spells yet</strong><span>Use Pin on any spell to place it here.</span></div>}
       </article>
+
+      {sheet && <article className="panel spell-slot-panel">
+        <div className="form-section-heading"><div><span className="card-label">Manual resources</span><h2>Spell slots</h2><p>Track slots by hand. Spell rolls do not spend slots automatically.</p></div><button className="primary-button" onClick={() => void longRest()} type="button">Long Rest reset</button></div>
+        <div className="spell-slot-tracker">
+          {Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => {
+            const maximum = sheet.spellSlots[level] ?? 0;
+            const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum);
+            return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => void changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => void changeSlotUse(level, 1)} type="button">+</button></div></article>;
+          })}
+        </div>
+      </article>}
 
       {selectedSpell && <SpellEditor key={selectedSpell.id} onClose={() => setSelectedSpellId("")} spell={selectedSpell} />}
 
