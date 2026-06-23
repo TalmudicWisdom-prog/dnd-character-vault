@@ -26,6 +26,12 @@ export type SrdClass = {
   savingThrows: AbilityId[];
   skillChoiceCount: number;
   hitDie: number;
+  features?: string[];
+  armorProficiencies?: string[];
+  weaponProficiencies?: string[];
+  toolProficiencies?: string[];
+  languages?: string[];
+  specialAbilities?: string[];
   spellcastingAbility?: AbilityId;
   spellcastingKind?: "prepared" | "known" | "pact";
   cantripsKnownByLevel?: Record<number, number>;
@@ -75,6 +81,11 @@ export type SrdNamedOption = {
   skills?: SkillId[];
   tools?: string[];
   feat?: string;
+  backgroundFeature?: string;
+  armorProficiencies?: string[];
+  weaponProficiencies?: string[];
+  toolProficiencies?: string[];
+  specialAbilities?: string[];
   abilitySuggestions?: AbilityId[];
   source: RulesSource;
 };
@@ -156,7 +167,7 @@ export const srdClasses: SrdClass[] = [
   { name: "Barbarian", primaryAbilities: ["str"], complexity: "Low", savingThrows: ["str", "con"], skillChoiceCount: 2, hitDie: 12, startingEquipment: equipmentChoices("barbarian", [{ label: "Choose a main weapon", choose: 1, options: ["battleaxe", "martial-weapon"] }, { label: "Choose travel gear", choose: 1, options: ["explorers-pack"] }]), description: "A fierce warrior who relies on rage, toughness, and physical power.", source: srdRulesSource },
   { name: "Bard", primaryAbilities: ["cha"], complexity: "High", savingThrows: ["dex", "cha"], skillChoiceCount: 3, hitDie: 8, spellcastingAbility: "cha", spellcastingKind: "known", cantripsKnownByLevel: { 1: 2 }, startingEquipment: equipmentChoices("bard", [{ label: "Choose a weapon", choose: 1, options: ["rapier", "longsword", "simple-weapon"] }, { label: "Choose performance gear", choose: 1, options: ["musical-instrument"] }]), description: "A performer and spellcaster who inspires allies and solves problems with skill.", source: srdRulesSource },
   { name: "Cleric", primaryAbilities: ["wis"], complexity: "Medium", savingThrows: ["wis", "cha"], skillChoiceCount: 2, hitDie: 8, spellcastingAbility: "wis", spellcastingKind: "prepared", cantripsKnownByLevel: { 1: 3 }, startingEquipment: equipmentChoices("cleric", [{ label: "Choose a weapon", choose: 1, options: ["mace", "simple-weapon"] }, { label: "Choose protection", choose: 1, options: ["chain-mail", "leather-armor"] }, { label: "Choose a pack", choose: 1, options: ["priest-pack", "explorers-pack"] }]), description: "A divine spellcaster shaped by faith, healing, protection, and sacred power.", source: srdRulesSource },
-  { name: "Druid", primaryAbilities: ["wis"], complexity: "High", savingThrows: ["int", "wis"], skillChoiceCount: 2, hitDie: 8, spellcastingAbility: "wis", spellcastingKind: "prepared", cantripsKnownByLevel: { 1: 2 }, startingEquipment: equipmentChoices("druid", [{ label: "Choose protection or a weapon", choose: 1, options: ["wooden-shield", "simple-weapon"] }, { label: "Choose a weapon", choose: 1, options: ["quarterstaff", "simple-weapon"] }, { label: "Choose a pack", choose: 1, options: ["explorers-pack", "scholars-pack"] }]), description: "A nature-focused spellcaster connected to beasts, terrain, and primal magic.", source: srdRulesSource },
+  { name: "Druid", primaryAbilities: ["wis"], complexity: "High", savingThrows: ["int", "wis"], skillChoiceCount: 2, hitDie: 8, features: ["Druidic", "Spellcasting"], armorProficiencies: ["Light Armor", "Medium Armor", "Shields"], weaponProficiencies: ["Clubs", "Daggers", "Darts", "Javelins", "Maces", "Quarterstaffs", "Scimitars", "Sickles", "Slings", "Spears"], toolProficiencies: ["Herbalism Kit"], languages: ["Druidic"], spellcastingAbility: "wis", spellcastingKind: "prepared", cantripsKnownByLevel: { 1: 2 }, startingEquipment: equipmentChoices("druid", [{ label: "Choose protection or a weapon", choose: 1, options: ["wooden-shield", "simple-weapon"] }, { label: "Choose a weapon", choose: 1, options: ["quarterstaff", "simple-weapon"] }, { label: "Choose a pack", choose: 1, options: ["explorers-pack", "scholars-pack"] }]), description: "A nature-focused spellcaster connected to beasts, terrain, and primal magic.", source: srdRulesSource },
   { name: "Fighter", primaryAbilities: ["str", "dex"], complexity: "Low", savingThrows: ["str", "con"], skillChoiceCount: 2, hitDie: 10, startingEquipment: equipmentChoices("fighter", [{ label: "Choose armor", choose: 1, options: ["chain-mail", "leather-armor"] }, { label: "Choose a weapon", choose: 1, options: ["martial-weapon", "longbow"] }, { label: "Choose a pack", choose: 1, options: ["explorers-pack"] }]), description: "A flexible weapon expert built around martial training and reliable combat.", source: srdRulesSource },
   { name: "Monk", primaryAbilities: ["dex", "wis"], complexity: "Medium", savingThrows: ["str", "dex"], skillChoiceCount: 2, hitDie: 8, startingEquipment: equipmentChoices("monk", [{ label: "Choose a weapon", choose: 1, options: ["shortsword", "simple-weapon"] }, { label: "Choose travel gear", choose: 1, options: ["explorers-pack"] }]), description: "A disciplined martial artist who uses speed, focus, and precise strikes.", source: srdRulesSource },
   { name: "Paladin", primaryAbilities: ["str", "cha"], complexity: "Medium", savingThrows: ["wis", "cha"], skillChoiceCount: 2, hitDie: 10, spellcastingAbility: "cha", spellcastingKind: "prepared", startingEquipment: equipmentChoices("paladin", [{ label: "Choose a weapon", choose: 1, options: ["martial-weapon", "shield"] }, { label: "Choose a pack", choose: 1, options: ["priest-pack", "explorers-pack"] }]), description: "An oath-bound warrior with protective magic, healing, and powerful strikes.", source: srdRulesSource },
@@ -171,7 +182,7 @@ export const srdSpecies: SrdNamedOption[] = [
   { name: "Aasimar", description: "A person touched by celestial power.", speed: 30, source: srdRulesSource },
   { name: "Dragonborn", description: "A draconic people with elemental ancestry.", speed: 30, source: srdRulesSource },
   { name: "Dwarf", description: "A sturdy people often associated with endurance and craft.", speed: 30, source: srdRulesSource },
-  { name: "Elf", description: "A graceful people often associated with keen senses and magic.", speed: 30, source: srdRulesSource },
+  { name: "Elf", description: "A graceful people often associated with keen senses and magic.", speed: 30, traits: ["Darkvision", "Fey Ancestry", "Trance", "Keen Senses"], languages: ["Common", "Elvish"], source: srdRulesSource },
   { name: "Gnome", description: "A small people often associated with cleverness and wonder.", speed: 30, source: srdRulesSource },
   { name: "Goliath", description: "A powerful people with giant ancestry.", speed: 35, source: srdRulesSource },
   { name: "Halfling", description: "A small people known for bravery, luck, and quick movement.", speed: 30, source: srdRulesSource },
@@ -192,7 +203,7 @@ export const srdBackgrounds: SrdNamedOption[] = [
   { name: "Hermit", description: "A secluded life of study, reflection, survival, or revelation.", source: srdRulesSource },
   { name: "Merchant", description: "A trader with business sense, negotiation, and practical contacts.", source: srdRulesSource },
   { name: "Noble", description: "A person from privilege, courtly life, lineage, or social obligation.", source: srdRulesSource },
-  { name: "Sage", description: "A scholar shaped by study, research, and deep knowledge.", source: srdRulesSource },
+  { name: "Sage", description: "A scholar shaped by study, research, and deep knowledge.", skills: ["arcana", "history"], tools: ["Calligrapher's Supplies"], languages: ["Choose one additional language"], backgroundFeature: "Scholarly research background feature", source: srdRulesSource },
   { name: "Sailor", description: "A seafarer used to ships, crews, storms, and distant ports.", source: srdRulesSource },
   { name: "Scribe", description: "A trained writer, clerk, record keeper, or document specialist.", source: srdRulesSource },
   { name: "Soldier", description: "A person shaped by military life, battle, ranks, and discipline.", source: srdRulesSource },

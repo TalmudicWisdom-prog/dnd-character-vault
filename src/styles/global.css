@@ -283,6 +283,7 @@ h1, h2, strong { color: var(--ink); }
 .srd-spell-card-heading { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
 .srd-spell-card-heading > div { display: grid; gap: 2px; }
 .srd-spell-card p { margin: 0; color: var(--muted); line-height: 1.45; }
+.guided-feature-hint { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 9px 10px; color: var(--muted); background: var(--paper-strong); border: 1px dashed var(--line); border-radius: 10px; font-size: 0.78rem; font-weight: 650; line-height: 1.35; }
 .review-stack { display: grid; gap: 12px; }
 .review-stack section { padding: 16px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
 .review-stack h3 { margin-top: 0; font-family: Georgia, serif; font-weight: 500; }

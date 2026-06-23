@@ -28,10 +28,13 @@ import {
   selectedSkillCount,
 } from "./creationMode";
 import {
+  applyGuidedFeatureSuggestions,
   canSelectSrdSpell,
   combatSuggestions,
   equipmentName,
   filterSrdSpells,
+  guidedFeatureEmptyStateText,
+  guidedFeatureSuggestions,
   preparedSpellLimit,
   selectedEquipmentNames,
   spellcastingCantripLimit,
@@ -64,6 +67,7 @@ export function CreateCharacterWizardPage() {
   const [spellClassFilter, setSpellClassFilter] = useState("selected");
   const [spellSchoolFilter, setSpellSchoolFilter] = useState("all");
   const dirtyVersion = useRef(0);
+  const autoFeatureKey = useRef("");
 
   useEffect(() => {
     let active = true;
@@ -87,6 +91,33 @@ export function CreateCharacterWizardPage() {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [draft]);
+
+  useEffect(() => {
+    if (!draft || draft.creationMode !== "guided" || draft.step !== 12) return;
+    const key = `${draft.character.characterClass}|${draft.character.ancestry}|${draft.character.background}`;
+    if (autoFeatureKey.current === key) return;
+    autoFeatureKey.current = key;
+    const next = applyGuidedFeatureSuggestions(
+      draft,
+      srdClass(draft.character.characterClass),
+      srdSpecies.find((species) => species.name === draft.character.ancestry),
+      srdBackgrounds.find((background) => background.name === draft.character.background),
+    );
+    const changed = next.sheet.classFeatures !== draft.sheet.classFeatures
+      || next.sheet.speciesTraits !== draft.sheet.speciesTraits
+      || next.sheet.backgroundFeature !== draft.sheet.backgroundFeature
+      || next.sheet.feats !== draft.sheet.feats
+      || next.sheet.armorProficiencies !== draft.sheet.armorProficiencies
+      || next.sheet.weaponProficiencies !== draft.sheet.weaponProficiencies
+      || next.sheet.toolProficiencies !== draft.sheet.toolProficiencies
+      || next.sheet.languages !== draft.sheet.languages
+      || next.sheet.specialAbilities !== draft.sheet.specialAbilities;
+    if (changed) {
+      dirtyVersion.current += 1;
+      setDraft(next);
+      setStatus("Added available SRD features and traits locally.");
+    }
+  }, [draft?.step, draft?.creationMode, draft?.character.characterClass, draft?.character.ancestry, draft?.character.background]);
 
   const update = (change: (current: CharacterCreationDraft) => CharacterCreationDraft) => {
     dirtyVersion.current += 1;
@@ -342,6 +373,14 @@ export function CreateCharacterWizardPage() {
     className: "all",
     school: spellSchoolFilter,
   });
+  const featureSuggestions = guidedFeatureSuggestions(selectedClass, selectedSpecies, selectedBackground);
+  const renderGuidedFeatureHint = (items: string[]) => isGuided
+    ? <div className="guided-feature-hint">
+      {items.length
+        ? <><SourceBadge source="SRD" /><span>Inserted from SRD: {items.join(", ")}</span></>
+        : <span>{guidedFeatureEmptyStateText}</span>}
+    </div>
+    : null;
 
   return (
     <section className="page create-character-page">
@@ -700,15 +739,64 @@ export function CreateCharacterWizardPage() {
           </div>}
 
           {step === 12 && <div className="form-grid">
-            <label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => updateSheet("classFeatures", event.target.value)} rows={7} value={sheet.classFeatures} /></label>
-            <label className="form-field"><span>Species traits</span><textarea onChange={(event) => updateSheet("speciesTraits", event.target.value)} rows={7} value={sheet.speciesTraits} /></label>
-            <label className="form-field"><span>Background feature</span><textarea onChange={(event) => updateSheet("backgroundFeature", event.target.value)} rows={5} value={sheet.backgroundFeature} /></label>
-            <label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => updateSheet("feats", event.target.value)} rows={5} value={sheet.feats} /></label>
-            <label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => updateSheet("armorProficiencies", event.target.value)} rows={4} value={sheet.armorProficiencies} /></label>
-            <label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => updateSheet("weaponProficiencies", event.target.value)} rows={4} value={sheet.weaponProficiencies} /></label>
-            <label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => updateSheet("toolProficiencies", event.target.value)} rows={4} value={sheet.toolProficiencies} /></label>
-            <label className="form-field"><span>Languages</span><textarea onChange={(event) => updateSheet("languages", event.target.value)} rows={4} value={sheet.languages} /></label>
-            <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => updateSheet("specialAbilities", event.target.value)} rows={6} value={sheet.specialAbilities} /></label>
+            {isGuided && <article className="choice-explainer full-width">
+              <h3>Features and traits helper <SourceBadge source="SRD" /></h3>
+              <p>Guided mode adds known SRD entries when it can. These are editable, and you can change them later if your table uses different rules.</p>
+            </article>}
+            <label className="form-field level-up-field">
+              <span>Class features <LevelUpHint /></span>
+              <small>Abilities your class gives you.</small>
+              {renderGuidedFeatureHint(featureSuggestions.classFeatures)}
+              <textarea onChange={(event) => updateSheet("classFeatures", event.target.value)} rows={7} value={sheet.classFeatures} />
+            </label>
+            <label className="form-field">
+              <span>Species traits</span>
+              <small>Abilities that come from your ancestry/species.</small>
+              {renderGuidedFeatureHint(featureSuggestions.speciesTraits)}
+              <textarea onChange={(event) => updateSheet("speciesTraits", event.target.value)} rows={7} value={sheet.speciesTraits} />
+            </label>
+            <label className="form-field">
+              <span>Background feature</span>
+              <small>A story-based ability from your background.</small>
+              {renderGuidedFeatureHint(featureSuggestions.backgroundFeature)}
+              <textarea onChange={(event) => updateSheet("backgroundFeature", event.target.value)} rows={5} value={sheet.backgroundFeature} />
+            </label>
+            <label className="form-field level-up-field">
+              <span>Feats <LevelUpHint /></span>
+              <small>Special improvements or talents your character has.</small>
+              {renderGuidedFeatureHint(featureSuggestions.feats)}
+              <textarea onChange={(event) => updateSheet("feats", event.target.value)} rows={5} value={sheet.feats} />
+            </label>
+            <label className="form-field">
+              <span>Armor proficiencies</span>
+              <small>Things your character is trained to use.</small>
+              {renderGuidedFeatureHint(featureSuggestions.armorProficiencies)}
+              <textarea onChange={(event) => updateSheet("armorProficiencies", event.target.value)} rows={4} value={sheet.armorProficiencies} />
+            </label>
+            <label className="form-field">
+              <span>Weapon proficiencies</span>
+              <small>Weapons your character is trained to use.</small>
+              {renderGuidedFeatureHint(featureSuggestions.weaponProficiencies)}
+              <textarea onChange={(event) => updateSheet("weaponProficiencies", event.target.value)} rows={4} value={sheet.weaponProficiencies} />
+            </label>
+            <label className="form-field">
+              <span>Tool proficiencies</span>
+              <small>Tools your character is trained to use.</small>
+              {renderGuidedFeatureHint(featureSuggestions.toolProficiencies)}
+              <textarea onChange={(event) => updateSheet("toolProficiencies", event.target.value)} rows={4} value={sheet.toolProficiencies} />
+            </label>
+            <label className="form-field">
+              <span>Languages</span>
+              <small>Languages your character can speak, read, or understand.</small>
+              {renderGuidedFeatureHint(featureSuggestions.languages)}
+              <textarea onChange={(event) => updateSheet("languages", event.target.value)} rows={4} value={sheet.languages} />
+            </label>
+            <label className="form-field full-width">
+              <span>Special abilities</span>
+              <small>Other powers or rules your character has.</small>
+              {renderGuidedFeatureHint(featureSuggestions.specialAbilities)}
+              <textarea onChange={(event) => updateSheet("specialAbilities", event.target.value)} rows={6} value={sheet.specialAbilities} />
+            </label>
           </div>}
 
           {step === 13 && <div className="review-stack">
@@ -728,6 +816,7 @@ export function CreateCharacterWizardPage() {
             <section><h3>Abilities</h3>{allAbilitiesAreDefault && <p className="inline-message">All ability scores are still using <strong>Default placeholder: 10</strong>.</p>}<div className="review-pill-row">{abilityIds.map((ability) => <span key={ability}>{abilityLabels[ability].slice(0, 3)} {sheet.abilityScores[ability]} ({formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))})</span>)}</div></section>
             <section><h3>Combat</h3><p>AC {sheet.armorClass} · HP {sheet.currentHp}/{sheet.maxHp} · Speed {sheet.speed} · Hit Dice {sheet.hitDice || "not set"}</p></section>
             <section><h3>Equipment and spells</h3><p>{draft.equipment.filter((item) => item.name.trim()).length} equipment items · {lines(sheet.cantrips).length} cantrips · {lines(sheet.preparedSpells).length} prepared spells</p></section>
+            <section><h3>Features, traits, and proficiencies</h3><p>{lines(sheet.classFeatures).length} class features · {lines(sheet.speciesTraits).length} species traits · {lines(sheet.languages).length} languages</p><p>{lines(sheet.armorProficiencies).length + lines(sheet.weaponProficiencies).length + lines(sheet.toolProficiencies).length} proficiencies · {lines(sheet.specialAbilities).length} special abilities</p></section>
           </div>}
 
           <div className="creation-nav">

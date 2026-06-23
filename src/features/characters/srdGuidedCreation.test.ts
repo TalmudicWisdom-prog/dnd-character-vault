@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { srdClass, srdSpecies } from "../../rules/srd";
+import { srdBackgrounds, srdClass, srdSpecies } from "../../rules/srd";
 import { createEmptyCreationDraft } from "../../storage/characterCreation";
 import {
+  applyGuidedFeatureSuggestions,
   canSelectSrdSpell,
   combatSuggestions,
   equipmentName,
   filterSrdSpells,
+  guidedFeatureEmptyStateText,
+  guidedFeatureSuggestions,
   preparedSpellLimit,
   spellcastingCantripLimit,
 } from "./srdGuidedCreation";
@@ -64,5 +67,49 @@ describe("SRD guided character creation helpers", () => {
     ], { search: "", level: "all", className: "Druid", school: "all" });
 
     expect(spells.map((spell) => spell.name)).toEqual(["Guidance", "Thunderwave"]);
+  });
+
+  it("populates Druid class features and proficiencies from SRD", () => {
+    const suggestions = guidedFeatureSuggestions(srdClass("Druid"));
+
+    expect(suggestions.classFeatures).toEqual(expect.arrayContaining(["Druidic", "Spellcasting"]));
+    expect(suggestions.armorProficiencies).toContain("Light Armor");
+    expect(suggestions.weaponProficiencies).toContain("Quarterstaffs");
+    expect(suggestions.toolProficiencies).toContain("Herbalism Kit");
+  });
+
+  it("populates Elf species traits and languages from SRD", () => {
+    const suggestions = guidedFeatureSuggestions(undefined, srdSpecies.find((species) => species.name === "Elf"));
+
+    expect(suggestions.speciesTraits).toEqual(expect.arrayContaining(["Darkvision", "Fey Ancestry", "Trance", "Keen Senses"]));
+    expect(suggestions.languages).toEqual(expect.arrayContaining(["Common", "Elvish"]));
+  });
+
+  it("surfaces the beginner-friendly empty state when SRD data is unavailable", () => {
+    const suggestions = guidedFeatureSuggestions(srdClass("Fighter"), srdSpecies.find((species) => species.name === "Human"));
+
+    expect(suggestions.classFeatures).toEqual([]);
+    expect(guidedFeatureEmptyStateText).toBe("No SRD data found yet. You can add this manually, skip for now, or edit it later.");
+  });
+
+  it("preserves manual entries while adding SRD feature suggestions", () => {
+    const draft = createEmptyCreationDraft();
+    const updated = applyGuidedFeatureSuggestions({
+      ...draft,
+      sheet: {
+        ...draft.sheet,
+        classFeatures: "Circle of Ashes",
+        languages: "Primordial",
+      },
+    }, srdClass("Druid"), srdSpecies.find((species) => species.name === "Elf"), srdBackgrounds.find((background) => background.name === "Sage"));
+
+    expect(updated.sheet.classFeatures).toContain("Circle of Ashes");
+    expect(updated.sheet.classFeatures).toContain("Druidic");
+    expect(updated.sheet.classFeatures).toContain("Spellcasting");
+    expect(updated.sheet.speciesTraits).toContain("Fey Ancestry");
+    expect(updated.sheet.toolProficiencies).toContain("Herbalism Kit");
+    expect(updated.sheet.toolProficiencies).toContain("Calligrapher's Supplies");
+    expect(updated.sheet.languages).toContain("Primordial");
+    expect(updated.sheet.languages).toContain("Elvish");
   });
 });

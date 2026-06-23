@@ -3,6 +3,8 @@ import { db } from "./database";
 import { createCharacter } from "./characters";
 import { createCharacterFromCreationDraft, getOrCreateCreationDraft, saveCreationDraft } from "./characterCreation";
 import { saveCharacterSheet } from "./characterSheets";
+import { applyGuidedFeatureSuggestions } from "../features/characters/srdGuidedCreation";
+import { srdBackgrounds, srdClass, srdSpecies } from "../rules/srd";
 
 describe("guided character creation", () => {
   beforeEach(async () => {
@@ -89,6 +91,45 @@ describe("guided character creation", () => {
       expect.objectContaining({ name: "Guidance", source: "SRD", homebrew: false }),
       expect.objectContaining({ name: "Entangle", source: "SRD", homebrew: false }),
     ]));
+  });
+
+  it("creates a character with SRD-populated features, traits, proficiencies, and languages", async () => {
+    const draft = await getOrCreateCreationDraft();
+    const withIdentity = {
+      ...draft,
+      character: {
+        ...draft.character,
+        name: "Lethariel",
+        characterClass: "Druid",
+        ancestry: "Elf",
+        background: "Sage",
+        level: 1,
+      },
+      sheet: {
+        ...draft.sheet,
+        classFeatures: "Moon-touched omen",
+      },
+    };
+    const populated = applyGuidedFeatureSuggestions(
+      withIdentity,
+      srdClass("Druid"),
+      srdSpecies.find((species) => species.name === "Elf"),
+      srdBackgrounds.find((background) => background.name === "Sage"),
+    );
+    const saved = await saveCreationDraft(populated);
+
+    const character = await createCharacterFromCreationDraft(saved);
+    const sheet = await db.characterSheets.get(character.id);
+
+    expect(sheet?.classFeatures).toContain("Moon-touched omen");
+    expect(sheet?.classFeatures).toContain("Druidic");
+    expect(sheet?.classFeatures).toContain("Spellcasting");
+    expect(sheet?.speciesTraits).toContain("Darkvision");
+    expect(sheet?.speciesTraits).toContain("Fey Ancestry");
+    expect(sheet?.armorProficiencies).toContain("Light Armor");
+    expect(sheet?.weaponProficiencies).toContain("Quarterstaffs");
+    expect(sheet?.toolProficiencies).toContain("Herbalism Kit");
+    expect(sheet?.languages).toContain("Elvish");
   });
 
   it("saves draft progress locally before the character is created", async () => {

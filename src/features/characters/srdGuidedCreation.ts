@@ -16,6 +16,20 @@ export type CombatSuggestion = {
   dexterityModifier: number;
 };
 
+export type GuidedFeatureSuggestions = {
+  classFeatures: string[];
+  speciesTraits: string[];
+  backgroundFeature: string[];
+  feats: string[];
+  armorProficiencies: string[];
+  weaponProficiencies: string[];
+  toolProficiencies: string[];
+  languages: string[];
+  specialAbilities: string[];
+};
+
+export const guidedFeatureEmptyStateText = "No SRD data found yet. You can add this manually, skip for now, or edit it later.";
+
 export function combatSuggestions(draft: CharacterCreationDraft, selectedClass?: SrdClass, selectedSpecies?: SrdNamedOption): CombatSuggestion | null {
   if (!selectedClass) return null;
   const level = draft.character.level || 1;
@@ -80,4 +94,73 @@ export function canSelectSrdSpell(draft: CharacterCreationDraft, spell: SrdSpell
   }
   return draft.srdSelectedSpellIds.includes(spell.id)
     || draft.srdSelectedSpellIds.length < preparedSpellLimit(draft, selectedClass);
+}
+
+export function guidedFeatureSuggestions(selectedClass?: SrdClass, selectedSpecies?: SrdNamedOption, selectedBackground?: SrdNamedOption): GuidedFeatureSuggestions {
+  return {
+    classFeatures: selectedClass?.features ?? [],
+    speciesTraits: selectedSpecies?.traits ?? [],
+    backgroundFeature: selectedBackground?.backgroundFeature ? [selectedBackground.backgroundFeature] : [],
+    feats: selectedBackground?.feat ? [selectedBackground.feat] : [],
+    armorProficiencies: [
+      ...(selectedClass?.armorProficiencies ?? []),
+      ...(selectedSpecies?.armorProficiencies ?? []),
+      ...(selectedBackground?.armorProficiencies ?? []),
+    ],
+    weaponProficiencies: [
+      ...(selectedClass?.weaponProficiencies ?? []),
+      ...(selectedSpecies?.weaponProficiencies ?? []),
+      ...(selectedBackground?.weaponProficiencies ?? []),
+    ],
+    toolProficiencies: [
+      ...(selectedClass?.toolProficiencies ?? []),
+      ...(selectedSpecies?.tools ?? []),
+      ...(selectedSpecies?.toolProficiencies ?? []),
+      ...(selectedBackground?.tools ?? []),
+      ...(selectedBackground?.toolProficiencies ?? []),
+    ],
+    languages: [
+      ...(selectedClass?.languages ?? []),
+      ...(selectedSpecies?.languages ?? []),
+      ...(selectedBackground?.languages ?? []),
+    ],
+    specialAbilities: [
+      ...(selectedClass?.specialAbilities ?? []),
+      ...(selectedSpecies?.specialAbilities ?? []),
+      ...(selectedBackground?.specialAbilities ?? []),
+    ],
+  };
+}
+
+export function mergeUniqueLines(existing: string, additions: string[]) {
+  const current = existing.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const seen = new Set(current.map((line) => line.toLocaleLowerCase()));
+  const next = [...current];
+  for (const addition of additions.map((line) => line.trim()).filter(Boolean)) {
+    const key = addition.toLocaleLowerCase();
+    if (!seen.has(key)) {
+      next.push(addition);
+      seen.add(key);
+    }
+  }
+  return next.join("\n");
+}
+
+export function applyGuidedFeatureSuggestions(draft: CharacterCreationDraft, selectedClass?: SrdClass, selectedSpecies?: SrdNamedOption, selectedBackground?: SrdNamedOption) {
+  const suggestions = guidedFeatureSuggestions(selectedClass, selectedSpecies, selectedBackground);
+  return {
+    ...draft,
+    sheet: {
+      ...draft.sheet,
+      classFeatures: mergeUniqueLines(draft.sheet.classFeatures, suggestions.classFeatures),
+      speciesTraits: mergeUniqueLines(draft.sheet.speciesTraits, suggestions.speciesTraits),
+      backgroundFeature: mergeUniqueLines(draft.sheet.backgroundFeature, suggestions.backgroundFeature),
+      feats: mergeUniqueLines(draft.sheet.feats, suggestions.feats),
+      armorProficiencies: mergeUniqueLines(draft.sheet.armorProficiencies, suggestions.armorProficiencies),
+      weaponProficiencies: mergeUniqueLines(draft.sheet.weaponProficiencies, suggestions.weaponProficiencies),
+      toolProficiencies: mergeUniqueLines(draft.sheet.toolProficiencies, suggestions.toolProficiencies),
+      languages: mergeUniqueLines(draft.sheet.languages, suggestions.languages),
+      specialAbilities: mergeUniqueLines(draft.sheet.specialAbilities, suggestions.specialAbilities),
+    },
+  };
 }
