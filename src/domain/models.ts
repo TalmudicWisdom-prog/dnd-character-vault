@@ -120,6 +120,8 @@ export const creationEquipmentItemSchema = z.object({
   quantity: z.number().int().min(0),
   notes: z.string().max(20000),
   equipped: z.boolean(),
+  source: rulesSourceSchema.default("Manual"),
+  sourceId: z.string().max(200).default(""),
 });
 export type CreationEquipmentItem = z.infer<typeof creationEquipmentItemSchema>;
 
@@ -150,6 +152,9 @@ export const characterCreationDraftSchema = z.object({
   character: characterCreationCharacterSchema,
   sheet: characterSheetSchema.omit({ characterId: true, updatedAt: true }),
   abilityScoreSetup: abilityScoreSetupSchema,
+  srdEquipmentSelections: z.record(z.string(), z.string()).default({}),
+  srdSelectedCantripIds: z.array(z.string()).default([]),
+  srdSelectedSpellIds: z.array(z.string()).default([]),
   equipment: z.array(creationEquipmentItemSchema),
   updatedAt: z.string().datetime(),
 });

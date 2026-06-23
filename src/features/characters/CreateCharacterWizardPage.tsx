@@ -10,7 +10,7 @@ import {
   resetCreationDraft,
   saveCreationDraft,
 } from "../../storage/characterCreation";
-import { srdAbilities, srdBackgrounds, srdClass, srdClasses, srdSkill, srdSkills, srdSpecies } from "../../rules/srd";
+import { srdAbilities, srdBackgrounds, srdClass, srdClasses, srdEquipmentItem, srdSkill, srdSkills, srdSpecies, srdSpellMetadata, srdSpells } from "../../rules/srd";
 import {
   clampPointBuyScore,
   isLegalPointBuy,
@@ -26,8 +26,17 @@ import {
   guidedReviewWarnings,
   modeLabel,
   selectedSkillCount,
-  suggestedMaxHp,
 } from "./creationMode";
+import {
+  canSelectSrdSpell,
+  combatSuggestions,
+  equipmentName,
+  filterSrdSpells,
+  preparedSpellLimit,
+  selectedEquipmentNames,
+  spellcastingCantripLimit,
+  spellsForClass,
+} from "./srdGuidedCreation";
 
 const abilityLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.label])) as Record<AbilityId, string>;
 const abilityShortLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.shortLabel])) as Record<AbilityId, string>;
@@ -50,6 +59,10 @@ export function CreateCharacterWizardPage() {
   const [draft, setDraft] = useState<CharacterCreationDraft | null>(null);
   const [status, setStatus] = useState("Loading saved draft...");
   const [creating, setCreating] = useState(false);
+  const [spellSearch, setSpellSearch] = useState("");
+  const [spellLevelFilter, setSpellLevelFilter] = useState("all");
+  const [spellClassFilter, setSpellClassFilter] = useState("selected");
+  const [spellSchoolFilter, setSpellSchoolFilter] = useState("all");
   const dirtyVersion = useRef(0);
 
   useEffect(() => {
@@ -188,7 +201,7 @@ export function CreateCharacterWizardPage() {
 
   const addEquipment = () => update((current) => ({
     ...current,
-    equipment: [...current.equipment, { id: crypto.randomUUID(), name: "", quantity: 1, notes: "", equipped: false }],
+    equipment: [...current.equipment, { id: crypto.randomUUID(), name: "", quantity: 1, notes: "", equipped: false, source: "Manual", sourceId: "" }],
   }));
 
   const updateEquipment = (id: string, change: Partial<CreationEquipmentItem>) => update((current) => ({
@@ -200,6 +213,69 @@ export function CreateCharacterWizardPage() {
     ...current,
     equipment: current.equipment.filter((item) => item.id !== id),
   }));
+
+  const chooseSrdEquipment = (groupId: string, equipmentId: string) => update((current) => {
+    const equipment = srdEquipmentItem(equipmentId);
+    if (!equipment) return current;
+    const sourceId = `${groupId}:${equipmentId}`;
+    const nextEquipment = current.equipment.filter((item) => !item.sourceId.startsWith(`${groupId}:`));
+    return {
+      ...current,
+      srdEquipmentSelections: { ...current.srdEquipmentSelections, [groupId]: equipmentId },
+      equipment: [
+        ...nextEquipment,
+        {
+          id: crypto.randomUUID(),
+          name: equipment.name,
+          quantity: 1,
+          notes: equipment.description,
+          equipped: false,
+          source: "SRD" as const,
+          sourceId,
+        },
+      ],
+    };
+  });
+
+  const syncSpellNames = (cantripIds: string[], spellIds: string[], current: CharacterCreationDraft) => {
+    const cantripNames = cantripIds.map((id) => srdSpells.find((spell) => spell.id === id)?.name).filter((name): name is string => Boolean(name));
+    const spellNames = spellIds.map((id) => srdSpells.find((spell) => spell.id === id)?.name).filter((name): name is string => Boolean(name));
+    const manualCantrips = lines(current.sheet.cantrips).filter((name) => !srdSpells.some((spell) => spell.level === 0 && spell.name.toLocaleLowerCase() === name.toLocaleLowerCase()));
+    const manualSpells = lines(current.sheet.preparedSpells).filter((name) => !srdSpells.some((spell) => spell.level > 0 && spell.name.toLocaleLowerCase() === name.toLocaleLowerCase()));
+    return {
+      cantrips: [...cantripNames, ...manualCantrips].join("\n"),
+      preparedSpells: [...spellNames, ...manualSpells].join("\n"),
+    };
+  };
+
+  const toggleSrdSpell = (spellId: string) => update((current) => {
+    const spell = srdSpells.find((candidate) => candidate.id === spellId);
+    if (!spell) return current;
+    const selectedClassForDraft = srdClass(current.character.characterClass);
+    const isCantrip = spell.level === 0;
+    const selectedIds = isCantrip ? current.srdSelectedCantripIds : current.srdSelectedSpellIds;
+    const alreadySelected = selectedIds.includes(spellId);
+    if (!alreadySelected && !canSelectSrdSpell(current, spell, selectedClassForDraft)) {
+      setStatus(isCantrip ? "Cantrip limit reached. Unselect one first, or add custom cantrips manually." : "Prepared spell limit reached. Unselect one first, or add custom spells manually.");
+      return current;
+    }
+    const nextCantripIds = isCantrip
+      ? (alreadySelected ? current.srdSelectedCantripIds.filter((id) => id !== spellId) : [...current.srdSelectedCantripIds, spellId])
+      : current.srdSelectedCantripIds;
+    const nextSpellIds = !isCantrip
+      ? (alreadySelected ? current.srdSelectedSpellIds.filter((id) => id !== spellId) : [...current.srdSelectedSpellIds, spellId])
+      : current.srdSelectedSpellIds;
+    const spellText = syncSpellNames(nextCantripIds, nextSpellIds, current);
+    return {
+      ...current,
+      srdSelectedCantripIds: nextCantripIds,
+      srdSelectedSpellIds: nextSpellIds,
+      sheet: {
+        ...current.sheet,
+        ...spellText,
+      },
+    };
+  });
 
   const canCreate = Boolean(draft?.character.name.trim() && draft.character.characterClass.trim() && draft.character.ancestry.trim() && draft.character.level);
   const spellSlotLevels = useMemo(() => Array.from({ length: 9 }, (_, index) => String(index + 1)), []);
@@ -249,13 +325,23 @@ export function CreateCharacterWizardPage() {
   const skillChoiceLimit = selectedClass?.skillChoiceCount ?? skillIds.length;
   const currentSkillCount = selectedSkillCount(sheet.skillProficiencies);
   const reviewWarnings = guidedReviewWarnings(draft, selectedClass);
-  const suggestedHp = selectedClass ? suggestedMaxHp(character.level ?? 1, selectedClass.hitDie, sheet.abilityScores.con ?? 10) : null;
   const skipLabel = step === 7 ? "Skip for now: keep default 10s" : "Skip for now";
   const currentProficiencyBonus = proficiencyBonusForLevel(character.level ?? 1);
   const effectiveProficiencyBonus = isGuided ? currentProficiencyBonus : sheet.proficiencyBonus;
   const pointBuyScores = fullAbilityScores(sheet.abilityScores, 8);
   const pointBuyPointsLeft = pointBuyRemaining(pointBuyScores);
   const recommendedAbilities = selectedClass?.primaryAbilities ?? [];
+  const combatGuide = combatSuggestions(draft, selectedClass, selectedSpecies);
+  const chosenSrdEquipment = selectedEquipmentNames(draft);
+  const cantripLimit = spellcastingCantripLimit(selectedClass, character.level);
+  const preparedLimit = preparedSpellLimit(draft, selectedClass);
+  const spellClassName = spellClassFilter === "selected" ? (selectedClass?.name ?? "all") : spellClassFilter;
+  const spellLibrary = filterSrdSpells(spellClassName === "all" ? srdSpells : spellsForClass(spellClassName), {
+    search: spellSearch,
+    level: spellLevelFilter,
+    className: "all",
+    school: spellSchoolFilter,
+  });
 
   return (
     <section className="page create-character-page">
@@ -485,18 +571,39 @@ export function CreateCharacterWizardPage() {
           </div>}
 
           {step === 9 && <div className="form-grid">
-            {isGuided && selectedClass && <article className="choice-explainer full-width">
-              <h3>Combat helper</h3>
-              <p>{selectedClass.name} uses a d{selectedClass.hitDie} Hit Die in the SRD helper data. Based on level {character.level} and CON {sheet.abilityScores.con ?? 10}, a simple average HP suggestion is <strong>{suggestedHp}</strong>.</p>
-              <button className="secondary-button compact" onClick={() => updateSheet("maxHp", suggestedHp ?? sheet.maxHp)} type="button">Use suggested Max HP</button>
+            {isGuided && combatGuide && <article className="choice-explainer full-width">
+              <h3>Combat helper <SourceBadge source="SRD" /></h3>
+              <p>Learn more: these fields are your quick combat numbers. They stay editable because armor, magic items, and table rulings can change them.</p>
+              <div className="guided-combat-grid">
+                <div><strong>Starting HP: {combatGuide.maxHp}</strong><small>Calculated from {selectedClass?.name} Hit Die {combatGuide.hitDie} + Constitution modifier {formatModifier(combatGuide.constitutionModifier)}.</small></div>
+                <div><strong>Hit Dice: {combatGuide.hitDice}</strong><small>Calculated from level {character.level} and class Hit Die.</small></div>
+                <div><strong>Speed: {combatGuide.speed} ft.</strong><small>{selectedSpecies?.name ? `From ${selectedSpecies.name} SRD helper data.` : "Default SRD helper value."}</small></div>
+                <div><strong>Initiative: {formatModifier(combatGuide.initiative)}</strong><small>Calculated from Dexterity modifier.</small></div>
+                <div><strong>Unarmored AC idea: {combatGuide.armorClass}</strong><small>Calculated as 10 + Dexterity modifier before armor or shields.</small></div>
+                <div><strong>Ability modifiers</strong><small>DEX {formatModifier(combatGuide.dexterityModifier)} · CON {formatModifier(combatGuide.constitutionModifier)}</small></div>
+              </div>
+              <button className="secondary-button compact" onClick={() => {
+                update((current) => ({
+                  ...current,
+                  sheet: {
+                    ...current.sheet,
+                    armorClass: combatGuide.armorClass,
+                    initiative: combatGuide.initiative,
+                    speed: combatGuide.speed,
+                    maxHp: combatGuide.maxHp,
+                    currentHp: combatGuide.currentHp,
+                    hitDice: combatGuide.hitDice,
+                  },
+                }));
+              }} type="button">Apply calculated combat values</button>
             </article>}
-            <label className="form-field"><span>Armor Class</span><input min={0} onChange={(event) => updateSheet("armorClass", Number(event.target.value))} type="number" value={sheet.armorClass} /></label>
-            <label className="form-field"><span>Initiative</span><input onChange={(event) => updateSheet("initiative", Number(event.target.value))} type="number" value={sheet.initiative} /></label>
-            <label className="form-field"><span>Speed</span><input min={0} onChange={(event) => updateSheet("speed", Number(event.target.value))} type="number" value={sheet.speed} /></label>
-            <label className="form-field level-up-field"><span>Max HP <LevelUpHint /></span><input min={0} onChange={(event) => updateSheet("maxHp", Number(event.target.value))} type="number" value={sheet.maxHp} /></label>
-            <label className="form-field"><span>Current HP</span><input min={0} onChange={(event) => updateSheet("currentHp", Number(event.target.value))} type="number" value={sheet.currentHp} /></label>
-            <label className="form-field"><span>Temporary HP</span><input min={0} onChange={(event) => updateSheet("temporaryHp", Number(event.target.value))} type="number" value={sheet.temporaryHp} /></label>
-            <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input maxLength={100} onChange={(event) => updateSheet("hitDice", event.target.value)} placeholder="1d8, 3d10..." value={sheet.hitDice} /></label>
+            <label className="form-field"><span>Armor Class (AC) <small>Editable</small></span><input min={0} onChange={(event) => updateSheet("armorClass", Number(event.target.value))} type="number" value={sheet.armorClass} /><small>How hard you are to hit.</small></label>
+            <label className="form-field"><span>Initiative <small>Editable</small></span><input onChange={(event) => updateSheet("initiative", Number(event.target.value))} type="number" value={sheet.initiative} /><small>Determines turn order in combat.</small></label>
+            <label className="form-field"><span>Speed <small>Editable</small></span><input min={0} onChange={(event) => updateSheet("speed", Number(event.target.value))} type="number" value={sheet.speed} /><small>How far you can move each turn.</small></label>
+            <label className="form-field level-up-field"><span>Max HP <LevelUpHint /></span><input min={0} onChange={(event) => updateSheet("maxHp", Number(event.target.value))} type="number" value={sheet.maxHp} /><small>How much damage you can take before falling unconscious.</small></label>
+            <label className="form-field"><span>Current HP</span><input min={0} onChange={(event) => updateSheet("currentHp", Number(event.target.value))} type="number" value={sheet.currentHp} /><small>Your HP right now.</small></label>
+            <label className="form-field"><span>Temporary HP</span><input min={0} onChange={(event) => updateSheet("temporaryHp", Number(event.target.value))} type="number" value={sheet.temporaryHp} /><small>Extra buffer HP from features or spells.</small></label>
+            <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input maxLength={100} onChange={(event) => updateSheet("hitDice", event.target.value)} placeholder="1d8, 3d10..." value={sheet.hitDice} /><small>Used during short rests to recover HP.</small></label>
             <label className="form-field"><span>Death saves</span><input readOnly value={`${sheet.deathSaveSuccesses} successes / ${sheet.deathSaveFailures} failures`} /></label>
             <label className="form-field"><span>Attacks</span><textarea onChange={(event) => updateSheet("attacks", event.target.value)} rows={4} value={sheet.attacks} /></label>
             <label className="form-field"><span>Weapons</span><textarea onChange={(event) => updateSheet("weapons", event.target.value)} rows={4} value={sheet.weapons} /></label>
@@ -504,13 +611,34 @@ export function CreateCharacterWizardPage() {
           </div>}
 
           {step === 10 && <div className="creation-equipment-list">
-            <p className="inline-message">Optional starter equipment. You can skip this and use the full inventory tools after creation.</p>
+            <p className="inline-message">Equipment means items your character begins the game with. Guided mode can add SRD starting equipment; manual entries are still welcome.</p>
+            {isGuided && selectedClass?.startingEquipment?.length ? <section className="choice-explainer">
+              <h3>{selectedClass.name} Starting Equipment <SourceBadge source="SRD" /></h3>
+              <p>Choose one option in each group. Selected SRD items are added to the starting inventory below and will become character inventory when you create the character.</p>
+              <div className="srd-choice-groups">
+                {selectedClass.startingEquipment.map((group) => <fieldset className="srd-choice-group" key={group.id}>
+                  <legend>{group.label}</legend>
+                  <small>Choose {group.choose}</small>
+                  {group.options.map((equipmentId) => {
+                    const equipment = srdEquipmentItem(equipmentId);
+                    return <label className="srd-option-row" key={equipmentId}>
+                      <input checked={draft.srdEquipmentSelections[group.id] === equipmentId} onChange={() => chooseSrdEquipment(group.id, equipmentId)} type="radio" name={group.id} />
+                      <span><strong>{equipment?.name ?? equipmentId}</strong>{equipment && <small>{equipment.category} · {equipment.description}</small>}</span>
+                      <SourceBadge source={equipment?.source ?? "SRD"} />
+                    </label>;
+                  })}
+                </fieldset>)}
+              </div>
+              {chosenSrdEquipment.length ? <p className="inline-message">Selected SRD gear: {chosenSrdEquipment.join(", ")}</p> : <p className="inline-message">No SRD gear selected yet.</p>}
+            </section> : isGuided ? <p className="inline-message">No SRD starting equipment is available for this class yet. Use manual equipment entry below.</p> : null}
             <button className="secondary-button" onClick={addEquipment} type="button">Add equipment item</button>
             {draft.equipment.map((item) => <article className="creation-equipment-row" key={item.id}>
               <label className="form-field"><span>Item name</span><input onChange={(event) => updateEquipment(item.id, { name: event.target.value })} value={item.name} /></label>
               <label className="form-field"><span>Quantity</span><input min={0} onChange={(event) => updateEquipment(item.id, { quantity: Number(event.target.value) })} type="number" value={item.quantity} /></label>
+              <label className="form-field"><span>Source</span><select onChange={(event) => updateEquipment(item.id, { source: event.target.value as CreationEquipmentItem["source"] })} value={item.source}><option value="SRD">SRD</option><option value="Manual">Manual</option><option value="Homebrew">Homebrew</option><option value="Imported PDF">Imported PDF</option></select></label>
               <label className="touch-toggle"><input checked={item.equipped} onChange={(event) => updateEquipment(item.id, { equipped: event.target.checked })} type="checkbox" /><span>Equipped</span></label>
               <label className="form-field full-width"><span>Notes</span><textarea onChange={(event) => updateEquipment(item.id, { notes: event.target.value })} rows={3} value={item.notes} /></label>
+              <SourceBadge source={item.source} />
               <button className="text-button danger" onClick={() => removeEquipment(item.id)} type="button">Remove</button>
             </article>)}
           </div>}
@@ -518,10 +646,50 @@ export function CreateCharacterWizardPage() {
           {step === 11 && <div className="form-grid">
             {isGuided && selectedClass?.spellcastingAbility && <article className="choice-explainer full-width">
               <h3>Spellcasting helper</h3>
+              <p><strong>Cantrips</strong> are small spells you can use often. <strong>Spell Slots</strong> are the fuel for leveled spells. <strong>Prepared Spells</strong> are the leveled spells you have ready. <strong>Spellcasting Ability</strong> powers your spell attacks and save DCs.</p>
               <p>{selectedClass.name} usually casts with <strong>{abilityLabels[selectedClass.spellcastingAbility]}</strong>. Spell slots still stay manual for now.</p>
               <button className="secondary-button compact" onClick={() => updateSheet("spellcastingAbility", selectedClass.spellcastingAbility ?? null)} type="button">Use {abilityLabels[selectedClass.spellcastingAbility]}</button>
             </article>}
             {isGuided && selectedClass && !selectedClass.spellcastingAbility && <p className="inline-message full-width">{selectedClass.name} does not have a basic spellcasting ability in this SRD helper layer. You can still enter spells manually if your table grants them.</p>}
+            {isGuided && selectedClass?.spellcastingAbility && <section className="choice-explainer full-width">
+              <div className="form-section-heading">
+                <div>
+                  <span className="card-label">SRD Spell Library</span>
+                  <h3>Choose spells for {selectedClass.name}</h3>
+                  <p>Choose {cantripLimit} cantrips: {draft.srdSelectedCantripIds.length} of {cantripLimit} selected. Choose prepared spells: {draft.srdSelectedSpellIds.length} of {preparedLimit} selected.</p>
+                </div>
+                <SourceBadge source="SRD" />
+              </div>
+              <div className="spell-library-controls">
+                <label className="form-field"><span>Search</span><input onChange={(event) => setSpellSearch(event.target.value)} placeholder="Search spell names or descriptions" value={spellSearch} /></label>
+                <label className="form-field"><span>Level</span><select onChange={(event) => setSpellLevelFilter(event.target.value)} value={spellLevelFilter}><option value="all">All levels</option>{srdSpellMetadata.levels.slice(0, 3).map((level) => <option key={level} value={level}>{level === 0 ? "Cantrip" : `Level ${level}`}</option>)}</select></label>
+                <label className="form-field"><span>Class</span><select onChange={(event) => setSpellClassFilter(event.target.value)} value={spellClassFilter}><option value="selected">{selectedClass.name}</option><option value="all">All SRD classes</option>{srdClasses.filter((option) => option.spellcastingAbility).map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></label>
+                <label className="form-field"><span>School</span><select onChange={(event) => setSpellSchoolFilter(event.target.value)} value={spellSchoolFilter}><option value="all">All schools</option>{srdSpellMetadata.schools.map((school) => <option key={school} value={school}>{school}</option>)}</select></label>
+              </div>
+              <div className="srd-spell-browser">
+                {spellLibrary.map((spell) => {
+                  const selected = spell.level === 0 ? draft.srdSelectedCantripIds.includes(spell.id) : draft.srdSelectedSpellIds.includes(spell.id);
+                  const canSelect = selected || canSelectSrdSpell(draft, spell, selectedClass);
+                  return <article className={selected ? "srd-spell-card selected" : "srd-spell-card"} key={spell.id}>
+                    <div className="srd-spell-card-heading">
+                      <div><strong>{spell.name}</strong><small>{spell.level === 0 ? "Cantrip" : `Level ${spell.level}`} · {spell.school}</small></div>
+                      <SourceBadge source={spell.source} />
+                    </div>
+                    <div className="spell-tags">
+                      <span>{spell.castingTime}</span>
+                      <span>{spell.range}</span>
+                      <span>{spell.components.join(", ") || "No components"}</span>
+                      <span>{spell.duration}</span>
+                    </div>
+                    <p>{spell.description}</p>
+                    {spell.materialDetails && <small>Material: {spell.materialDetails}</small>}
+                    <button className={selected ? "secondary-button compact" : "primary-button compact"} disabled={!canSelect} onClick={() => toggleSrdSpell(spell.id)} type="button">{selected ? "Remove" : "Select"}</button>
+                  </article>;
+                })}
+                {!spellLibrary.length && <p className="inline-message">No embedded SRD spells match those filters. Try another filter or use manual entry below.</p>}
+              </div>
+              <p className="inline-message">Need a non-SRD spell? Add it manually below. Manual and homebrew spells are not blocked.</p>
+            </section>}
             <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => updateSheet("spellcastingAbility", event.target.value ? event.target.value as AbilityId : null)} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
             <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => updateSheet("spellSaveDc", Number(event.target.value))} type="number" value={sheet.spellSaveDc} /></label>
             <label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => updateSheet("spellAttackBonus", Number(event.target.value))} type="number" value={sheet.spellAttackBonus} /></label>

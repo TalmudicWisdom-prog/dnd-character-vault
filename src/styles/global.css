@@ -266,8 +266,23 @@ h1, h2, strong { color: var(--ink); }
 .slot-grid label { display: grid; gap: 4px; color: var(--muted); text-align: center; }
 .slot-grid input { min-width: 0; padding: 7px; text-align: center; }
 .creation-equipment-list { display: grid; gap: 12px; }
-.creation-equipment-row { display: grid; grid-template-columns: 1fr 110px auto; gap: 10px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
+.creation-equipment-row { display: grid; grid-template-columns: 1fr 110px 150px auto; gap: 10px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
 .creation-equipment-row .full-width { grid-column: 1 / -1; }
+.guided-combat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+.guided-combat-grid > div { display: grid; gap: 4px; padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.guided-combat-grid small, .srd-choice-group small, .srd-spell-card small { color: var(--muted); line-height: 1.35; }
+.srd-choice-groups { display: grid; gap: 12px; margin-top: 12px; }
+.srd-choice-group { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.srd-choice-group legend { padding: 0 6px; color: var(--ink); font-weight: 850; }
+.srd-option-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 48px; padding: 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.srd-option-row span { display: grid; gap: 3px; }
+.spell-library-controls { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
+.srd-spell-browser { display: grid; gap: 10px; max-height: 520px; overflow: auto; padding-right: 4px; }
+.srd-spell-card { display: grid; gap: 10px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+.srd-spell-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
+.srd-spell-card-heading { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.srd-spell-card-heading > div { display: grid; gap: 2px; }
+.srd-spell-card p { margin: 0; color: var(--muted); line-height: 1.45; }
 .review-stack { display: grid; gap: 12px; }
 .review-stack section { padding: 16px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 12px; }
 .review-stack h3 { margin-top: 0; font-family: Georgia, serif; font-weight: 500; }
@@ -605,7 +620,7 @@ h1, h2, strong { color: var(--ink); }
   .hp-values { grid-template-columns: 1fr auto 1fr; }
   .temp-hp { grid-column: 1 / -1; }
   .hp-action-buttons, .combat-stats, .skills-list, .pdf-upload-panel, .pdf-grid, .pdf-sidebar, .level-up-grid, .dice-controls, .spell-slot-tracker { grid-template-columns: 1fr; }
-  .creation-steps, .slot-grid, .creation-equipment-row, .ability-method-grid, .guided-methods .ability-method-grid, .ability-assignment-grid { grid-template-columns: 1fr; }
+  .creation-steps, .slot-grid, .creation-equipment-row, .ability-method-grid, .guided-methods .ability-method-grid, .ability-assignment-grid, .guided-combat-grid, .spell-library-controls { grid-template-columns: 1fr; }
   .creation-nav, .creation-nav-actions, .creation-status-actions { display: grid; justify-items: stretch; }
   .creation-equipment-row .full-width { grid-column: auto; }
   .ability-grid { grid-template-columns: repeat(2, 1fr); }

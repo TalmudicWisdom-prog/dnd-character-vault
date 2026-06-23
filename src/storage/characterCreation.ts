@@ -1,10 +1,11 @@
 import type { CharacterCreationDraft, CreationEquipmentItem } from "../domain/models";
 import { characterCreationDraftSchema, characterSheetSchema, inventoryItemSchema } from "../domain/models";
 import { proficiencyBonusForLevel } from "../domain/dndMath";
+import { srdSpell } from "../rules/srd";
 import { createCharacter } from "./characters";
 import { db } from "./database";
 import { ensureDefaultContainers } from "./inventory";
-import { createEmptySpell, getOrCreateSpellbook } from "./spellbooks";
+import { createEmptySpell, createSpellFromSrd, getOrCreateSpellbook } from "./spellbooks";
 import { abilityIds, createCharacterSheetDraft, skillIds } from "./characterSheets";
 
 const draftId = "new-character" as const;
@@ -43,6 +44,9 @@ export function createEmptyCreationDraft(): CharacterCreationDraft {
       rolledScores: [],
       rolledAssignments: {},
     },
+    srdEquipmentSelections: {},
+    srdSelectedCantripIds: [],
+    srdSelectedSpellIds: [],
     equipment: [],
     updatedAt: timestamp,
   });
@@ -76,6 +80,9 @@ export async function saveCreationDraft(draft: CharacterCreationDraft) {
       proficiencyBonus,
     },
     abilityScoreSetup: draft.abilityScoreSetup ?? {},
+    srdEquipmentSelections: draft.srdEquipmentSelections ?? {},
+    srdSelectedCantripIds: draft.srdSelectedCantripIds ?? [],
+    srdSelectedSpellIds: draft.srdSelectedSpellIds ?? [],
     updatedAt: now(),
   });
   await db.characterCreationDrafts.put(normalized);
@@ -131,7 +138,7 @@ export async function createCharacterFromCreationDraft(draft: CharacterCreationD
         favorite: false,
         customRulesText: "",
         effectsAndStats: "",
-        source: "Manual",
+        source: item.source ?? "Manual",
         createdAt: timestamp,
         updatedAt: timestamp,
       }));
@@ -139,9 +146,18 @@ export async function createCharacterFromCreationDraft(draft: CharacterCreationD
   }
 
   await getOrCreateSpellbook(character.id);
-  const spellNames = [...textLines(sheet.cantrips), ...textLines(sheet.preparedSpells)];
-  if (spellNames.length) {
-    await db.spells.bulkAdd(spellNames.map((name) => createEmptySpell(character.id, name)));
+  const selectedSrdSpells = [...parsed.srdSelectedCantripIds, ...parsed.srdSelectedSpellIds]
+    .map((id) => srdSpell(id))
+    .filter((spell): spell is NonNullable<typeof spell> => Boolean(spell));
+  const selectedSrdNames = new Set(selectedSrdSpells.map((spell) => spell.name.toLocaleLowerCase()));
+  const manualSpellNames = [...textLines(sheet.cantrips), ...textLines(sheet.preparedSpells)]
+    .filter((name) => !selectedSrdNames.has(name.toLocaleLowerCase()));
+  const spells = [
+    ...selectedSrdSpells.map((spell) => createSpellFromSrd(character.id, spell)),
+    ...manualSpellNames.map((name) => createEmptySpell(character.id, name)),
+  ];
+  if (spells.length) {
+    await db.spells.bulkAdd(spells);
   }
 
   await db.characterCreationDrafts.delete(draftId);

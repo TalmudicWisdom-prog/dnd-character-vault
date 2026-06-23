@@ -1,5 +1,6 @@
 import type { Spell, SpellActionType, Spellbook } from "../domain/models";
 import { spellSchema, spellbookSchema } from "../domain/models";
+import type { SrdSpell } from "../rules/srd";
 import { db } from "./database";
 
 function now() {
@@ -45,6 +46,52 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     sourceNotes: "",
     source: "Homebrew",
     homebrew: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function actionTypeFromCastingTime(castingTime: string): SpellActionType {
+  const normalized = castingTime.toLocaleLowerCase();
+  if (normalized.includes("bonus")) return "bonusAction";
+  if (normalized.includes("reaction")) return "reaction";
+  if (normalized.includes("minute")) return "minute";
+  if (normalized.includes("hour")) return "hour";
+  if (normalized.includes("action")) return "action";
+  return "special";
+}
+
+export function createSpellFromSrd(characterId: string, spell: SrdSpell): Spell {
+  const timestamp = now();
+  return spellSchema.parse({
+    id: crypto.randomUUID(),
+    characterId,
+    name: spell.name,
+    level: spell.level,
+    school: spell.school,
+    castingTime: spell.castingTime,
+    actionType: actionTypeFromCastingTime(spell.castingTime),
+    range: spell.range,
+    verbalComponent: spell.components.includes("V"),
+    somaticComponent: spell.components.includes("S"),
+    materialComponent: spell.components.includes("M"),
+    materialDetails: spell.materialDetails,
+    duration: spell.duration,
+    concentration: spell.concentration,
+    ritual: spell.ritual,
+    damageType: "",
+    damageFormula: "",
+    healingFormula: "",
+    areaOfEffectType: "",
+    areaOfEffectSize: "",
+    savingThrowType: "",
+    attackRollRequired: false,
+    statusEffects: "",
+    description: spell.description,
+    higherLevelScaling: "",
+    sourceNotes: `SRD classes: ${spell.classes.join(", ")}`,
+    source: "SRD",
+    homebrew: false,
     createdAt: timestamp,
     updatedAt: timestamp,
   });

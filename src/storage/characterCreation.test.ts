@@ -37,7 +37,7 @@ describe("guided character creation", () => {
         spellSlots: { "1": 4, "2": 3, "3": 2 },
         classFeatures: "Arcane Recovery",
       },
-      equipment: [{ id: crypto.randomUUID(), name: "Spellbook", quantity: 1, notes: "Blue cover", equipped: false }],
+      equipment: [{ id: crypto.randomUUID(), name: "Spellbook", quantity: 1, notes: "Blue cover", equipped: false, source: "Manual", sourceId: "" }],
     });
     const character = await createCharacterFromCreationDraft(saved);
     const sheet = await db.characterSheets.get(character.id);
@@ -51,6 +51,44 @@ describe("guided character creation", () => {
     expect(sheet?.spellSlots["3"]).toBe(2);
     expect(items.map((item) => item.name)).toContain("Spellbook");
     expect(spells.map((spell) => spell.name)).toEqual(expect.arrayContaining(["Mage Hand", "Shield", "Fireball"]));
+  });
+
+  it("populates inventory and spellbook from guided SRD choices with source labels", async () => {
+    const draft = await getOrCreateCreationDraft();
+    const saved = await saveCreationDraft({
+      ...draft,
+      character: {
+        ...draft.character,
+        name: "Willow",
+        characterClass: "Druid",
+        ancestry: "Human",
+        level: 1,
+      },
+      sheet: {
+        ...draft.sheet,
+        abilityScores: { ...draft.sheet.abilityScores, wis: 16, con: 14 },
+        cantrips: "Guidance\nProduce Flame",
+        preparedSpells: "Cure Wounds\nEntangle\nFaerie Fire\nHealing Word",
+      },
+      srdEquipmentSelections: { "druid-equipment-1": "wooden-shield" },
+      srdSelectedCantripIds: ["guidance", "produce-flame"],
+      srdSelectedSpellIds: ["cure-wounds", "entangle", "faerie-fire", "healing-word"],
+      equipment: [
+        { id: crypto.randomUUID(), name: "Wooden Shield", quantity: 1, notes: "A shield made primarily of wood.", equipped: false, source: "SRD", sourceId: "druid-equipment-1:wooden-shield" },
+      ],
+    });
+
+    const character = await createCharacterFromCreationDraft(saved);
+    const items = await db.inventoryItems.where("characterId").equals(character.id).toArray();
+    const spells = await db.spells.where("characterId").equals(character.id).toArray();
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Wooden Shield", source: "SRD" }),
+    ]));
+    expect(spells).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Guidance", source: "SRD", homebrew: false }),
+      expect.objectContaining({ name: "Entangle", source: "SRD", homebrew: false }),
+    ]));
   });
 
   it("saves draft progress locally before the character is created", async () => {
