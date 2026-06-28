@@ -11,6 +11,9 @@ import { SoulReaperSection } from "./SoulReaperSection";
 import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import { rollFormula } from "../../dice/dice";
+import { applyDamage, applyHealing } from "../../rules/hitPoints";
+import { buildRollAssistantRows, type RollAssistantMode } from "../../rules/rollAssistant";
+import { createCharacterBackup, downloadBackup } from "../../storage/backups";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
@@ -33,8 +36,11 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [sheet, setSheet] = useState<CharacterSheet | null>(null);
   const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState("Saved locally");
-  const [hpAmount, setHpAmount] = useState(1);
+  const [damageAmount, setDamageAmount] = useState(1);
+  const [healingAmount, setHealingAmount] = useState(1);
+  const [hpPreview, setHpPreview] = useState("");
   const [quickRoll, setQuickRoll] = useState("");
+  const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const editVersion = useRef(0);
 
   useEffect(() => {
@@ -65,29 +71,46 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     return () => window.clearTimeout(timer);
   }, [sheet, status]);
 
+  useEffect(() => {
+    const flush = () => {
+      if (!sheet || status !== "Unsaved changes") return;
+      void saveCharacterSheet(sheet).then((saved) => {
+        setSheet(saved);
+        setStatus("Saved locally");
+      });
+    };
+    window.addEventListener("vault:flush", flush);
+    return () => window.removeEventListener("vault:flush", flush);
+  }, [sheet, status]);
+
   const edit = (change: (current: CharacterSheet) => CharacterSheet) => {
     editVersion.current += 1;
     setSheet((current) => current ? change(current) : current);
     setStatus("Unsaved changes");
   };
 
-  const changeHp = async (mode: "damage" | "healing") => {
+  const changeHp = async (mode: "damage" | "healing", amount: number) => {
     if (!sheet) return;
-    const amount = Math.max(0, hpAmount);
-    let currentHp = sheet.currentHp;
-    let temporaryHp = sheet.temporaryHp;
-    if (mode === "damage") {
-      const absorbed = Math.min(temporaryHp, amount);
-      temporaryHp -= absorbed;
-      currentHp = Math.max(0, currentHp - Math.max(0, amount - absorbed));
-    } else {
-      currentHp = Math.min(sheet.maxHp, currentHp + amount);
-    }
+    const before = `${sheet.currentHp}/${sheet.maxHp} HP, ${sheet.temporaryHp} temp`;
+    const next = mode === "damage" ? applyDamage(sheet, amount) : applyHealing(sheet, amount);
+    const after = `${next.currentHp}/${next.maxHp} HP, ${next.temporaryHp} temp`;
 
     setStatus("Saving locally...");
-    const updated = await saveCharacterSheet({ ...sheet, currentHp, temporaryHp });
+    const updated = await saveCharacterSheet({ ...sheet, currentHp: next.currentHp, temporaryHp: next.temporaryHp });
     setSheet(updated);
+    setHpPreview(`${mode === "damage" ? "Damage" : "Healing"} applied: ${before} → ${after}${next.absorbedByTemporaryHp ? ` (${next.absorbedByTemporaryHp} absorbed by temporary HP)` : ""}`);
     setStatus("Saved locally");
+  };
+
+  const exportCharacter = async () => {
+    setStatus("Preparing character backup...");
+    try {
+      const created = await createCharacterBackup(characterId);
+      const result = await downloadBackup(created, "character");
+      setStatus(`Backup successful · Characters backed up: ${result.charactersBackedUp} · File size: ${result.fileSizeLabel} · Time: ${result.timeLabel}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not export character");
+    }
   };
 
   const updateCharacterField = async (changes: Record<string, string | number>) => {
@@ -123,9 +146,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     setQuickRoll("Short Rest noted. No spell slots were reset automatically.");
   };
 
+  const setAssistantMode = (mode: RollAssistantMode) => {
+    setRollMode(mode);
+    localStorage.setItem("vault:roll-mode", mode);
+  };
+
   if (loadError) return <section className="page"><div className="loading-state">Could not open character sheet: {loadError}</div></section>;
   if (!character || !sheet) return <section className="page"><div className="loading-state">Opening character sheet...</div></section>;
   const levelPreview = levelUpPreview(character.level);
+  const rollRows = buildRollAssistantRows(sheet);
 
   return (
     <section className="page sheet-page">
@@ -133,7 +162,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Play tools"
         title={character.name}
         description="A touch-friendly sheet for the details you reach for during play."
-        actions={<div className="header-action-group"><a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a><a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a><a className="secondary-button button-link" href="#characters">Characters</a></div>}
+        actions={<div className="header-action-group"><a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a><button className="secondary-button" onClick={() => void exportCharacter()} type="button">Export Character</button><a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a><a className="secondary-button button-link" href="#characters">Characters</a></div>}
       />
 
       <div className="sheet-status"><span className="status-dot" />{status}</div>
@@ -142,6 +171,23 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       <article className="panel sheet-section dice-tools-panel">
         <div className="form-section-heading"><div><span className="card-label">Optional rolling</span><h2>Dice</h2><p>Roll here when useful, or keep using physical dice.</p></div></div>
         <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />
+      </article>
+
+      <article className="panel sheet-section roll-assistant-panel">
+        <div className="form-section-heading">
+          <div><span className="card-label">Live play helper</span><h2>What Do I Roll?</h2><p>Character-specific shortcuts based on this sheet's saved bonuses and proficiencies.</p></div>
+          <div className="mode-toggle">
+            <button className={rollMode === "beginner" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("beginner")} type="button">Beginner</button>
+            <button className={rollMode === "veteran" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("veteran")} type="button">Veteran</button>
+          </div>
+        </div>
+        <div className="roll-assistant-grid">
+          {rollRows.map((row) => <article className="roll-assistant-card" key={row.id}>
+            <div><strong>{row.label}</strong><span>{row.formula}</span>{row.bonus !== null && <small>Total bonus {formatModifier(row.bonus)}</small>}</div>
+            <button className="primary-button compact" onClick={() => row.rollable ? rollNow(row.label, row.formula) : setQuickRoll(`${row.label}: ${row.explanation}`)} type="button">{row.rollable ? "Roll" : "Explain"}</button>
+            {rollMode === "beginner" && <p>{row.explanation}</p>}
+          </article>)}
+        </div>
       </article>
 
       <article className="panel sheet-section">
@@ -200,14 +246,21 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <label className="stat-field temp-hp"><span>Temporary</span><input min={0} onChange={(event) => edit((current) => ({ ...current, temporaryHp: Number(event.target.value) }))} type="number" value={sheet.temporaryHp} /></label>
           </div>
           <div className="hp-controls">
-            <div className="quick-values" aria-label="Quick HP amount">
-              {[1, 5, 10, 25].map((amount) => <button className={hpAmount === amount ? "quick-value active" : "quick-value"} key={amount} onClick={() => setHpAmount(amount)} type="button">{amount}</button>)}
-              <label className="sr-only" htmlFor="hp-amount">Custom HP amount</label>
-              <input id="hp-amount" min={0} onChange={(event) => setHpAmount(Number(event.target.value))} type="number" value={hpAmount} />
+            <div className="hp-before-after">
+              <strong>Before</strong><span>{sheet.currentHp}/{sheet.maxHp} HP · {sheet.temporaryHp} temp</span>
+              {hpPreview && <><strong>Last change</strong><span>{hpPreview}</span></>}
+            </div>
+            <div className="hp-entry-grid">
+              <label className="form-field"><span>Damage input</span><input min={0} onChange={(event) => setDamageAmount(Number(event.target.value))} type="number" value={damageAmount} /></label>
+              <label className="form-field"><span>Healing input</span><input min={0} onChange={(event) => setHealingAmount(Number(event.target.value))} type="number" value={healingAmount} /></label>
             </div>
             <div className="hp-action-buttons">
-              <button className="touch-button damage-button" onClick={() => void changeHp("damage")} type="button">Take {hpAmount} damage</button>
-              <button className="touch-button healing-button" onClick={() => void changeHp("healing")} type="button">Heal {hpAmount} HP</button>
+              <button className="touch-button damage-button" onClick={() => void changeHp("damage", damageAmount)} type="button">Apply Damage</button>
+              <button className="touch-button healing-button" onClick={() => void changeHp("healing", healingAmount)} type="button">Apply Healing</button>
+            </div>
+            <div className="hp-quick-deltas" aria-label="Quick HP changes">
+              {[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}
+              {[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}
             </div>
           </div>
         </article>

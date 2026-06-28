@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { UpdatePrompt } from "../components/UpdatePrompt";
 import { CharacterEditorPage } from "../features/characters/CharacterEditorPage";
 import { CreateCharacterWizardPage } from "../features/characters/CreateCharacterWizardPage";
 import { CharacterListPage } from "../features/characters/CharacterListPage";
@@ -14,6 +15,7 @@ import { AboutLegalPage } from "../features/legal/AboutLegalPage";
 import { SpellbookPage } from "../features/spells/SpellbookPage";
 import { getSettings } from "../storage/database";
 import type { PageId } from "./navigation";
+import { flushBeforeBackgrounding, rememberRoute, rememberScroll, restoreScroll, savedRouteHash } from "./sessionRestore";
 
 type AppRoute =
   | { page: PageId; characterId?: never }
@@ -25,7 +27,7 @@ type AppRoute =
   | { page: "legal"; characterId?: never };
 
 function routeFromHash(): AppRoute {
-  const route = window.location.hash.slice(1);
+  const route = (window.location.hash || savedRouteHash()).replace(/^#/, "");
   if (route.startsWith("character/")) {
     return { page: "character", characterId: route.replace("character/", "") };
   }
@@ -48,9 +50,61 @@ export function App() {
   const [route, setRoute] = useState<AppRoute>(routeFromHash);
 
   useEffect(() => {
-    const onHashChange = () => setRoute(routeFromHash());
+    const onHashChange = () => {
+      rememberScroll();
+      const next = routeFromHash();
+      setRoute(next);
+      rememberRoute();
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (!window.location.hash && savedRouteHash()) {
+      window.location.hash = savedRouteHash();
+      return;
+    }
+    rememberRoute();
+  }, []);
+
+  useEffect(() => {
+    restoreScroll();
+  }, [route]);
+
+  useEffect(() => {
+    let scrollTimer = 0;
+    let touchStartY = 0;
+    const onScroll = () => {
+      window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(rememberScroll, 150);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushBeforeBackgrounding();
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      if (window.scrollY <= 0) touchStartY = event.touches[0]?.clientY ?? 0;
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const endY = event.changedTouches[0]?.clientY ?? 0;
+      if (touchStartY && window.scrollY <= 0 && endY - touchStartY > 90) {
+        window.dispatchEvent(new CustomEvent("vault:pull-refresh"));
+      }
+      touchStartY = 0;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pagehide", flushBeforeBackgrounding);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", flushBeforeBackgrounding);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -61,6 +115,7 @@ export function App() {
 
   return (
     <AppShell currentPage={route.page === "character" || route.page === "sheet" || route.page === "spellbook" ? "characters" : route.page === "pdf" ? "library" : route.page === "import" ? "tools" : route.page === "legal" ? "settings" : route.page}>
+      <UpdatePrompt />
       {route.page === "characters" && <CharacterListPage />}
       {route.page === "character" && (route.characterId === "new" ? <CreateCharacterWizardPage /> : <CharacterEditorPage characterId={route.characterId} />)}
       {route.page === "sheet" && <CharacterSheetPage characterId={route.characterId} />}

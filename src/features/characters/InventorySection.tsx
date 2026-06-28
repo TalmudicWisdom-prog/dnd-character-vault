@@ -51,6 +51,17 @@ function InventoryItemCard({
     return () => window.clearTimeout(timer);
   }, [draft, status]);
 
+  useEffect(() => {
+    const flush = () => {
+      if (status === "unsaved") void saveInventoryItem(draft).then((saved) => {
+        setDraft(saved);
+        setStatus("saved");
+      });
+    };
+    window.addEventListener("vault:flush", flush);
+    return () => window.removeEventListener("vault:flush", flush);
+  }, [draft, status]);
+
   const edit = <Key extends keyof InventoryItem>(key: Key, value: InventoryItem[Key]) => {
     editVersion.current += 1;
     setDraft((current) => ({ ...current, [key]: value }));
@@ -117,8 +128,17 @@ export function InventorySection({ characterId }: { characterId: string }) {
 
   useEffect(() => {
     if (!containers.length) return;
+    const saved = sessionStorage.getItem(`vault:inventory-tab:${characterId}`) ?? "";
+    if (saved && containers.some((container) => container.id === saved)) {
+      setSelectedContainerId(saved);
+      return;
+    }
     if (!containers.some((container) => container.id === selectedContainerId)) setSelectedContainerId(containers[0].id);
   }, [containers, selectedContainerId]);
+
+  useEffect(() => {
+    if (selectedContainerId) sessionStorage.setItem(`vault:inventory-tab:${characterId}`, selectedContainerId);
+  }, [characterId, selectedContainerId]);
 
   const addItem = async (event: FormEvent) => {
     event.preventDefault();

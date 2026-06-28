@@ -22,20 +22,25 @@ import {
 import { clampCreationStep, creationSteps, nextCreationStep, previousCreationStep } from "./createCharacterWizard";
 import {
   canChooseSkill,
-  classSavingThrowRecord,
   guidedReviewWarnings,
   modeLabel,
   selectedSkillCount,
 } from "./creationMode";
 import {
   applyGuidedFeatureSuggestions,
+  autoApplyClassSavingThrows,
   canSelectSrdSpell,
+  combatEmptyStates,
   combatSuggestions,
-  equipmentName,
+  expandedEquipmentOptions,
   filterSrdSpells,
   guidedFeatureEmptyStateText,
   guidedFeatureSuggestions,
+  isPlaceholderEquipment,
+  optionMatchesSelection,
   preparedSpellLimit,
+  recommendedSkillLabels,
+  reviewSummary,
   selectedEquipmentNames,
   spellcastingCantripLimit,
   spellsForClass,
@@ -93,6 +98,14 @@ export function CreateCharacterWizardPage() {
   }, [draft]);
 
   useEffect(() => {
+    const flush = () => {
+      if (draft) void saveCreationDraft(draft);
+    };
+    window.addEventListener("vault:flush", flush);
+    return () => window.removeEventListener("vault:flush", flush);
+  }, [draft]);
+
+  useEffect(() => {
     if (!draft || draft.creationMode !== "guided" || draft.step !== 12) return;
     const key = `${draft.character.characterClass}|${draft.character.ancestry}|${draft.character.background}`;
     if (autoFeatureKey.current === key) return;
@@ -118,6 +131,19 @@ export function CreateCharacterWizardPage() {
       setStatus("Added available SRD features and traits locally.");
     }
   }, [draft?.step, draft?.creationMode, draft?.character.characterClass, draft?.character.ancestry, draft?.character.background]);
+
+  useEffect(() => {
+    if (!draft || draft.creationMode !== "guided") return;
+    const selectedClassForDraft = srdClass(draft.character.characterClass);
+    if (!selectedClassForDraft) return;
+    const next = autoApplyClassSavingThrows(draft, selectedClassForDraft);
+    const changed = abilityIds.some((ability) => next.sheet.savingThrows[ability] !== draft.sheet.savingThrows[ability]);
+    if (changed) {
+      dirtyVersion.current += 1;
+      setDraft(next);
+      setStatus(`Standard ${selectedClassForDraft.name} saving throw proficiencies from the SRD applied.`);
+    }
+  }, [draft?.creationMode, draft?.character.characterClass]);
 
   const update = (change: (current: CharacterCreationDraft) => CharacterCreationDraft) => {
     dirtyVersion.current += 1;
@@ -248,8 +274,15 @@ export function CreateCharacterWizardPage() {
   const chooseSrdEquipment = (groupId: string, equipmentId: string) => update((current) => {
     const equipment = srdEquipmentItem(equipmentId);
     if (!equipment) return current;
-    const sourceId = `${groupId}:${equipmentId}`;
     const nextEquipment = current.equipment.filter((item) => !item.sourceId.startsWith(`${groupId}:`));
+    if (equipment.placeholder) {
+      return {
+        ...current,
+        srdEquipmentSelections: { ...current.srdEquipmentSelections, [groupId]: equipmentId },
+        equipment: nextEquipment,
+      };
+    }
+    const sourceId = `${groupId}:${equipmentId}`;
     return {
       ...current,
       srdEquipmentSelections: { ...current.srdEquipmentSelections, [groupId]: equipmentId },
@@ -374,6 +407,8 @@ export function CreateCharacterWizardPage() {
     school: spellSchoolFilter,
   });
   const featureSuggestions = guidedFeatureSuggestions(selectedClass, selectedSpecies, selectedBackground);
+  const skillRecommendations = recommendedSkillLabels(selectedClass);
+  const characterReviewSummary = reviewSummary(draft);
   const renderGuidedFeatureHint = (items: string[]) => isGuided
     ? <div className="guided-feature-hint">
       {items.length
@@ -589,22 +624,29 @@ export function CreateCharacterWizardPage() {
               <label className="big-stat"><span>Bonus</span><input disabled={isGuided} min={2} max={6} onChange={(event) => updateSheet("proficiencyBonus", Number(event.target.value))} type="number" value={effectiveProficiencyBonus} /></label>
               <p className="inline-message">{isGuided ? `Guided mode calculates this from level ${character.level}.` : "Manual mode lets you override proficiency bonus for homebrew or table exceptions."}</p>
               <h3>Saving throw proficiencies</h3>
-              {isGuided && selectedClass && <button className="secondary-button compact" onClick={() => updateSheet("savingThrows", classSavingThrowRecord(sheet.savingThrows, selectedClass))} type="button">Apply {selectedClass.name} saves</button>}
-              {isGuided && selectedClass && <p className="inline-message">SRD helper: {selectedClass.name} usually has {selectedClass.savingThrows.map((ability) => abilityLabels[ability]).join(" and ")} saving throw proficiencies.</p>}
-              <div className="check-list">{abilityIds.map((ability) => <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => updateSheet("savingThrows", { ...sheet.savingThrows, [ability]: event.target.checked })} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? effectiveProficiencyBonus : 0))}</small></label>)}</div>
+              {isGuided && selectedClass && <button className="secondary-button compact" onClick={() => update((current) => autoApplyClassSavingThrows(current, selectedClass))} type="button">Apply {selectedClass.name} Saves</button>}
+              {isGuided && selectedClass && <p className="inline-message">Standard {selectedClass.name} saving throw proficiencies from the SRD. Saving throws are special defenses against harmful effects.</p>}
+              {!isGuided && <p className="inline-message">Saving throws are special defenses against harmful effects.</p>}
+              <div className="check-list">{abilityIds.map((ability) => {
+                const checked = isGuided && selectedClass ? selectedClass.savingThrows.includes(ability) : sheet.savingThrows[ability] ?? false;
+                return <label className="proficiency-row" key={ability}><input checked={checked} disabled={isGuided} onChange={(event) => updateSheet("savingThrows", { ...sheet.savingThrows, [ability]: event.target.checked })} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10) + (checked ? effectiveProficiencyBonus : 0))}</small></label>;
+              })}</div>
             </article>
             <article>
               <h3>Skill proficiencies</h3>
-              {isGuided && selectedClass && <p className="inline-message">Choose about <strong>{selectedClass.skillChoiceCount}</strong> class skills. Selected: <strong>{currentSkillCount}</strong> of {selectedClass.skillChoiceCount}.</p>}
+              {isGuided && selectedClass && <p className="inline-message">Choose <strong>{selectedClass.skillChoiceCount} {selectedClass.name} skills</strong>. Skill proficiencies are things your character is trained to do. Selected: <strong>{currentSkillCount}</strong> of {selectedClass.skillChoiceCount}.</p>}
+              {isGuided && skillRecommendations.length > 0 && <p className="inline-message">Recommended for {selectedClass?.name}: {skillRecommendations.join(", ")}.</p>}
+              {!isGuided && <p className="inline-message">Skill proficiencies are things your character is trained to do.</p>}
               <div className="check-list skills-list">{skillIds.map((skill) => {
                 const skillInfo = srdSkill(skill);
-                return <label className="proficiency-row skill-helper-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => {
+                const recommended = selectedClass?.recommendedSkills?.includes(skill) ?? false;
+                return <label className={recommended && isGuided ? "proficiency-row skill-helper-row recommended" : "proficiency-row skill-helper-row"} key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => {
                   if (event.target.checked && !canChooseSkill(sheet.skillProficiencies, skill, skillChoiceLimit, isGuided)) {
                     setStatus(`Guided mode limit reached: ${skillChoiceLimit} class skills. Switch to Manual mode for exceptions.`);
                     return;
                   }
                   updateSheet("skillProficiencies", { ...sheet.skillProficiencies, [skill]: event.target.checked });
-                }} type="checkbox" /><span>{skillLabels[skill]}{skillInfo && <small>{skillInfo.description}</small>}</span><small>{abilityShortLabels[skillAbilityLabels[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>;
+                }} type="checkbox" /><span>{skillLabels[skill]}{recommended && isGuided && <small>Recommended for {selectedClass?.name}</small>}{skillInfo && <small>{skillInfo.description}</small>}</span><small>{abilityShortLabels[skillAbilityLabels[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>;
               })}</div>
             </article>
           </div>}
@@ -644,9 +686,9 @@ export function CreateCharacterWizardPage() {
             <label className="form-field"><span>Temporary HP</span><input min={0} onChange={(event) => updateSheet("temporaryHp", Number(event.target.value))} type="number" value={sheet.temporaryHp} /><small>Extra buffer HP from features or spells.</small></label>
             <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input maxLength={100} onChange={(event) => updateSheet("hitDice", event.target.value)} placeholder="1d8, 3d10..." value={sheet.hitDice} /><small>Used during short rests to recover HP.</small></label>
             <label className="form-field"><span>Death saves</span><input readOnly value={`${sheet.deathSaveSuccesses} successes / ${sheet.deathSaveFailures} failures`} /></label>
-            <label className="form-field"><span>Attacks</span><textarea onChange={(event) => updateSheet("attacks", event.target.value)} rows={4} value={sheet.attacks} /></label>
-            <label className="form-field"><span>Weapons</span><textarea onChange={(event) => updateSheet("weapons", event.target.value)} rows={4} value={sheet.weapons} /></label>
-            <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => updateSheet("damageNotes", event.target.value)} rows={4} value={sheet.damageNotes} /></label>
+            <label className="form-field"><span>Attacks</span><textarea onChange={(event) => updateSheet("attacks", event.target.value)} placeholder={combatEmptyStates.attacks} rows={4} value={sheet.attacks} /><small>{sheet.attacks.trim() ? "Editable attack notes." : combatEmptyStates.attacks}</small></label>
+            <label className="form-field"><span>Weapons</span><textarea onChange={(event) => updateSheet("weapons", event.target.value)} placeholder={combatEmptyStates.weapons} rows={4} value={sheet.weapons} /><small>{sheet.weapons.trim() ? "Editable weapon notes." : combatEmptyStates.weapons}</small></label>
+            <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => updateSheet("damageNotes", event.target.value)} placeholder={combatEmptyStates.damageNotes} rows={4} value={sheet.damageNotes} /><small>{sheet.damageNotes.trim() ? "Editable combat reminders." : combatEmptyStates.damageNotes}</small></label>
           </div>}
 
           {step === 10 && <div className="creation-equipment-list">
@@ -660,11 +702,27 @@ export function CreateCharacterWizardPage() {
                   <small>Choose {group.choose}</small>
                   {group.options.map((equipmentId) => {
                     const equipment = srdEquipmentItem(equipmentId);
-                    return <label className="srd-option-row" key={equipmentId}>
-                      <input checked={draft.srdEquipmentSelections[group.id] === equipmentId} onChange={() => chooseSrdEquipment(group.id, equipmentId)} type="radio" name={group.id} />
-                      <span><strong>{equipment?.name ?? equipmentId}</strong>{equipment && <small>{equipment.category} · {equipment.description}</small>}</span>
-                      <SourceBadge source={equipment?.source ?? "SRD"} />
-                    </label>;
+                    const selectedId = draft.srdEquipmentSelections[group.id];
+                    const expandedIds = expandedEquipmentOptions(equipmentId);
+                    const showExpandedChoices = isPlaceholderEquipment(equipmentId) && optionMatchesSelection(equipmentId, selectedId);
+                    return <div className="srd-equipment-option" key={equipmentId}>
+                      <label className="srd-option-row">
+                        <input checked={optionMatchesSelection(equipmentId, selectedId)} onChange={() => chooseSrdEquipment(group.id, equipmentId)} type="radio" name={group.id} />
+                        <span><strong>{equipment?.name ?? equipmentId}</strong>{equipment && <small>{equipment.category} · {equipment.description}</small>}</span>
+                        <SourceBadge source={equipment?.source ?? "SRD"} />
+                      </label>
+                      {showExpandedChoices && <div className="srd-expanded-options">
+                        <p className="inline-message">Choose the actual item. Placeholder categories are never added to inventory.</p>
+                        {expandedIds.map((expandedId) => {
+                          const expanded = srdEquipmentItem(expandedId);
+                          return <label className="srd-option-row nested" key={expandedId}>
+                            <input checked={selectedId === expandedId} onChange={() => chooseSrdEquipment(group.id, expandedId)} type="radio" name={`${group.id}-expanded`} />
+                            <span><strong>{expanded?.name ?? expandedId}</strong>{expanded && <small>{expanded.category} · {expanded.description}</small>}</span>
+                            <SourceBadge source={expanded?.source ?? "SRD"} />
+                          </label>;
+                        })}
+                      </div>}
+                    </div>;
                   })}
                 </fieldset>)}
               </div>
@@ -814,8 +872,9 @@ export function CreateCharacterWizardPage() {
             <section><h3>Required details</h3><p><strong>{character.name || "Unnamed"}</strong> · Level {character.level} {character.characterClass || "Class missing"} · {character.ancestry || "Ancestry missing"}</p>{!canCreate && <p className="inline-message">Name, class, species/ancestry, and level are required before creating.</p>}</section>
             <section><h3>Origin and concept</h3><p>{character.background || "No background"} · {character.concept || "No concept yet"}</p><p>{character.backstory || "No backstory yet."}</p></section>
             <section><h3>Abilities</h3>{allAbilitiesAreDefault && <p className="inline-message">All ability scores are still using <strong>Default placeholder: 10</strong>.</p>}<div className="review-pill-row">{abilityIds.map((ability) => <span key={ability}>{abilityLabels[ability].slice(0, 3)} {sheet.abilityScores[ability]} ({formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))})</span>)}</div></section>
-            <section><h3>Combat</h3><p>AC {sheet.armorClass} · HP {sheet.currentHp}/{sheet.maxHp} · Speed {sheet.speed} · Hit Dice {sheet.hitDice || "not set"}</p></section>
-            <section><h3>Equipment and spells</h3><p>{draft.equipment.filter((item) => item.name.trim()).length} equipment items · {lines(sheet.cantrips).length} cantrips · {lines(sheet.preparedSpells).length} prepared spells</p></section>
+            <section><h3>Saves and skills</h3><p><strong>Saving throws:</strong> {characterReviewSummary.savingThrows.length ? characterReviewSummary.savingThrows.join(", ") : "None selected yet"}</p><p><strong>Skill proficiencies:</strong> {characterReviewSummary.skills.length ? characterReviewSummary.skills.join(", ") : "None selected yet"}</p></section>
+            <section><h3>Combat</h3><p><strong>AC:</strong> {sheet.armorClass} · <strong>HP:</strong> {sheet.currentHp}/{sheet.maxHp} · <strong>Speed:</strong> {sheet.speed} · <strong>Hit Dice:</strong> {sheet.hitDice || "not set"}</p></section>
+            <section><h3>Equipment, weapons, and spells</h3><p><strong>Equipment:</strong> {characterReviewSummary.equipment.length ? characterReviewSummary.equipment.join(", ") : "No equipment selected yet"}</p><p><strong>Weapons:</strong> {characterReviewSummary.weapons.length ? characterReviewSummary.weapons.join(", ") : "No weapons selected yet"}</p><p><strong>Spells:</strong> {[...characterReviewSummary.cantrips, ...characterReviewSummary.spells].length ? [...characterReviewSummary.cantrips, ...characterReviewSummary.spells].join(", ") : "No spells selected yet"}</p></section>
             <section><h3>Features, traits, and proficiencies</h3><p>{lines(sheet.classFeatures).length} class features · {lines(sheet.speciesTraits).length} species traits · {lines(sheet.languages).length} languages</p><p>{lines(sheet.armorProficiencies).length + lines(sheet.weaponProficiencies).length + lines(sheet.toolProficiencies).length} proficiencies · {lines(sheet.specialAbilities).length} special abilities</p></section>
           </div>}
 

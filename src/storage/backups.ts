@@ -61,6 +61,14 @@ const backupEnvelopeSchema = z.object({
 });
 
 export type VaultBackup = z.infer<typeof vaultBackupSchema>;
+export type BackupDownloadKind = "all" | "full" | "character";
+export type BackupDownloadSummary = {
+  fileName: string;
+  fileSize: number;
+  fileSizeLabel: string;
+  charactersBackedUp: number;
+  timeLabel: string;
+};
 
 function bytesToBase64(bytes: Uint8Array) {
   let value = "";
@@ -109,6 +117,56 @@ export async function createVaultBackup(includePdfs: boolean): Promise<VaultBack
     appVersion: APP_VERSION,
     createdAt: new Date().toISOString(),
     includesPdfs: includePdfs,
+    checksum: await checksumPayload(payload),
+    payload,
+  });
+}
+
+export async function createCharacterBackup(characterId: string): Promise<VaultBackup> {
+  const [
+    character,
+    characterSheet,
+    inventoryContainers,
+    inventoryItems,
+    spellbook,
+    spells,
+    soulReaperProgression,
+    pdfDocuments,
+    settings,
+  ] = await Promise.all([
+    db.characters.get(characterId),
+    db.characterSheets.get(characterId),
+    db.inventoryContainers.where("characterId").equals(characterId).toArray(),
+    db.inventoryItems.where("characterId").equals(characterId).toArray(),
+    db.spellbooks.get(characterId),
+    db.spells.where("characterId").equals(characterId).toArray(),
+    db.soulReaperProgressions.get(characterId),
+    db.pdfDocuments.filter((document) => document.characterIds.includes(characterId)).toArray(),
+    db.settings.toArray(),
+  ]);
+  if (!character) throw new Error("Character not found");
+  const scopedPdfDocuments = pdfDocuments.map((document) => ({ ...document, characterIds: [characterId] }));
+  const documentIds = new Set(scopedPdfDocuments.map((document) => document.id));
+  const payload = backupPayloadSchema.parse({
+    characters: [character],
+    characterSheets: characterSheet ? [characterSheet] : [],
+    characterCreationDrafts: [],
+    inventoryContainers,
+    inventoryItems,
+    spellbooks: spellbook ? [spellbook] : [],
+    spells,
+    soulReaperProgressions: soulReaperProgression ? [soulReaperProgression] : [],
+    pdfDocuments: scopedPdfDocuments,
+    pdfBookmarks: await db.pdfBookmarks.filter((bookmark) => documentIds.has(bookmark.documentId)).toArray(),
+    settings,
+    pdfFiles: [],
+  });
+  return vaultBackupSchema.parse({
+    format: "dnd-character-vault-backup",
+    formatVersion: BACKUP_FORMAT_VERSION,
+    appVersion: APP_VERSION,
+    createdAt: new Date().toISOString(),
+    includesPdfs: false,
     checksum: await checksumPayload(payload),
     payload,
   });
@@ -179,16 +237,37 @@ export async function restoreVaultBackup(backup: VaultBackup, mode: RestoreMode)
   });
 }
 
-export function downloadBackup(backup: VaultBackup) {
-  const fileName = `character-vault-${backup.includesPdfs ? "full" : "light"}-${backup.createdAt.slice(0, 10)}.json`;
-  const file = new File([JSON.stringify(backup)], fileName, { type: "application/json" });
+function safeFileName(value: string) {
+  return value.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "vault";
+}
+
+function fileSizeLabel(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export async function downloadBackup(backup: VaultBackup, kind: BackupDownloadKind = backup.includesPdfs ? "full" : "all"): Promise<BackupDownloadSummary> {
+  const namePart = kind === "character" ? safeFileName(backup.payload.characters[0]?.name ?? "character") : kind === "full" ? "everything-with-pdfs" : "all-characters";
+  const fileName = `character-vault-${namePart}-${backup.createdAt.slice(0, 10)}.json`;
+  const json = JSON.stringify(backup);
+  const file = new File([json], fileName, { type: "application/json" });
   const shareData = { files: [file], title: "D&D Character Vault Backup" };
-  if (navigator.share && navigator.canShare?.(shareData)) return navigator.share(shareData);
-  const url = URL.createObjectURL(file);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
-  return Promise.resolve();
+  if (navigator.share && navigator.canShare?.(shareData)) {
+    await navigator.share(shareData);
+  } else {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  return {
+    fileName,
+    fileSize: file.size,
+    fileSizeLabel: fileSizeLabel(file.size),
+    charactersBackedUp: backup.payload.characters.length,
+    timeLabel: new Date(backup.createdAt).toLocaleString(),
+  };
 }

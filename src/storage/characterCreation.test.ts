@@ -93,6 +93,30 @@ describe("guided character creation", () => {
     ]));
   });
 
+  it("does not create inventory items from SRD equipment placeholders", async () => {
+    const draft = await getOrCreateCreationDraft();
+    const saved = await saveCreationDraft({
+      ...draft,
+      character: {
+        ...draft.character,
+        name: "Juniper",
+        characterClass: "Druid",
+        ancestry: "Human",
+        level: 1,
+      },
+      equipment: [
+        { id: crypto.randomUUID(), name: "Simple Weapon", quantity: 1, notes: "Choose a specific simple weapon.", equipped: false, source: "SRD", sourceId: "druid-equipment-2:simple-weapon" },
+        { id: crypto.randomUUID(), name: "Quarterstaff", quantity: 1, notes: "A sturdy wooden staff.", equipped: false, source: "SRD", sourceId: "druid-equipment-2:quarterstaff" },
+      ],
+    });
+
+    const character = await createCharacterFromCreationDraft(saved);
+    const items = await db.inventoryItems.where("characterId").equals(character.id).toArray();
+
+    expect(items.map((item) => item.name)).not.toContain("Simple Weapon");
+    expect(items.map((item) => item.name)).toContain("Quarterstaff");
+  });
+
   it("creates a character with SRD-populated features, traits, proficiencies, and languages", async () => {
     const draft = await getOrCreateCreationDraft();
     const withIdentity = {

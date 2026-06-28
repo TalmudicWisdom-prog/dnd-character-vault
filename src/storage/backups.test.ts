@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createVaultBackup, restoreVaultBackup, validateVaultBackup } from "./backups";
+import { createCharacterBackup, createVaultBackup, restoreVaultBackup, validateVaultBackup } from "./backups";
 import { db } from "./database";
 import { createCharacter } from "./characters";
 import { createSpell, setSpellPinned } from "./spellbooks";
@@ -50,5 +50,18 @@ describe("manual backup and restore", () => {
     const upgraded = await validateVaultBackup({ ...backup, formatVersion: 2, payload: legacyPayload, checksum });
     expect(upgraded.formatVersion).toBe(3);
     expect(upgraded.payload.characterCreationDrafts).toEqual([]);
+  });
+
+  it("exports one character without including another character's records", async () => {
+    const first = await createCharacter({ name: "Solo Backup", summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "", level: 1 });
+    const second = await createCharacter({ name: "Other Hero", summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "", level: 1 });
+    const firstSpell = await createSpell(first.id, "Solo Ward");
+    await createSpell(second.id, "Other Ward");
+
+    const backup = await createCharacterBackup(first.id);
+
+    expect(backup.payload.characters.map((character) => character.name)).toEqual(["Solo Backup"]);
+    expect(backup.payload.spells.map((spell) => spell.id)).toEqual([firstSpell.id]);
+    expect(backup.includesPdfs).toBe(false);
   });
 });

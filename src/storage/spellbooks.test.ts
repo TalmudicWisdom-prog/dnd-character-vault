@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createCharacter, deleteCharacter, duplicateCharacter } from "./characters";
 import { db } from "./database";
-import { createSpell, deleteSpell, duplicateSpell, movePinnedSpell, saveSpell, setSpellPinned } from "./spellbooks";
+import { srdSpell } from "../rules/srd";
+import { createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, movePinnedSpell, saveSpell, setSpellPinned } from "./spellbooks";
 
 const draft = (name: string) => ({
   name, summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "", level: 1,
@@ -49,5 +50,36 @@ describe("character-scoped spellbooks", () => {
     expect(await db.spells.where("characterId").equals(original.id).count()).toBe(0);
     expect(await db.spellbooks.get(original.id)).toBeUndefined();
     expect(await db.spells.where("characterId").equals(copy.id).count()).toBe(1);
+  });
+
+  it("populates SRD spell metadata when importing a spell", async () => {
+    const character = await createCharacter(draft("SRD Mage"));
+    const thunderwave = srdSpell("thunderwave");
+    expect(thunderwave).toBeTruthy();
+
+    const spell = createSpellFromSrd(character.id, thunderwave!);
+
+    expect(spell).toMatchObject({
+      name: "Thunderwave",
+      level: 1,
+      school: "Evocation",
+      castingTime: "1 action",
+      actionType: "action",
+      range: "Self",
+      verbalComponent: true,
+      somaticComponent: true,
+      duration: "Instantaneous",
+      concentration: false,
+      ritual: false,
+      damageType: "Thunder",
+      damageFormula: "2d8",
+      savingThrowType: "CON",
+      areaOfEffectType: "Cube",
+      areaOfEffectSize: "15-foot cube",
+      source: "SRD",
+      homebrew: false,
+    });
+    expect(spell.description).toContain("thunderous force");
+    expect(spell.higherLevelScaling).toContain("higher-level");
   });
 });

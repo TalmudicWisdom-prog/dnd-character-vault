@@ -36,6 +36,17 @@ export function SoulReaperSection({ characterId, characterLevel }: { characterId
     return () => window.clearTimeout(timer);
   }, [progression, status]);
 
+  useEffect(() => {
+    const flush = () => {
+      if (progression && status === "Unsaved changes") void saveSoulReaperProgression(progression).then((saved) => {
+        setProgression(saved);
+        setStatus("Saved locally");
+      });
+    };
+    window.addEventListener("vault:flush", flush);
+    return () => window.removeEventListener("vault:flush", flush);
+  }, [progression, status]);
+
   const edit = (change: (current: SoulReaperProgression) => SoulReaperProgression) => {
     editVersion.current += 1;
     setProgression((current) => current ? change(current) : current);

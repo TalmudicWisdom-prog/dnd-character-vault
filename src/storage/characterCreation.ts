@@ -1,7 +1,7 @@
 import type { CharacterCreationDraft, CreationEquipmentItem } from "../domain/models";
 import { characterCreationDraftSchema, characterSheetSchema, inventoryItemSchema } from "../domain/models";
 import { proficiencyBonusForLevel } from "../domain/dndMath";
-import { srdSpell } from "../rules/srd";
+import { srdEquipmentItem, srdSpell } from "../rules/srd";
 import { createCharacter } from "./characters";
 import { db } from "./database";
 import { ensureDefaultContainers } from "./inventory";
@@ -99,6 +99,13 @@ function textLines(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
+function isRealEquipmentItem(item: CreationEquipmentItem) {
+  if (!item.name.trim()) return false;
+  if (item.source !== "SRD") return true;
+  const equipmentId = item.sourceId.split(":")[1];
+  return !srdEquipmentItem(equipmentId)?.placeholder;
+}
+
 export async function createCharacterFromCreationDraft(draft: CharacterCreationDraft) {
   const parsed = characterCreationDraftSchema.parse(draft);
   if (!parsed.character.name.trim()) throw new Error("Character name is required");
@@ -125,7 +132,7 @@ export async function createCharacterFromCreationDraft(draft: CharacterCreationD
   if (main) {
     const timestamp = now();
     const items = parsed.equipment
-      .filter((item: CreationEquipmentItem) => item.name.trim())
+      .filter(isRealEquipmentItem)
       .map((item) => inventoryItemSchema.parse({
         id: crypto.randomUUID(),
         characterId: character.id,

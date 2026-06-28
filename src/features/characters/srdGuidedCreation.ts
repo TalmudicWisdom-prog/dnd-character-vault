@@ -1,7 +1,7 @@
-import type { AbilityId, CharacterCreationDraft } from "../../domain/models";
+import type { AbilityId, CharacterCreationDraft, SkillId } from "../../domain/models";
 import { abilityModifier } from "../../domain/dndMath";
 import type { SrdClass, SrdNamedOption, SrdSpell } from "../../rules/srd";
-import { srdEquipmentItem, srdSpells } from "../../rules/srd";
+import { srdEquipmentItem, srdSkills, srdSpells } from "../../rules/srd";
 import { suggestedMaxHp } from "./creationMode";
 
 export type CombatSuggestion = {
@@ -29,6 +29,11 @@ export type GuidedFeatureSuggestions = {
 };
 
 export const guidedFeatureEmptyStateText = "No SRD data found yet. You can add this manually, skip for now, or edit it later.";
+export const combatEmptyStates = {
+  attacks: "No attacks generated yet. Equipment choices come next.",
+  weapons: "No weapons selected yet.",
+  damageNotes: "Optional combat reminders. Equipment and spells may add notes later.",
+} as const;
 
 export function combatSuggestions(draft: CharacterCreationDraft, selectedClass?: SrdClass, selectedSpecies?: SrdNamedOption): CombatSuggestion | null {
   if (!selectedClass) return null;
@@ -55,6 +60,41 @@ export function selectedEquipmentNames(draft: CharacterCreationDraft) {
 
 export function equipmentName(id: string) {
   return srdEquipmentItem(id)?.name ?? id;
+}
+
+export function isPlaceholderEquipment(id: string) {
+  return Boolean(srdEquipmentItem(id)?.placeholder);
+}
+
+export function expandedEquipmentOptions(id: string) {
+  return srdEquipmentItem(id)?.expandsTo ?? [];
+}
+
+export function optionMatchesSelection(optionId: string, selectedId?: string) {
+  if (!selectedId) return false;
+  if (selectedId === optionId) return true;
+  return expandedEquipmentOptions(optionId).includes(selectedId);
+}
+
+export function skillLabel(skill: SkillId) {
+  return srdSkills.find((item) => item.id === skill)?.label ?? skill;
+}
+
+export function recommendedSkillLabels(selectedClass?: SrdClass) {
+  return (selectedClass?.recommendedSkills ?? []).map(skillLabel);
+}
+
+export function autoApplyClassSavingThrows(draft: CharacterCreationDraft, selectedClass?: SrdClass): CharacterCreationDraft {
+  if (!selectedClass) return draft;
+  return {
+    ...draft,
+    sheet: {
+      ...draft.sheet,
+      savingThrows: Object.fromEntries(
+        (["str", "dex", "con", "int", "wis", "cha"] satisfies AbilityId[]).map((ability) => [ability, selectedClass.savingThrows.includes(ability)]),
+      ) as Record<AbilityId, boolean>,
+    },
+  };
 }
 
 export function spellcastingCantripLimit(selectedClass?: SrdClass, level = 1) {
@@ -162,5 +202,28 @@ export function applyGuidedFeatureSuggestions(draft: CharacterCreationDraft, sel
       languages: mergeUniqueLines(draft.sheet.languages, suggestions.languages),
       specialAbilities: mergeUniqueLines(draft.sheet.specialAbilities, suggestions.specialAbilities),
     },
+  };
+}
+
+export function reviewSummary(draft: CharacterCreationDraft) {
+  const savingThrows = Object.entries(draft.sheet.savingThrows)
+    .filter(([, proficient]) => proficient)
+    .map(([ability]) => ability.toUpperCase());
+  const skills = Object.entries(draft.sheet.skillProficiencies)
+    .filter(([, proficient]) => proficient)
+    .map(([skill]) => skillLabel(skill as SkillId));
+  const weapons = draft.equipment
+    .filter((item) => {
+      const equipmentId = item.sourceId.split(":")[1];
+      return item.name.trim() && srdEquipmentItem(equipmentId)?.category === "Weapon";
+    })
+    .map((item) => item.name);
+  return {
+    savingThrows,
+    skills,
+    equipment: draft.equipment.filter((item) => item.name.trim()).map((item) => item.name),
+    weapons,
+    cantrips: draft.sheet.cantrips.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    spells: draft.sheet.preparedSpells.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
   };
 }

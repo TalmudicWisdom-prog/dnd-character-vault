@@ -20,6 +20,7 @@ const defaultSettings: AppSettings = {
   id: "app",
   theme: "system",
   backupReminders: true,
+  lastUpdateCheck: null,
   updatedAt: new Date().toISOString(),
 };
 

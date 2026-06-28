@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { srdBackgrounds, srdClass, srdSpecies } from "../../rules/srd";
 import { createEmptyCreationDraft } from "../../storage/characterCreation";
+import { canChooseSkill } from "./creationMode";
 import {
   applyGuidedFeatureSuggestions,
+  autoApplyClassSavingThrows,
   canSelectSrdSpell,
+  combatEmptyStates,
   combatSuggestions,
   equipmentName,
+  expandedEquipmentOptions,
   filterSrdSpells,
   guidedFeatureEmptyStateText,
   guidedFeatureSuggestions,
+  isPlaceholderEquipment,
+  optionMatchesSelection,
   preparedSpellLimit,
+  recommendedSkillLabels,
+  reviewSummary,
   spellcastingCantripLimit,
 } from "./srdGuidedCreation";
 
@@ -34,6 +42,47 @@ describe("SRD guided character creation helpers", () => {
 
   it("exposes SRD equipment names for choice groups", () => {
     expect(equipmentName("wooden-shield")).toBe("Wooden Shield");
+  });
+
+  it("auto-applies standard Druid saving throws in guided mode", () => {
+    const draft = createEmptyCreationDraft();
+    const updated = autoApplyClassSavingThrows({
+      ...draft,
+      sheet: {
+        ...draft.sheet,
+        savingThrows: { str: true, dex: true, con: true, int: false, wis: false, cha: true },
+      },
+    }, srdClass("Druid"));
+
+    expect(updated.sheet.savingThrows).toEqual({
+      str: false,
+      dex: false,
+      con: false,
+      int: true,
+      wis: true,
+      cha: false,
+    });
+  });
+
+  it("surfaces Druid skill recommendations and preserves guided skill limits", () => {
+    const druid = srdClass("Druid");
+
+    expect(recommendedSkillLabels(druid)).toEqual(["Animal Handling", "Nature", "Perception", "Survival"]);
+    expect(canChooseSkill({ animalHandling: true, nature: true }, "perception", druid?.skillChoiceCount ?? 0, true)).toBe(false);
+    expect(canChooseSkill({ animalHandling: true, nature: true }, "perception", druid?.skillChoiceCount ?? 0, false)).toBe(true);
+  });
+
+  it("explains combat empty states before equipment creates attacks or weapons", () => {
+    expect(combatEmptyStates.attacks).toBe("No attacks generated yet. Equipment choices come next.");
+    expect(combatEmptyStates.weapons).toBe("No weapons selected yet.");
+    expect(combatEmptyStates.damageNotes).toBe("Optional combat reminders. Equipment and spells may add notes later.");
+  });
+
+  it("expands SRD equipment categories before inventory creation", () => {
+    expect(isPlaceholderEquipment("simple-weapon")).toBe(true);
+    expect(expandedEquipmentOptions("simple-weapon")).toEqual(expect.arrayContaining(["club", "dagger", "quarterstaff", "spear"]));
+    expect(optionMatchesSelection("simple-weapon", "dagger")).toBe(true);
+    expect(optionMatchesSelection("simple-weapon", "wooden-shield")).toBe(false);
   });
 
   it("calculates guided spell selection limits", () => {
@@ -67,6 +116,32 @@ describe("SRD guided character creation helpers", () => {
     ], { search: "", level: "all", className: "Druid", school: "all" });
 
     expect(spells.map((spell) => spell.name)).toEqual(["Guidance", "Thunderwave"]);
+  });
+
+  it("summarizes review choices for a beginner pre-create check", () => {
+    const draft = {
+      ...createEmptyCreationDraft(),
+      equipment: [
+        { id: crypto.randomUUID(), name: "Dagger", quantity: 1, notes: "", equipped: false, source: "SRD" as const, sourceId: "druid-equipment-2:dagger" },
+        { id: crypto.randomUUID(), name: "Explorer's Pack", quantity: 1, notes: "", equipped: false, source: "SRD" as const, sourceId: "druid-equipment-3:explorers-pack" },
+      ],
+      sheet: {
+        ...createEmptyCreationDraft().sheet,
+        savingThrows: { str: false, dex: false, con: false, int: true, wis: true, cha: false },
+        skillProficiencies: { ...createEmptyCreationDraft().sheet.skillProficiencies, animalHandling: true, perception: true },
+        cantrips: "Guidance",
+        preparedSpells: "Cure Wounds",
+      },
+    };
+
+    expect(reviewSummary(draft)).toEqual(expect.objectContaining({
+      savingThrows: ["INT", "WIS"],
+      skills: ["Animal Handling", "Perception"],
+      equipment: ["Dagger", "Explorer's Pack"],
+      weapons: ["Dagger"],
+      cantrips: ["Guidance"],
+      spells: ["Cure Wounds"],
+    }));
   });
 
   it("populates Druid class features and proficiencies from SRD", () => {

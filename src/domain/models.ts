@@ -286,8 +286,9 @@ export type ThemePreference = z.infer<typeof themeSchema>;
 
 export const settingsSchema = z.object({
   id: z.literal("app"),
-  theme: themeSchema,
-  backupReminders: z.boolean(),
+  theme: themeSchema.default("system"),
+  backupReminders: z.boolean().default(true),
+  lastUpdateCheck: z.string().datetime().nullable().default(null),
   updatedAt: z.string().datetime(),
 });
 

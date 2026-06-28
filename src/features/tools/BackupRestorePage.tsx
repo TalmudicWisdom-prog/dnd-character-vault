@@ -8,11 +8,11 @@ export function BackupRestorePage() {
   const [mode, setMode] = useState<RestoreMode>("merge-skip");
 
   const exportBackup = async (includePdfs: boolean) => {
-    setStatus(includePdfs ? "Preparing full local backup..." : "Preparing lightweight local backup...");
+    setStatus(includePdfs ? "Preparing everything backup..." : "Preparing all characters backup...");
     try {
       const created = await createVaultBackup(includePdfs);
-      await downloadBackup(created);
-      setStatus("Backup ready. Choose a location using the system save or share sheet.");
+      const result = await downloadBackup(created, includePdfs ? "full" : "all");
+      setStatus(`Backup successful · Characters backed up: ${result.charactersBackedUp} · File size: ${result.fileSizeLabel} · Time: ${result.timeLabel}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not export backup");
     }
@@ -50,14 +50,14 @@ export function BackupRestorePage() {
       <PageHeader eyebrow="Vault tools" title="Backup & Restore" description="Create and restore user-controlled files. Nothing is uploaded or synced automatically." actions={<a className="primary-button button-link" href="#import">Import character sheet</a>} />
       <div className="tool-grid">
         <article className="panel tool-card">
-          <span className="card-label">Export</span><h2>Lightweight vault backup</h2>
-          <p>Characters, sheets, notes, inventory, spellbooks, custom modules, PDF metadata, bookmarks, and settings. PDF files are omitted.</p>
-          <button className="primary-button" onClick={() => void exportBackup(false)} type="button">Export without PDFs</button>
+          <span className="card-label">Export</span><h2>Backup All Characters</h2>
+          <p>Exports every character, sheet, HP and stats, inventory, containers, notes, spellbooks, custom class data, PDF metadata, bookmarks, and settings. PDF files are not included, so this is the best routine iPad backup.</p>
+          <button className="primary-button" onClick={() => void exportBackup(false)} type="button">Backup All Characters</button>
         </article>
         <article className="panel tool-card">
-          <span className="card-label">Export</span><h2>Full vault backup</h2>
-          <p>Includes everything in the lightweight backup plus locally stored PDF files. Large libraries create very large JSON files.</p>
-          <button className="secondary-button" onClick={() => void exportBackup(true)} type="button">Export with PDFs</button>
+          <span className="card-label">Export</span><h2>Backup Everything (Including PDFs)</h2>
+          <p>Exports everything above plus locally stored PDF files. This can create a very large JSON file and may take longer on iPad.</p>
+          <button className="secondary-button" onClick={() => void exportBackup(true)} type="button">Backup Everything</button>
         </article>
       </div>
       <article className="panel restore-panel">

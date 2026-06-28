@@ -120,6 +120,17 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
     return () => window.clearTimeout(timer);
   }, [draft, status]);
 
+  useEffect(() => {
+    const flush = () => {
+      if (status === "unsaved") void saveSpell(draft).then((saved) => {
+        setDraft(saved);
+        setStatus("saved");
+      });
+    };
+    window.addEventListener("vault:flush", flush);
+    return () => window.removeEventListener("vault:flush", flush);
+  }, [draft, status]);
+
   const edit = <Key extends keyof Spell>(key: Key, value: Spell[Key]) => {
     editVersion.current += 1;
     setDraft((current) => ({ ...current, [key]: value }));
