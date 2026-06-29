@@ -54,6 +54,15 @@ const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
   inventory: "Inventory",
 };
 
+const playJumpSections: { id: SheetLayoutSectionId; label: string }[] = [
+  { id: "health-combat", label: "HP" },
+  { id: "roll-helper", label: "Rolls" },
+  { id: "dice", label: "Dice" },
+  { id: "attacks", label: "Actions" },
+  { id: "spells", label: "Spells" },
+  { id: "notes", label: "Notes" },
+];
+
 function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
 }
@@ -75,11 +84,12 @@ type LayoutCardProps = {
 
 function LayoutCard({ children, customizeMode, dragging, id, index, style, title, total, onDragEnd, onDragMove, onDragStart, onMove }: LayoutCardProps) {
   return (
-    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} style={style}>
+    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} id={`sheet-section-${id}`} style={style}>
       {customizeMode && (
         <div className="layout-card-controls">
           <button
             aria-label={`Drag ${title}`}
+            aria-pressed={dragging}
             className="layout-drag-handle"
             onPointerCancel={onDragEnd}
             onPointerDown={(event) => onDragStart(id, event)}
@@ -180,9 +190,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     try {
       const created = await createCharacterBackup(characterId);
       const result = await downloadBackup(created, "character");
-      setStatus(`Backup successful · Characters backed up: ${result.charactersBackedUp} · File size: ${result.fileSizeLabel} · Time: ${result.timeLabel}`);
+      const action = result.deliveryMethod === "shared" ? "shared" : result.deliveryMethod === "opened" ? "opened in a new tab" : "download started";
+      setStatus(`Character export ${action}: ${result.fileName} · ${result.fileSizeLabel} · ${result.timeLabel}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not export character");
+      setStatus(error instanceof DOMException && error.name === "AbortError" ? "Export canceled. No character backup was shared or downloaded." : error instanceof Error ? error.message : "Could not export character");
     }
   };
 
@@ -270,6 +281,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   if (!character || !sheet) return <section className="page"><div className="loading-state">Opening character sheet...</div></section>;
   const levelPreview = levelUpPreview(character.level);
   const rollRows = buildRollAssistantRows(sheet);
+  const initiativeRow = rollRows.find((row) => row.id === "initiative");
   const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
@@ -287,7 +299,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   });
 
   return (
-    <section className="page sheet-page">
+    <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
       <PageHeader
         eyebrow="Play tools"
         title={character.name}
@@ -307,10 +319,16 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       <div className="sheet-status"><span className="status-dot" />{status}</div>
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
+      <nav aria-label="Live play shortcuts" className="play-jump-bar">
+        {playJumpSections.map((section) => <a href={`#sheet-section-${section.id}`} key={section.id}>{section.label}</a>)}
+        <a href={`#spellbook/${characterId}`}>Book</a>
+      </nav>
+
       {customizeLayout && <div className="layout-customize-bar">
         <div>
-          <span className="card-label">Sheet layout</span>
-          <p>Drag sections or use Move up / Move down, then tap Done in the page header.</p>
+          <span className="card-label">Editing layout</span>
+          <h2>Reorder this character's play sheet</h2>
+          <p>Drag section handles on touch or mouse. Move up and Move down stay available for precise control. Tap Done in the page header when finished.</p>
         </div>
       </div>}
 
@@ -434,7 +452,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label>
             <label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label>
             <label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label>
+            <button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula)} type="button">Roll initiative</button>
             <button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice)} type="button">Roll hit dice</button>
+            <a className="secondary-button compact button-link" href="#sheet-section-notes">Conditions / notes</a>
           </div>
         </article>
       </div>

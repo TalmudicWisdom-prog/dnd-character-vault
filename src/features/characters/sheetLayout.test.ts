@@ -26,7 +26,7 @@ describe("character sheet layout customization", () => {
     await saveCharacterSheet({ ...sheet, sheetLayoutOrder: customOrder });
     const reloaded = await getOrCreateCharacterSheet(character.id);
 
-    expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).slice(0, 3)).toEqual(["dice", "roll-helper", "identity"]);
+    expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).slice(0, 3)).toEqual(["health-combat", "roll-helper", "attacks"]);
     expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).indexOf("spells")).toBe(defaultSheetLayoutOrder.indexOf("spells") - 1);
   });
 

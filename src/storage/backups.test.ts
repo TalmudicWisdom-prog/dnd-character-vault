@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createCharacterBackup, createVaultBackup, restoreVaultBackup, validateVaultBackup } from "./backups";
 import { db } from "./database";
 import { createCharacter } from "./characters";
-import { createSpell, setSpellPinned } from "./spellbooks";
+import { createInventoryItem, ensureDefaultContainers, saveInventoryItem } from "./inventory";
+import { createEmptyCharacterSheet, saveCharacterSheet } from "./characterSheets";
+import { createSpell, saveSpell, setSpellPinned } from "./spellbooks";
 
 describe("manual backup and restore", () => {
   beforeEach(async () => {
@@ -63,5 +65,43 @@ describe("manual backup and restore", () => {
     expect(backup.payload.characters.map((character) => character.name)).toEqual(["Solo Backup"]);
     expect(backup.payload.spells.map((spell) => spell.id)).toEqual([firstSpell.id]);
     expect(backup.includesPdfs).toBe(false);
+  });
+
+  it("imports an exported character backup into an empty vault with sheet, spells, layout, notes, and inventory", async () => {
+    const cloud = await createCharacter({ name: "Cloud", summary: "Storm druid", playerName: "Yitzak", campaign: "Sunday", ancestry: "Human", characterClass: "Druid", level: 4 });
+    await saveCharacterSheet({
+      ...createEmptyCharacterSheet(cloud.id),
+      abilityScores: { str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 },
+      currentHp: 17,
+      maxHp: 31,
+      temporaryHp: 4,
+      notes: "Concentrating on Call Lightning.",
+      sheetLayoutOrder: ["spells", "roll-helper", "health-combat"],
+    });
+    const spell = await createSpell(cloud.id, "Call Lightning");
+    await saveSpell({ ...spell, level: 3, school: "Conjuration", description: "Storm cloud follows Cloud." });
+    const mainContainer = (await ensureDefaultContainers(cloud.id)).find((container) => container.name === "Main Inventory")!;
+    const staff = await createInventoryItem(cloud.id, mainContainer.id, "Storm Staff");
+    await saveInventoryItem({ ...staff, quantity: 1, category: "Arcane focus", effectsAndStats: "+1 spell attack", favorite: true });
+
+    const backup = await createCharacterBackup(cloud.id);
+    const transferredFileContents = JSON.stringify(backup);
+
+    await db.delete();
+    await db.open();
+    const imported = await validateVaultBackup(JSON.parse(transferredFileContents) as unknown);
+    await restoreVaultBackup(imported, "merge-skip");
+
+    const restoredCharacter = await db.characters.get(cloud.id);
+    const restoredSheet = await db.characterSheets.get(cloud.id);
+    const restoredSpells = await db.spells.where("characterId").equals(cloud.id).toArray();
+    const restoredItems = await db.inventoryItems.where("characterId").equals(cloud.id).toArray();
+
+    expect(restoredCharacter?.name).toBe("Cloud");
+    expect(restoredSheet?.abilityScores).toMatchObject({ str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 });
+    expect(restoredSheet).toMatchObject({ currentHp: 17, maxHp: 31, temporaryHp: 4, notes: "Concentrating on Call Lightning." });
+    expect(restoredSheet?.sheetLayoutOrder).toEqual(["spells", "roll-helper", "health-combat"]);
+    expect(restoredSpells).toEqual([expect.objectContaining({ name: "Call Lightning", level: 3, description: "Storm cloud follows Cloud." })]);
+    expect(restoredItems).toEqual([expect.objectContaining({ name: "Storm Staff", category: "Arcane focus", effectsAndStats: "+1 spell attack", favorite: true })]);
   });
 });

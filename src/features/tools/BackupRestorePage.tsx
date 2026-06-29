@@ -12,9 +12,10 @@ export function BackupRestorePage() {
     try {
       const created = await createVaultBackup(includePdfs);
       const result = await downloadBackup(created, includePdfs ? "full" : "all");
-      setStatus(`Backup successful · Characters backed up: ${result.charactersBackedUp} · File size: ${result.fileSizeLabel} · Time: ${result.timeLabel}`);
+      const action = result.deliveryMethod === "shared" ? "shared" : result.deliveryMethod === "opened" ? "opened in a new tab" : "download started";
+      setStatus(`Backup ${action}: ${result.fileName} · Characters backed up: ${result.charactersBackedUp} · File size: ${result.fileSizeLabel} · Time: ${result.timeLabel}`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not export backup");
+      setStatus(error instanceof DOMException && error.name === "AbortError" ? "Export canceled. No backup file was shared or downloaded." : error instanceof Error ? error.message : "Could not export backup");
     }
   };
 
@@ -24,11 +25,13 @@ export function BackupRestorePage() {
     setStatus("Validating backup before making changes...");
     try {
       const parsed = JSON.parse(await file.text()) as unknown;
-      setBackup(await validateVaultBackup(parsed));
-      setStatus("Backup is valid. Choose how to restore it.");
+      const validated = await validateVaultBackup(parsed);
+      setBackup(validated);
+      const names = validated.payload.characters.map((character) => character.name).join(", ");
+      setStatus(`Backup is valid: ${validated.payload.characters.length} ${validated.payload.characters.length === 1 ? "character" : "characters"}${names ? ` (${names})` : ""}. Choose how to restore it.`);
     } catch (error) {
       setBackup(null);
-      setStatus(error instanceof Error ? error.message : "This backup is invalid");
+      setStatus(error instanceof SyntaxError ? "That file is not valid JSON. Choose a Character Vault .json backup." : error instanceof Error ? error.message : "This backup is invalid");
     }
   };
 
@@ -38,8 +41,9 @@ export function BackupRestorePage() {
     if (mode === "merge-replace" && !window.confirm("Replace matching records with backup versions?")) return;
     setStatus("Restoring validated local backup...");
     try {
+      const restoredNames = backup.payload.characters.map((character) => character.name).join(", ");
       await restoreVaultBackup(backup, mode);
-      setStatus("Restore complete. Character ownership and PDF associations were validated.");
+      setStatus(`Restore complete: ${backup.payload.characters.length} ${backup.payload.characters.length === 1 ? "character" : "characters"}${restoredNames ? ` (${restoredNames})` : ""} restored locally.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not restore backup");
     }
@@ -62,7 +66,7 @@ export function BackupRestorePage() {
       </div>
       <article className="panel restore-panel">
         <div><span className="card-label">Import</span><h2>Restore a vault backup</h2><p>The file is fully validated, checksummed, and checked for character ownership before existing data changes.</p></div>
-        <label className="file-button secondary-button">Choose backup file<input accept="application/json,.json" onChange={(event) => void chooseBackup(event)} type="file" /></label>
+        <label className="file-button secondary-button">Choose backup file<input accept="application/json,text/plain,.json" onChange={(event) => void chooseBackup(event)} type="file" /></label>
         {backup && <div className="restore-options">
           <label className="touch-toggle"><input checked={mode === "merge-skip"} onChange={() => setMode("merge-skip")} type="radio" /><span>Merge and skip duplicates</span></label>
           <label className="touch-toggle"><input checked={mode === "merge-replace"} onChange={() => setMode("merge-replace")} type="radio" /><span>Merge and replace matching records</span></label>

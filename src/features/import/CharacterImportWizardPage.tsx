@@ -7,6 +7,7 @@ import { applyProviderConfidence, extractCharacterText } from "../../import/extr
 import { mergeImportResults } from "../../import/merge";
 import { getImportProvider, getOnlineImportProvider } from "../../import/providers";
 import { saveCharacterImport } from "../../import/saveImport";
+import { restoreVaultBackup, validateVaultBackup } from "../../storage/backups";
 import { abilityIds, skillIds } from "../../storage/characterSheets";
 import { db } from "../../storage/database";
 import { addImportFiles, createImportSession, discardImportSession, removeImportFile, reorderImportFile, updateImportSession } from "../../storage/importSessions";
@@ -72,6 +73,24 @@ export function CharacterImportWizardPage() {
     }
   };
 
+  const chooseBackupFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setStatus(`Reading ${file.name}...`);
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const backup = await validateVaultBackup(parsed);
+      if (backup.payload.characters.length !== 1) throw new Error("This backup contains more than one character. Use Vault Tools to restore full-vault backups.");
+      const characterName = backup.payload.characters[0].name;
+      await restoreVaultBackup(backup, "merge-skip");
+      setStatus(`Imported ${characterName} from ${file.name}. Character sheet, spells, notes, layout, and inventory were restored locally.`);
+      event.target.value = "";
+      window.location.hash = `sheet/${backup.payload.characters[0].id}`;
+    } catch (error) {
+      setStatus(error instanceof SyntaxError ? "That file is not valid JSON. Choose a Character Vault .json export." : error instanceof Error ? error.message : "Could not import character backup");
+    }
+  };
+
   const setImportMode = async (nextMode: ImportMode) => {
     if (!session) return;
     await updateImportSession({ ...session, mode: nextMode });
@@ -132,6 +151,13 @@ export function CharacterImportWizardPage() {
 
   return <section className="page import-page">
     <PageHeader eyebrow="Character tools" title="Import one character from several sources" description="Combine PDFs, scans, photos, and screenshots into one reviewable character draft. Your in-progress session stays on this device." actions={<button className="secondary-button" onClick={() => void startFresh()} type="button">New import session</button>} />
+
+    <article className="panel import-files-panel">
+      <div className="form-section-heading">
+        <div><span className="card-label">Character transfer</span><h2>Import an exported character backup</h2><p>Use this for a Character Vault .json file shared from another device. It restores the character locally without uploading anything.</p></div>
+        <label className="file-button primary-button">Choose character backup<input accept="application/json,text/plain,.json" onChange={(event) => void chooseBackupFile(event)} type="file" /></label>
+      </div>
+    </article>
 
     <article className="panel import-mode-panel">
       <div><span className="card-label">Import method</span><h2>Choose how files are read</h2><p>After parsing, both methods use the same conflict review and manual correction flow.</p></div>

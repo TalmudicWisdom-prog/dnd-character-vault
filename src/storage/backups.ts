@@ -67,6 +67,7 @@ export type BackupDownloadSummary = {
   fileSize: number;
   fileSizeLabel: string;
   charactersBackedUp: number;
+  deliveryMethod: "shared" | "downloaded" | "opened";
   timeLabel: string;
 };
 
@@ -247,27 +248,80 @@ function fileSizeLabel(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export async function downloadBackup(backup: VaultBackup, kind: BackupDownloadKind = backup.includesPdfs ? "full" : "all"): Promise<BackupDownloadSummary> {
+function backupFileName(backup: VaultBackup, kind: BackupDownloadKind) {
   const namePart = kind === "character" ? safeFileName(backup.payload.characters[0]?.name ?? "character") : kind === "full" ? "everything-with-pdfs" : "all-characters";
-  const fileName = `character-vault-${namePart}-${backup.createdAt.slice(0, 10)}.json`;
-  const json = JSON.stringify(backup);
-  const file = new File([json], fileName, { type: "application/json" });
-  const shareData = { files: [file], title: "D&D Character Vault Backup" };
-  if (navigator.share && navigator.canShare?.(shareData)) {
+  return `character-vault-${namePart}-${backup.createdAt.slice(0, 10)}.json`;
+}
+
+function backupJson(backup: VaultBackup) {
+  return JSON.stringify(backup);
+}
+
+function backupFile(json: string, fileName: string, type = "application/json") {
+  return new File([json], fileName, { type });
+}
+
+async function shareBackupFile(json: string, fileName: string) {
+  if (!navigator.share || !navigator.canShare) return false;
+
+  const title = "D&D Character Vault Backup";
+  const candidates = [
+    backupFile(json, fileName, "application/json"),
+    backupFile(json, fileName, "text/plain"),
+  ];
+
+  for (const file of candidates) {
+    const shareData = { files: [file], title };
+    try {
+      if (!navigator.canShare(shareData)) continue;
+    } catch {
+      continue;
+    }
     await navigator.share(shareData);
-  } else {
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(url);
+    return true;
   }
+  return false;
+}
+
+function downloadBackupFile(json: string, fileName: string): "downloaded" | "opened" {
+  const file = backupFile(json, fileName, "application/json;charset=utf-8");
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.append(link);
+
+  const supportsDownload = "download" in (link as HTMLElement);
+  if (supportsDownload) {
+    link.click();
+    window.setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
+    return "downloaded";
+  }
+
+  link.remove();
+  const opened = window.open(url, "_blank", "noopener");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  if (opened) return "opened";
+  throw new Error("This browser could not start a download. Use Share if available, or try from Safari.");
+}
+
+export async function downloadBackup(backup: VaultBackup, kind: BackupDownloadKind = backup.includesPdfs ? "full" : "all"): Promise<BackupDownloadSummary> {
+  const fileName = backupFileName(backup, kind);
+  const json = backupJson(backup);
+  const file = backupFile(json, fileName);
+  const shared = await shareBackupFile(json, fileName);
+  const deliveryMethod = shared ? "shared" : downloadBackupFile(json, fileName);
   return {
     fileName,
     fileSize: file.size,
     fileSizeLabel: fileSizeLabel(file.size),
     charactersBackedUp: backup.payload.characters.length,
+    deliveryMethod,
     timeLabel: new Date(backup.createdAt).toLocaleString(),
   };
 }
