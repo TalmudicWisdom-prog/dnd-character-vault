@@ -296,6 +296,17 @@ h1, h2, strong { color: var(--ink); }
 .review-pill-row span { padding: 6px 9px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; font-weight: 800; }
 
 .sheet-status { display: flex; align-items: center; gap: 9px; width: fit-content; margin: -24px 0 24px auto; color: var(--muted); font-size: 0.78rem; font-weight: 750; }
+.layout-customize-bar { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-bottom: 16px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }
+.layout-customize-bar p { margin: 4px 0 0; color: var(--muted); font-size: 0.84rem; line-height: 1.45; }
+.sheet-layout-stack { display: flex; flex-direction: column; }
+.layout-card { min-width: 0; }
+.layout-card > .panel, .layout-card > .play-grid, .layout-card > .proficiency-grid, .layout-card > .inventory-section { margin-bottom: 16px; }
+.layout-card.customizing { padding: 10px; background: color-mix(in srgb, var(--accent) 5%, transparent); border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 16px; }
+.layout-card.customizing.dragging { border-style: solid; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.layout-card-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.layout-drag-handle { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; color: var(--ink); background: var(--paper-strong); border: 1px solid var(--line); border-radius: 10px; font-weight: 850; touch-action: none; user-select: none; }
+.layout-drag-handle span { color: var(--accent); font-size: 1.1rem; letter-spacing: -0.14em; transform: rotate(90deg); }
+.layout-move-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .dice-tools-panel { margin-bottom: 16px; }
 .dice-roller { display: grid; gap: 12px; padding: 14px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 14px; }
 .compact-dice-roller { padding: 12px; box-shadow: none; }
@@ -643,6 +654,8 @@ h1, h2, strong { color: var(--ink); }
   .form-grid { grid-template-columns: 1fr; }
   .form-field.full-width { grid-column: auto; }
   .form-section-heading { display: grid; }
+  .layout-customize-bar, .layout-card-controls { display: grid; align-items: stretch; }
+  .layout-move-buttons { display: grid; grid-template-columns: 1fr 1fr; }
   .header-action-group { display: grid; }
   .character-create-actions, .empty-create-actions { display: grid; width: 100%; }
   .character-create-actions .button-link, .empty-create-actions .button-link { width: 100%; min-width: 0; }

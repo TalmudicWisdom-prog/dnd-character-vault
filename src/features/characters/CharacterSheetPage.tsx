@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { AbilityId, CharacterSheet, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
@@ -14,6 +14,15 @@ import { rollFormula } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, type RollAssistantMode } from "../../rules/rollAssistant";
 import { createCharacterBackup, downloadBackup } from "../../storage/backups";
+import {
+  defaultSheetLayoutOrder,
+  isSheetLayoutSectionId,
+  moveSheetLayoutSection,
+  normalizeSheetLayoutOrder,
+  reorderSheetLayoutOrder,
+  type SheetLayoutPlacement,
+  type SheetLayoutSectionId,
+} from "./sheetLayout";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
@@ -27,8 +36,69 @@ const skillLabels: Record<SkillId, string> = {
   religion: "Religion", sleightOfHand: "Sleight of Hand", stealth: "Stealth", survival: "Survival",
 };
 
+const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
+  dice: "Dice",
+  "roll-helper": "What Do I Roll?",
+  identity: "Character identity",
+  "level-preview": "Next level preview",
+  roleplay: "Concept and backstory",
+  "health-combat": "Health and combat",
+  abilities: "Ability scores",
+  proficiencies: "Saving throws and skills",
+  attacks: "Attacks and damage",
+  training: "Proficiencies and languages",
+  spells: "Spells",
+  features: "Features and traits",
+  notes: "Character notes",
+  "soul-reaper": "Soul Reaper",
+  inventory: "Inventory",
+};
+
 function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
+}
+
+type LayoutCardProps = {
+  children: ReactNode;
+  customizeMode: boolean;
+  dragging: boolean;
+  id: SheetLayoutSectionId;
+  index: number;
+  style?: CSSProperties;
+  title: string;
+  total: number;
+  onDragEnd: (event: PointerEvent<HTMLButtonElement>) => void;
+  onDragMove: (event: PointerEvent<HTMLButtonElement>) => void;
+  onDragStart: (id: SheetLayoutSectionId, event: PointerEvent<HTMLButtonElement>) => void;
+  onMove: (id: SheetLayoutSectionId, direction: "up" | "down") => void;
+};
+
+function LayoutCard({ children, customizeMode, dragging, id, index, style, title, total, onDragEnd, onDragMove, onDragStart, onMove }: LayoutCardProps) {
+  return (
+    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} style={style}>
+      {customizeMode && (
+        <div className="layout-card-controls">
+          <button
+            aria-label={`Drag ${title}`}
+            className="layout-drag-handle"
+            onPointerCancel={onDragEnd}
+            onPointerDown={(event) => onDragStart(id, event)}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            type="button"
+          >
+            <span aria-hidden="true">::</span>
+            <strong>{title}</strong>
+          </button>
+          <div className="layout-move-buttons">
+            <button className="secondary-button compact" disabled={index === 0} onClick={() => onMove(id, "up")} type="button">Move up</button>
+            <button className="secondary-button compact" disabled={index === total - 1} onClick={() => onMove(id, "down")} type="button">Move down</button>
+          </div>
+        </div>
+      )}
+      {children}
+    </div>
+  );
 }
 
 export function CharacterSheetPage({ characterId }: { characterId: string }) {
@@ -41,6 +111,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [hpPreview, setHpPreview] = useState("");
   const [quickRoll, setQuickRoll] = useState("");
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
+  const [customizeLayout, setCustomizeLayout] = useState(false);
+  const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
+  const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
   const editVersion = useRef(0);
 
   useEffect(() => {
@@ -151,10 +224,67 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     localStorage.setItem("vault:roll-mode", mode);
   };
 
+  const updateLayoutOrder = (change: (currentOrder: readonly string[]) => SheetLayoutSectionId[]) => {
+    edit((current) => ({ ...current, sheetLayoutOrder: change(current.sheetLayoutOrder) }));
+  };
+
+  const moveLayoutCard = (sectionId: SheetLayoutSectionId, direction: "up" | "down") => {
+    updateLayoutOrder((currentOrder) => moveSheetLayoutSection(currentOrder, sectionId, direction));
+  };
+
+  const resetLayout = () => {
+    updateLayoutOrder(() => []);
+    setCustomizeLayout(false);
+    setDraggingSectionId(null);
+    draggingSectionRef.current = null;
+  };
+
+  const startLayoutDrag = (sectionId: SheetLayoutSectionId, event: PointerEvent<HTMLButtonElement>) => {
+    if (!customizeLayout) return;
+    draggingSectionRef.current = sectionId;
+    setDraggingSectionId(sectionId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  const moveLayoutDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    const activeId = draggingSectionRef.current;
+    if (!activeId) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const targetCard = target instanceof Element ? target.closest<HTMLElement>("[data-layout-card-id]") : null;
+    const targetId = targetCard?.dataset.layoutCardId;
+    if (!targetId || !isSheetLayoutSectionId(targetId) || targetId === activeId) return;
+
+    const targetRect = targetCard.getBoundingClientRect();
+    const placement: SheetLayoutPlacement = event.clientY > targetRect.top + targetRect.height / 2 ? "after" : "before";
+    updateLayoutOrder((currentOrder) => reorderSheetLayoutOrder(currentOrder, activeId, targetId, placement));
+  };
+
+  const endLayoutDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    draggingSectionRef.current = null;
+    setDraggingSectionId(null);
+  };
+
   if (loadError) return <section className="page"><div className="loading-state">Could not open character sheet: {loadError}</div></section>;
   if (!character || !sheet) return <section className="page"><div className="loading-state">Opening character sheet...</div></section>;
   const levelPreview = levelUpPreview(character.level);
   const rollRows = buildRollAssistantRows(sheet);
+  const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
+
+  const layoutProps = (id: SheetLayoutSectionId) => ({
+    customizeMode: customizeLayout,
+    dragging: draggingSectionId === id,
+    id,
+    index: layoutOrder.indexOf(id),
+    onDragEnd: endLayoutDrag,
+    onDragMove: moveLayoutDrag,
+    onDragStart: startLayoutDrag,
+    onMove: moveLayoutCard,
+    style: { order: layoutOrder.indexOf(id) },
+    title: layoutSectionTitles[id],
+    total: defaultSheetLayoutOrder.length,
+  });
 
   return (
     <section className="page sheet-page">
@@ -168,11 +298,26 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       <div className="sheet-status"><span className="status-dot" />{status}</div>
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
+      <div className="layout-customize-bar">
+        <div>
+          <span className="card-label">Sheet layout</span>
+          <p>{customizeLayout ? "Drag sections or use Move up / Move down, then tap Done." : "Customize this character's live play order when you need a different flow."}</p>
+        </div>
+        <div className="header-action-group">
+          {customizeLayout && <button className="secondary-button" onClick={resetLayout} type="button">Reset Layout</button>}
+          <button className={customizeLayout ? "primary-button" : "secondary-button"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
+        </div>
+      </div>
+
+      <div className={customizeLayout ? "sheet-layout-stack customizing" : "sheet-layout-stack"}>
+      <LayoutCard {...layoutProps("dice")}>
       <article className="panel sheet-section dice-tools-panel">
         <div className="form-section-heading"><div><span className="card-label">Optional rolling</span><h2>Dice</h2><p>Roll here when useful, or keep using physical dice.</p></div></div>
         <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("roll-helper")}>
       <article className="panel sheet-section roll-assistant-panel">
         <div className="form-section-heading">
           <div><span className="card-label">Live play helper</span><h2>What Do I Roll?</h2><p>Character-specific shortcuts based on this sheet's saved bonuses and proficiencies.</p></div>
@@ -189,7 +334,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </article>)}
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("identity")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Overview</span><h2>Character identity</h2></div></div>
         <div className="form-grid">
@@ -203,7 +350,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => void updateCharacterField({ concept: event.target.value })} value={character.concept} /></label>
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("level-preview")}>
       <article className="panel sheet-section level-up-preview">
         <div className="form-section-heading">
           <div>
@@ -224,7 +373,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           {levelPreview.fields.map((field) => <span key={field}>{field} <LevelUpHint /></span>)}
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("roleplay")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Roleplay</span><h2>Concept and backstory</h2></div></div>
         <div className="form-grid">
@@ -235,7 +386,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field full-width"><span>Backstory</span><textarea onChange={(event) => void updateCharacterField({ backstory: event.target.value, summary: event.target.value.slice(0, 20000) })} rows={8} value={character.backstory} /></label>
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("health-combat")}>
       <div className="play-grid">
         <article className="panel hp-panel">
           <div className="form-section-heading"><div><span className="card-label">Hit points</span><h2>Health</h2></div></div>
@@ -280,7 +433,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         </article>
       </div>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("abilities")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Core abilities</span><h2>Ability scores</h2><p>These remain editable, but are normally adjusted during level-up choices.</p></div></div>
         <div className="ability-grid">
@@ -295,7 +450,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           ))}
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("proficiencies")}>
       <div className="proficiency-grid">
         <article className="panel sheet-section">
           <div className="form-section-heading"><div><span className="card-label">Proficiencies</span><h2>Saving throws</h2><p>Proficiency bonus: <strong>{formatModifier(sheet.proficiencyBonus)}</strong> <span className="level-up-hint">Usually changed during level up.</span></p></div><label className="form-field compact-field"><span>Override</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label></div>
@@ -313,7 +470,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         </article>
       </div>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("attacks")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Attacks, weapons, and damage</h2></div></div>
         <div className="form-grid">
@@ -323,7 +482,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <div className="full-width"><DiceRoller compact context="Use this for attack or damage formulas from your notes." initialFormula="d20" label="Attack roller" /></div>
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("training")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Training</span><h2>Proficiencies & Languages</h2></div></div>
         <div className="form-grid">
@@ -333,7 +494,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field"><span>Languages</span><textarea onChange={(event) => edit((current) => ({ ...current, languages: event.target.value }))} rows={4} value={sheet.languages} /></label>
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("spells")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Magic</span><h2>Spells</h2><p>Use this quick section for casting stats and prepared notes, or open the full spellbook.</p></div><div className="header-action-group"><button className="secondary-button" onClick={shortRest} type="button">Short Rest</button><button className="primary-button" onClick={longRest} type="button">Long Rest</button><a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></div></div>
         <div className="form-grid">
@@ -353,7 +516,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           })}
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("features")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">Features</span><h2>Features & Traits</h2></div></div>
         <div className="form-grid">
@@ -364,14 +529,22 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => edit((current) => ({ ...current, specialAbilities: event.target.value }))} rows={6} value={sheet.specialAbilities} /></label>
         </div>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("notes")}>
       <article className="panel sheet-section">
         <div className="form-section-heading"><div><span className="card-label">During play</span><h2>Character notes</h2></div></div>
         <label className="form-field full-width"><span>Notes</span><textarea onChange={(event) => edit((current) => ({ ...current, notes: event.target.value }))} placeholder="Conditions, reminders, NPC names, session details..." rows={12} value={sheet.notes} /></label>
       </article>
+      </LayoutCard>
 
+      <LayoutCard {...layoutProps("soul-reaper")}>
       <SoulReaperSection characterId={characterId} characterLevel={character.level} />
+      </LayoutCard>
+      <LayoutCard {...layoutProps("inventory")}>
       <InventorySection characterId={characterId} />
+      </LayoutCard>
+      </div>
     </section>
   );
 }

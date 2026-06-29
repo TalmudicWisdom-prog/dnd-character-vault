@@ -273,6 +273,7 @@ describe("guided character creation", () => {
       feats: "",
       specialAbilities: "",
       notes: "",
+      sheetLayoutOrder: [],
       updatedAt: new Date().toISOString(),
     });
     const updated = await saveCharacterSheet({ ...(await db.characterSheets.get(character.id))!, currentHp: 3, temporaryHp: 5, notes: "Poisoned" });

@@ -47,6 +47,7 @@ export function createEmptyCharacterSheet(characterId: string): CharacterSheet {
     feats: "",
     specialAbilities: "",
     notes: "",
+    sheetLayoutOrder: [],
     updatedAt: new Date().toISOString(),
   });
 }
