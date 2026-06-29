@@ -17,6 +17,7 @@ import { createCharacterBackup, downloadBackup } from "../../storage/backups";
 import {
   defaultSheetLayoutOrder,
   isSheetLayoutSectionId,
+  livePlayShortcutSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
@@ -53,15 +54,6 @@ const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
   "soul-reaper": "Soul Reaper",
   inventory: "Inventory",
 };
-
-const playJumpSections: { id: SheetLayoutSectionId; label: string }[] = [
-  { id: "health-combat", label: "HP" },
-  { id: "roll-helper", label: "Rolls" },
-  { id: "dice", label: "Dice" },
-  { id: "attacks", label: "Actions" },
-  { id: "spells", label: "Spells" },
-  { id: "notes", label: "Notes" },
-];
 
 function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
@@ -320,15 +312,20 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
       <nav aria-label="Live play shortcuts" className="play-jump-bar">
-        {playJumpSections.map((section) => <a href={`#sheet-section-${section.id}`} key={section.id}>{section.label}</a>)}
+        {livePlayShortcutSections.map((section) => <a href={`#sheet-section-${section.id}`} key={section.id}>{section.label}</a>)}
         <a href={`#spellbook/${characterId}`}>Book</a>
+        <button className={customizeLayout ? "play-jump-action active" : "play-jump-action"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Layout"}</button>
       </nav>
 
       {customizeLayout && <div className="layout-customize-bar">
         <div>
           <span className="card-label">Editing layout</span>
           <h2>Reorder this character's play sheet</h2>
-          <p>Drag section handles on touch or mouse. Move up and Move down stay available for precise control. Tap Done in the page header when finished.</p>
+          <p>Drag section handles on touch or mouse. Move up and Move down stay available for precise control. Tap Done when finished.</p>
+        </div>
+        <div className="layout-customize-actions">
+          <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>
+          <button className="primary-button compact" onClick={() => setCustomizeLayout(false)} type="button">Done</button>
         </div>
       </div>}
 

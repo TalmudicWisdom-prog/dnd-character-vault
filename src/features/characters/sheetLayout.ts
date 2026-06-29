@@ -19,6 +19,15 @@ export const defaultSheetLayoutOrder = [
 export type SheetLayoutSectionId = typeof defaultSheetLayoutOrder[number];
 export type SheetLayoutPlacement = "before" | "after";
 
+export const livePlayShortcutSections: { id: SheetLayoutSectionId; label: string }[] = [
+  { id: "health-combat", label: "HP" },
+  { id: "roll-helper", label: "Rolls" },
+  { id: "dice", label: "Dice" },
+  { id: "attacks", label: "Actions" },
+  { id: "spells", label: "Spells" },
+  { id: "notes", label: "Notes" },
+];
+
 const defaultLayoutSet = new Set<string>(defaultSheetLayoutOrder);
 
 export function isSheetLayoutSectionId(value: string): value is SheetLayoutSectionId {

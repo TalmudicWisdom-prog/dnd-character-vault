@@ -4,6 +4,7 @@ import { createCharacter } from "../../storage/characters";
 import { createEmptyCharacterSheet, getOrCreateCharacterSheet, saveCharacterSheet } from "../../storage/characterSheets";
 import {
   defaultSheetLayoutOrder,
+  livePlayShortcutSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
 } from "./sheetLayout";
@@ -16,6 +17,18 @@ describe("character sheet layout customization", () => {
 
   it("uses the default layout order when no custom order is saved", () => {
     expect(normalizeSheetLayoutOrder()).toEqual([...defaultSheetLayoutOrder]);
+  });
+
+  it("keeps live play shortcuts focused on valid gameplay sections", () => {
+    expect(livePlayShortcutSections.map((section) => section.id)).toEqual([
+      "health-combat",
+      "roll-helper",
+      "dice",
+      "attacks",
+      "spells",
+      "notes",
+    ]);
+    expect(livePlayShortcutSections.every((section) => defaultSheetLayoutOrder.includes(section.id))).toBe(true);
   });
 
   it("saves custom layout order per character", async () => {
