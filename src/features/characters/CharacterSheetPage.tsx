@@ -292,22 +292,27 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Play tools"
         title={character.name}
         description="A touch-friendly sheet for the details you reach for during play."
-        actions={<div className="header-action-group"><a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a><button className="secondary-button" onClick={() => void exportCharacter()} type="button">Export Character</button><a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a><a className="secondary-button button-link" href="#characters">Characters</a></div>}
+        actions={
+          <div className="header-action-group">
+            {customizeLayout && <button className="secondary-button" onClick={resetLayout} type="button">Reset Layout</button>}
+            <button className={customizeLayout ? "primary-button" : "secondary-button"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
+            <a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a>
+            <button className="secondary-button" onClick={() => void exportCharacter()} type="button">Export Character</button>
+            <a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a>
+            <a className="secondary-button button-link" href="#characters">Characters</a>
+          </div>
+        }
       />
 
       <div className="sheet-status"><span className="status-dot" />{status}</div>
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
-      <div className="layout-customize-bar">
+      {customizeLayout && <div className="layout-customize-bar">
         <div>
           <span className="card-label">Sheet layout</span>
-          <p>{customizeLayout ? "Drag sections or use Move up / Move down, then tap Done." : "Customize this character's live play order when you need a different flow."}</p>
+          <p>Drag sections or use Move up / Move down, then tap Done in the page header.</p>
         </div>
-        <div className="header-action-group">
-          {customizeLayout && <button className="secondary-button" onClick={resetLayout} type="button">Reset Layout</button>}
-          <button className={customizeLayout ? "primary-button" : "secondary-button"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
-        </div>
-      </div>
+      </div>}
 
       <div className={customizeLayout ? "sheet-layout-stack customizing" : "sheet-layout-stack"}>
       <LayoutCard {...layoutProps("dice")}>
