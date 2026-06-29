@@ -21,8 +21,17 @@ const abilityLabels: Record<AbilityId, string> = {
   cha: "Charisma",
 };
 
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function safeInteger(value: unknown, fallback = 0) {
+  return Math.round(safeNumber(value, fallback));
+}
+
 function d20Formula(bonus: number) {
-  return `d20${formatModifier(bonus)}`;
+  return `d20${formatModifier(safeInteger(bonus))}`;
 }
 
 function firstD20Formula(value: string) {
@@ -37,18 +46,27 @@ function formulaBonus(formula: string) {
 }
 
 export function savingThrowBonus(sheet: CharacterSheet, ability: AbilityId) {
-  return abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
+  const abilityScore = safeNumber(sheet.abilityScores[ability], 10);
+  const proficiencyBonus = sheet.savingThrows[ability] ? safeNumber(sheet.proficiencyBonus) : 0;
+  return abilityModifier(abilityScore) + proficiencyBonus;
+}
+
+export function initiativeBonus(sheet: CharacterSheet) {
+  const dexterityBonus = abilityModifier(safeNumber(sheet.abilityScores.dex, 10));
+  const savedInitiative = safeNumber(sheet.initiative, dexterityBonus);
+  return Math.abs(savedInitiative) <= 30 && savedInitiative !== 0 ? savedInitiative : dexterityBonus;
 }
 
 export function buildRollAssistantRows(sheet: CharacterSheet): RollAssistantRow[] {
+  const initiative = initiativeBonus(sheet);
   const rows: RollAssistantRow[] = [
     {
       id: "initiative",
       label: "Initiative",
-      formula: d20Formula(sheet.initiative),
-      bonus: sheet.initiative,
+      formula: d20Formula(initiative),
+      bonus: initiative,
       rollable: true,
-      explanation: "You rolled Initiative. This determines turn order in combat and uses the Initiative bonus saved on this sheet.",
+      explanation: "You rolled Initiative. This determines turn order in combat and uses your Dexterity modifier unless a valid Initiative bonus is saved on this sheet.",
     },
   ];
 
@@ -68,8 +86,8 @@ export function buildRollAssistantRows(sheet: CharacterSheet): RollAssistantRow[
   rows.push({
     id: "spell-attack",
     label: "Spell Attack",
-    formula: d20Formula(sheet.spellAttackBonus),
-    bonus: sheet.spellAttackBonus,
+    formula: d20Formula(safeNumber(sheet.spellAttackBonus)),
+    bonus: safeInteger(sheet.spellAttackBonus),
     rollable: true,
     explanation: "You rolled a spell attack. This uses the spell attack bonus saved on this character sheet.",
   });
@@ -77,7 +95,7 @@ export function buildRollAssistantRows(sheet: CharacterSheet): RollAssistantRow[
   rows.push({
     id: "spell-save-dc",
     label: "Spell Save DC",
-    formula: String(sheet.spellSaveDc || 0),
+    formula: String(safeInteger(sheet.spellSaveDc)),
     bonus: null,
     rollable: false,
     explanation: "Spell Save DC is the number the target rolls against. You usually do not roll this; the target rolls a saving throw.",
