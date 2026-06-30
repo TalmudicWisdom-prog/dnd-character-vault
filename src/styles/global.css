@@ -537,8 +537,33 @@ h1, h2, strong { color: var(--ink); }
 .check-list { display: grid; gap: 5px; }
 .skills-list { grid-template-columns: 1fr 1fr; column-gap: 16px; }
 .proficiency-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; min-height: 40px; padding: 6px 8px; color: var(--ink); border-bottom: 1px solid var(--line); font-size: 0.86rem; cursor: pointer; }
+.rollable-proficiency-row { grid-template-columns: minmax(0, 1fr) auto auto; cursor: default; }
+.proficiency-toggle { min-width: 0; display: flex; gap: 10px; align-items: center; cursor: pointer; }
+.proficiency-toggle span { min-width: 0; overflow-wrap: anywhere; }
 .proficiency-row input { width: 21px; height: 21px; accent-color: var(--accent); }
 .proficiency-row small { color: var(--muted); font-weight: 800; }
+.inline-roll-control { min-width: 0; display: grid; gap: 5px; justify-items: end; }
+.inline-roll-result {
+  max-width: 100%;
+  padding: 4px 7px;
+  color: var(--sheet-accent);
+  background: color-mix(in srgb, var(--sheet-accent) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sheet-accent) 35%, transparent);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  animation: inline-roll-pop 220ms ease-out;
+}
+.rollable-proficiency-row .inline-roll-result { grid-column: 3; justify-self: end; margin-top: -3px; }
+.ability-score-chip .inline-roll-result,
+.combat-summary-card .inline-roll-result,
+.roll-assistant-card .inline-roll-result { justify-self: center; }
+@keyframes inline-roll-pop {
+  from { opacity: 0; transform: translateY(-3px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .roll-assistant-panel { margin-bottom: 16px; }
 .mode-toggle, .settings-action-stack { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .mode-toggle .active { color: #fff; background: var(--accent); border-color: var(--accent); }

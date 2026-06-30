@@ -10,7 +10,7 @@ import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
-import { rollFormula } from "../../dice/dice";
+import { rollFormula, type DiceRollResult } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, type RollAssistantMode } from "../../rules/rollAssistant";
 import { createCharacterBackup, downloadBackup } from "../../storage/backups";
@@ -138,6 +138,26 @@ function textCount(value: string) {
   return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
 
+type InlineRollResult = {
+  id: string;
+  text: string;
+};
+
+function inlineRollText(result: DiceRollResult) {
+  const firstPart = result.parts[0];
+  if (result.parts.length === 1 && firstPart.count === 1 && firstPart.sign === 1) {
+    const roll = firstPart.rolls[0] ?? firstPart.subtotal;
+    const modifierText = result.modifier ? ` ${result.modifier > 0 ? "+" : "-"} ${Math.abs(result.modifier)}` : "";
+    return `${result.total} (${roll}${modifierText})`;
+  }
+  return `${result.total} (${result.breakdown.replace(` = ${result.total}`, "")})`;
+}
+
+function InlineRollFeedback({ result }: { result?: InlineRollResult }) {
+  if (!result) return null;
+  return <output aria-live="polite" className="inline-roll-result" key={result.id}>{result.text}</output>;
+}
+
 export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
   const [sheet, setSheet] = useState<CharacterSheet | null>(null);
@@ -147,6 +167,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [healingAmount, setHealingAmount] = useState(1);
   const [hpPreview, setHpPreview] = useState("");
   const [quickRoll, setQuickRoll] = useState("");
+  const [inlineRolls, setInlineRolls] = useState<Record<string, InlineRollResult>>({});
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
@@ -228,12 +249,25 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     await db.characters.update(characterId, { ...changes, updatedAt: new Date().toISOString() });
   };
 
-  const rollNow = (label: string, formula: string) => {
+  const rollNow = (label: string, formula: string, inlineKey?: string) => {
     try {
       const result = rollFormula(formula);
       setQuickRoll(`${label}: ${result.breakdown}`);
+      if (inlineKey) {
+        setInlineRolls((current) => ({
+          ...current,
+          [inlineKey]: { id: result.id, text: `Rolled: ${inlineRollText(result)}` },
+        }));
+      }
     } catch (error) {
-      setQuickRoll(error instanceof Error ? error.message : "Could not roll");
+      const message = error instanceof Error ? error.message : "Could not roll";
+      setQuickRoll(message);
+      if (inlineKey) {
+        setInlineRolls((current) => ({
+          ...current,
+          [inlineKey]: { id: `${Date.now()}-${inlineKey}`, text: message },
+        }));
+      }
     }
   };
 
@@ -384,10 +418,11 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <strong>{sheet.armorClass}</strong>
             <small>Defense</small>
           </button>
-          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula) : scrollToSheetSection("health-combat")} type="button">
+          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "dashboard-initiative") : scrollToSheetSection("health-combat")} type="button">
             <span>Initiative</span>
             <strong>{formatModifier(sheet.initiative)}</strong>
             <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
+            <InlineRollFeedback result={inlineRolls["dashboard-initiative"]} />
           </button>
           <button className="combat-summary-card hp-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
             <span>Hit Points</span>
@@ -431,7 +466,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
               <span>{abilityFullLabels[ability]}</span>
               <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
               <input aria-label={`${abilityFullLabels[ability]} score`} min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
-              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">Roll</button>
+              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`, `ability-${ability}`)} type="button">Roll</button>
+              <InlineRollFeedback result={inlineRolls[`ability-${ability}`]} />
             </label>
           ))}
         </div>
@@ -459,7 +495,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <div className="check-list">
               {abilityIds.map((ability) => {
                 const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
-                return <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`)} type="button">Roll</button></label>;
+                return <div className="proficiency-row rollable-proficiency-row" key={ability}><label className="proficiency-toggle"><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span></label><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`, `save-${ability}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`save-${ability}`]} /></div>;
               })}
             </div>
           </section>
@@ -473,7 +509,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <details className="module-detail skill-detail">
               <summary>Edit skill proficiencies</summary>
               <div className="check-list skills-list">
-                {skillIds.map((skill) => <label className="proficiency-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>)}
+                {skillIds.map((skill) => <div className="proficiency-row rollable-proficiency-row" key={skill}><label className="proficiency-toggle"><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span></label><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small><button className="secondary-button compact" onClick={() => rollNow(`${skillLabels[skill]} check`, `d20${formatModifier(skillModifier(sheet, skill))}`, `skill-${skill}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`skill-${skill}`]} /></div>)}
               </div>
             </details>
           </section>
@@ -529,7 +565,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         <div className="roll-assistant-grid">
           {rollRows.map((row) => <article className="roll-assistant-card" key={row.id}>
             <div><strong>{row.label}</strong><span>{row.formula}</span>{row.bonus !== null && <small>Total bonus {formatModifier(row.bonus)}</small>}</div>
-            <button className="primary-button compact" onClick={() => row.rollable ? rollNow(row.label, row.formula) : setQuickRoll(`${row.label}: ${row.explanation}`)} type="button">{row.rollable ? "Roll" : "Explain"}</button>
+            <button className="primary-button compact" onClick={() => row.rollable ? rollNow(row.label, row.formula, `assistant-${row.id}`) : setQuickRoll(`${row.label}: ${row.explanation}`)} type="button">{row.rollable ? "Roll" : "Explain"}</button>
+            {row.rollable && <InlineRollFeedback result={inlineRolls[`assistant-${row.id}`]} />}
             {rollMode === "beginner" && <p>{row.explanation}</p>}
           </article>)}
         </div>
@@ -596,7 +633,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="HP details"
         title="Health"
         summary={<div className="module-summary hp-module-summary"><span>{sheet.currentHp}/{sheet.maxHp} HP</span><strong>{sheet.temporaryHp} temp</strong><small>{hpPreview || "Ready for damage or healing"}</small><div className="hp-quick-deltas compact-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div></div>}
-        actions={<button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula)} type="button">Roll initiative</button>}
+        actions={<div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "health-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["health-initiative"]} /></div>}
       >
       <div className="play-grid">
         <article className="panel hp-panel">
@@ -638,8 +675,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label>
             <label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label>
             <label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label>
-            <button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula)} type="button">Roll initiative</button>
-            <button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice)} type="button">Roll hit dice</button>
+            <div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "combat-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["combat-initiative"]} /></div>
+            <div className="inline-roll-control"><button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice, "combat-hit-dice")} type="button">Roll hit dice</button><InlineRollFeedback result={inlineRolls["combat-hit-dice"]} /></div>
             <button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Conditions / notes</button>
           </div>
         </article>
@@ -652,7 +689,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Weapons and actions"
         title="Attacks"
         summary={<div className="module-summary"><span>{textCount(sheet.attacks)} attack lines</span><strong>{textCount(sheet.weapons)} weapon notes</strong><small>{attackNoteCount ? `${attackNoteCount} total combat notes` : "No attacks recorded"}</small></div>}
-        actions={<button className="primary-button compact" onClick={() => rollNow("Attack", "d20")} type="button">Roll d20</button>}
+        actions={<div className="inline-roll-control"><button className="primary-button compact" onClick={() => rollNow("Attack", "d20", "attacks-d20")} type="button">Roll d20</button><InlineRollFeedback result={inlineRolls["attacks-d20"]} /></div>}
       >
         <div className="form-grid">
           <label className="form-field"><span>Attacks</span><textarea onChange={(event) => edit((current) => ({ ...current, attacks: event.target.value }))} rows={5} value={sheet.attacks} /></label>
