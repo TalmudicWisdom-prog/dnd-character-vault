@@ -19,13 +19,32 @@ export const defaultSheetLayoutOrder = [
 export type SheetLayoutSectionId = typeof defaultSheetLayoutOrder[number];
 export type SheetLayoutPlacement = "before" | "after";
 
-export const livePlayShortcutSections: { id: SheetLayoutSectionId; label: string }[] = [
-  { id: "health-combat", label: "HP" },
-  { id: "roll-helper", label: "Rolls" },
-  { id: "dice", label: "Dice" },
-  { id: "attacks", label: "Actions" },
-  { id: "spells", label: "Spells" },
-  { id: "notes", label: "Notes" },
+export function sheetSectionDomId(sectionId: SheetLayoutSectionId) {
+  return `sheet-section-${sectionId}`;
+}
+
+export const livePlayShortcutSections: { id: SheetLayoutSectionId; label: string; targetId: string }[] = [
+  { id: "health-combat", label: "HP", targetId: sheetSectionDomId("health-combat") },
+  { id: "roll-helper", label: "Rolls", targetId: sheetSectionDomId("roll-helper") },
+  { id: "dice", label: "Dice", targetId: sheetSectionDomId("dice") },
+  { id: "attacks", label: "Actions", targetId: sheetSectionDomId("attacks") },
+  { id: "spells", label: "Spells", targetId: sheetSectionDomId("spells") },
+  { id: "inventory", label: "Gear", targetId: sheetSectionDomId("inventory") },
+  { id: "features", label: "Features", targetId: sheetSectionDomId("features") },
+  { id: "notes", label: "Notes", targetId: sheetSectionDomId("notes") },
+  { id: "roleplay", label: "Bio", targetId: sheetSectionDomId("roleplay") },
+];
+
+export const majorGameplayModuleSections: SheetLayoutSectionId[] = [
+  "health-combat",
+  "roll-helper",
+  "dice",
+  "attacks",
+  "spells",
+  "inventory",
+  "features",
+  "notes",
+  "roleplay",
 ];
 
 const defaultLayoutSet = new Set<string>(defaultSheetLayoutOrder);

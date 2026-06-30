@@ -5,8 +5,10 @@ import { createEmptyCharacterSheet, getOrCreateCharacterSheet, saveCharacterShee
 import {
   defaultSheetLayoutOrder,
   livePlayShortcutSections,
+  majorGameplayModuleSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
+  sheetSectionDomId,
 } from "./sheetLayout";
 
 describe("character sheet layout customization", () => {
@@ -26,9 +28,36 @@ describe("character sheet layout customization", () => {
       "dice",
       "attacks",
       "spells",
+      "inventory",
+      "features",
       "notes",
+      "roleplay",
     ]);
     expect(livePlayShortcutSections.every((section) => defaultSheetLayoutOrder.includes(section.id))).toBe(true);
+  });
+
+  it("points shortcut navigation at stable sheet section DOM IDs", () => {
+    expect(livePlayShortcutSections.map((section) => section.targetId)).toEqual(
+      livePlayShortcutSections.map((section) => sheetSectionDomId(section.id)),
+    );
+    expect(livePlayShortcutSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
+  });
+
+  it("keeps every major gameplay module available in phone layouts", () => {
+    const normalized = normalizeSheetLayoutOrder(["spells", "health-combat"]);
+
+    expect(majorGameplayModuleSections).toEqual([
+      "health-combat",
+      "roll-helper",
+      "dice",
+      "attacks",
+      "spells",
+      "inventory",
+      "features",
+      "notes",
+      "roleplay",
+    ]);
+    expect(majorGameplayModuleSections.every((section) => normalized.includes(section))).toBe(true);
   });
 
   it("saves custom layout order per character", async () => {

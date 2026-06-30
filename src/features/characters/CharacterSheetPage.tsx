@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, typ
 import { useLiveQuery } from "dexie-react-hooks";
 import type { AbilityId, CharacterSheet, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
-import { PageHeader } from "../../components/PageHeader";
 import { DiceRoller } from "../../components/DiceRoller";
 import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } from "../../storage/characterSheets";
 import { db } from "../../storage/database";
@@ -21,12 +20,17 @@ import {
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
+  sheetSectionDomId,
   type SheetLayoutPlacement,
   type SheetLayoutSectionId,
 } from "./sheetLayout";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
+};
+
+const abilityFullLabels: Record<AbilityId, string> = {
+  str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma",
 };
 
 const skillLabels: Record<SkillId, string> = {
@@ -42,7 +46,7 @@ const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
   "roll-helper": "What Do I Roll?",
   identity: "Character identity",
   "level-preview": "Next level preview",
-  roleplay: "Concept and backstory",
+  roleplay: "Biography",
   "health-combat": "Health and combat",
   abilities: "Ability scores",
   proficiencies: "Saving throws and skills",
@@ -76,7 +80,7 @@ type LayoutCardProps = {
 
 function LayoutCard({ children, customizeMode, dragging, id, index, style, title, total, onDragEnd, onDragMove, onDragStart, onMove }: LayoutCardProps) {
   return (
-    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} id={`sheet-section-${id}`} style={style}>
+    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} data-sheet-section-id={id} id={sheetSectionDomId(id)} style={style} tabIndex={-1}>
       {customizeMode && (
         <div className="layout-card-controls">
           <button
@@ -227,6 +231,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     localStorage.setItem("vault:roll-mode", mode);
   };
 
+  const scrollToSheetSection = (sectionId: SheetLayoutSectionId) => {
+    const target = document.getElementById(sheetSectionDomId(sectionId));
+    if (!target) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start", inline: "nearest" });
+    if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+  };
+
   const updateLayoutOrder = (change: (currentOrder: readonly string[]) => SheetLayoutSectionId[]) => {
     edit((current) => ({ ...current, sheetLayoutOrder: change(current.sheetLayoutOrder) }));
   };
@@ -275,6 +288,14 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const rollRows = buildRollAssistantRows(sheet);
   const initiativeRow = rollRows.find((row) => row.id === "initiative");
   const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
+  const passivePerception = 10 + skillModifier(sheet, "perception");
+  const hpMaximum = Math.max(sheet.maxHp, 1);
+  const hpPercent = Math.max(0, Math.min(100, Math.round((sheet.currentHp / hpMaximum) * 100)));
+  const characterSubtitle = [
+    character.ancestry,
+    character.characterClass,
+    `Level ${character.level}`,
+  ].filter(Boolean).join(" / ");
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
     customizeMode: customizeLayout,
@@ -292,11 +313,17 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   return (
     <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
-      <PageHeader
-        eyebrow="Play tools"
-        title={character.name}
-        description="A touch-friendly sheet for the details you reach for during play."
-        actions={
+      <header className="sheet-character-header" aria-labelledby="sheet-character-title">
+        <div className="sheet-character-title-block">
+          <span className="eyebrow">Play tools</span>
+          <h1 id="sheet-character-title">{character.name}</h1>
+          <p>{characterSubtitle || "Touch-friendly live play sheet"}</p>
+        </div>
+        <div className="sheet-header-panel">
+          <div className="sheet-header-meta">
+            <span>{character.campaign || "No campaign set"}</span>
+            <strong>{status}</strong>
+          </div>
           <div className="header-action-group">
             {customizeLayout && <button className="secondary-button" onClick={resetLayout} type="button">Reset Layout</button>}
             <button className={customizeLayout ? "primary-button" : "secondary-button"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
@@ -305,14 +332,70 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a>
             <a className="secondary-button button-link" href="#characters">Characters</a>
           </div>
-        }
-      />
+        </div>
+      </header>
 
-      <div className="sheet-status"><span className="status-dot" />{status}</div>
+      <section className="combat-summary-region" aria-label="Combat summary">
+        <button className="combat-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+          <span>Armor Class</span>
+          <strong>{sheet.armorClass}</strong>
+          <small>Defense</small>
+        </button>
+        <button className="combat-summary-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula) : scrollToSheetSection("health-combat")} type="button">
+          <span>Initiative</span>
+          <strong>{formatModifier(sheet.initiative)}</strong>
+          <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
+        </button>
+        <button className="combat-summary-card hp-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+          <span>Hit Points</span>
+          <strong>{sheet.currentHp}/{sheet.maxHp}</strong>
+          <small>{sheet.temporaryHp} temporary</small>
+          <i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i>
+        </button>
+        <button className="combat-summary-card" onClick={() => scrollToSheetSection("notes")} type="button">
+          <span>Conditions</span>
+          <strong>{sheet.notes.trim() ? "Notes" : "Clear"}</strong>
+          <small>Jump to play notes</small>
+        </button>
+      </section>
+
+      <section className="abilities-senses-region" aria-labelledby="abilities-senses-title">
+        <div className="sheet-region-heading">
+          <div>
+            <span className="card-label">Abilities, saves, senses</span>
+            <h2 id="abilities-senses-title">At-a-glance checks</h2>
+          </div>
+          <button className="secondary-button compact" onClick={() => scrollToSheetSection("abilities")} type="button">Edit scores</button>
+        </div>
+        <div className="ability-score-dashboard">
+          {abilityIds.map((ability) => (
+            <button className="ability-score-chip" key={ability} onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">
+              <span>{abilityFullLabels[ability]}</span>
+              <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
+              <small>{sheet.abilityScores[ability] ?? 10}</small>
+            </button>
+          ))}
+          <button className="sense-chip" onClick={() => scrollToSheetSection("proficiencies")} type="button">
+            <span>Passive Perception</span>
+            <strong>{passivePerception}</strong>
+          </button>
+          <button className="sense-chip" onClick={() => scrollToSheetSection("health-combat")} type="button">
+            <span>Speed</span>
+            <strong>{sheet.speed}</strong>
+          </button>
+          <button className="sense-chip" onClick={() => scrollToSheetSection("proficiencies")} type="button">
+            <span>Proficiency</span>
+            <strong>{formatModifier(sheet.proficiencyBonus)}</strong>
+          </button>
+        </div>
+      </section>
+
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
       <nav aria-label="Live play shortcuts" className="play-jump-bar">
-        {livePlayShortcutSections.map((section) => <a href={`#sheet-section-${section.id}`} key={section.id}>{section.label}</a>)}
+        {livePlayShortcutSections.map((section) => (
+          <button data-shortcut-target={section.targetId} key={section.id} onClick={() => scrollToSheetSection(section.id)} type="button">{section.label}</button>
+        ))}
         <a href={`#spellbook/${characterId}`}>Book</a>
         <button className={customizeLayout ? "play-jump-action active" : "play-jump-action"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Layout"}</button>
       </nav>
@@ -329,7 +412,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </div>}
 
-      <div className={customizeLayout ? "sheet-layout-stack customizing" : "sheet-layout-stack"}>
+      <div className={customizeLayout ? "sheet-layout-stack customizing" : "sheet-layout-stack"} aria-label="Gameplay modules">
       <LayoutCard {...layoutProps("dice")}>
       <article className="panel sheet-section dice-tools-panel">
         <div className="form-section-heading"><div><span className="card-label">Optional rolling</span><h2>Dice</h2><p>Roll here when useful, or keep using physical dice.</p></div></div>
@@ -397,7 +480,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
       <LayoutCard {...layoutProps("roleplay")}>
       <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Roleplay</span><h2>Concept and backstory</h2></div></div>
+        <div className="form-section-heading"><div><span className="card-label">Biography</span><h2>Biography and roleplay</h2></div></div>
         <div className="form-grid">
           <label className="form-field"><span>Personality notes</span><textarea onChange={(event) => void updateCharacterField({ personalityNotes: event.target.value })} rows={5} value={character.personalityNotes} /></label>
           <label className="form-field"><span>Goals</span><textarea onChange={(event) => void updateCharacterField({ goals: event.target.value })} rows={5} value={character.goals} /></label>
@@ -451,7 +534,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label>
             <button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula)} type="button">Roll initiative</button>
             <button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice)} type="button">Roll hit dice</button>
-            <a className="secondary-button compact button-link" href="#sheet-section-notes">Conditions / notes</a>
+            <button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Conditions / notes</button>
           </div>
         </article>
       </div>
