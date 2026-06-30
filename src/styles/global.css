@@ -592,13 +592,13 @@ h1, h2, strong { color: var(--ink); }
   border: 0;
   border-radius: 0;
 }
-.portrait-picker.compact .portrait-frame { min-height: 260px; width: 100%; }
+.portrait-picker.compact .portrait-frame { min-height: 210px; width: 100%; }
 .portrait-picker.compact .portrait-picker-controls {
-  padding: var(--space-3);
-  background: var(--sheet-panel);
-  border: 1px solid var(--sheet-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
+  padding: var(--space-2) 0 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .dashboard .sheet-character-header {
   min-width: 0;
@@ -1012,9 +1012,19 @@ h1, h2, strong { color: var(--ink); }
   .page-header, .section-heading, .setting-section, .guidance-panel { align-items: stretch; flex-direction: column; }
   .page-header { margin-bottom: 30px; }
   .dashboard { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; margin-bottom: 10px; }
-  .dashboard .portrait-picker.compact { grid-column: 1 / -1; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
-  .dashboard .portrait-picker.compact .portrait-picker-controls { align-content: center; padding: 10px; }
+  .dashboard .portrait-picker.compact { grid-column: 1 / -1; grid-template-columns: 118px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 176px; aspect-ratio: 2 / 3; border-radius: var(--radius-md); }
+  .dashboard .portrait-picker.compact .portrait-picker-controls { align-content: center; gap: 7px; padding: 0; }
+  .dashboard .portrait-picker.compact .form-field-label { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
   .dashboard .portrait-picker.compact .portrait-picker-actions { gap: 6px; }
+  .dashboard .portrait-picker.compact .file-button,
+  .dashboard .portrait-picker.compact .text-button {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+  .dashboard .portrait-picker.compact .portrait-picker-controls small { max-width: 22ch; font-size: 0.66rem; line-height: 1.25; }
   .portrait-frame { min-height: 132px; }
   .portrait-frame span { font-size: 3rem; }
   .dashboard .sheet-character-header { grid-column: 1 / -1; min-height: 132px; padding: 14px; }
