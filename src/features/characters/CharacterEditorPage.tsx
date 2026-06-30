@@ -10,6 +10,7 @@ import {
   updateCharacter,
 } from "../../storage/characters";
 import { db } from "../../storage/database";
+import { CharacterPortraitField } from "./CharacterPortraitField";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -18,6 +19,7 @@ const emptyDraft: CharacterDraft = {
   campaign: "",
   ancestry: "",
   characterClass: "",
+  portraitDataUrl: "",
   level: 1,
 };
 
@@ -51,6 +53,7 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
         campaign: character.campaign,
         ancestry: character.ancestry,
         characterClass: character.characterClass,
+        portraitDataUrl: character.portraitDataUrl,
         level: character.level,
       });
       setInitializedId(character.id);
@@ -153,6 +156,13 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
               <span className={status === "error" ? "save-state error" : "save-state"}>{statusLabel}</span>
             </div>
             <div className="form-grid">
+              <div className="full-width">
+                <CharacterPortraitField
+                  characterName={draft.name || "New character"}
+                  onChange={(portraitDataUrl) => updateDraft("portraitDataUrl", portraitDataUrl)}
+                  value={draft.portraitDataUrl ?? ""}
+                />
+              </div>
               <label className="form-field full-width">
                 <span>Character name</span>
                 <input

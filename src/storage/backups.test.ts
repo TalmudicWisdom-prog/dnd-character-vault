@@ -68,7 +68,7 @@ describe("manual backup and restore", () => {
   });
 
   it("imports an exported character backup into an empty vault with sheet, spells, layout, notes, and inventory", async () => {
-    const cloud = await createCharacter({ name: "Cloud", summary: "Storm druid", playerName: "Yitzak", campaign: "Sunday", ancestry: "Human", characterClass: "Druid", level: 4 });
+    const cloud = await createCharacter({ name: "Cloud", summary: "Storm druid", playerName: "Yitzak", campaign: "Sunday", ancestry: "Human", characterClass: "Druid", portraitDataUrl: "data:image/jpeg;base64,cloud", level: 4 });
     await saveCharacterSheet({
       ...createEmptyCharacterSheet(cloud.id),
       abilityScores: { str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 },
@@ -98,6 +98,7 @@ describe("manual backup and restore", () => {
     const restoredItems = await db.inventoryItems.where("characterId").equals(cloud.id).toArray();
 
     expect(restoredCharacter?.name).toBe("Cloud");
+    expect(restoredCharacter?.portraitDataUrl).toBe("data:image/jpeg;base64,cloud");
     expect(restoredSheet?.abilityScores).toMatchObject({ str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 });
     expect(restoredSheet).toMatchObject({ currentHp: 17, maxHp: 31, temporaryHp: 4, notes: "Concentrating on Call Lightning." });
     expect(restoredSheet?.sheetLayoutOrder).toEqual(["spells", "roll-helper", "health-combat"]);

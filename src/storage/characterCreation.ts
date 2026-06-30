@@ -30,6 +30,7 @@ export function createEmptyCreationDraft(): CharacterCreationDraft {
       background: "",
       summary: "",
       concept: "",
+      portraitDataUrl: "",
       personalityNotes: "",
       backstory: "",
       goals: "",

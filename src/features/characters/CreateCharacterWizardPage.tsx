@@ -45,6 +45,7 @@ import {
   spellcastingCantripLimit,
   spellsForClass,
 } from "./srdGuidedCreation";
+import { CharacterPortraitField } from "./CharacterPortraitField";
 
 const abilityLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.label])) as Record<AbilityId, string>;
 const abilityShortLabels = Object.fromEntries(srdAbilities.map((ability) => [ability.id, ability.shortLabel])) as Record<AbilityId, string>;
@@ -468,6 +469,13 @@ export function CreateCharacterWizardPage() {
           </div>}
 
           {step === 1 && <div className="form-grid">
+            <div className="full-width">
+              <CharacterPortraitField
+                characterName={character.name || "New character"}
+                onChange={(portraitDataUrl) => updateCharacter("portraitDataUrl", portraitDataUrl)}
+                value={character.portraitDataUrl ?? ""}
+              />
+            </div>
             <label className="form-field"><span>Character name *</span><input autoFocus maxLength={100} onChange={(event) => updateCharacter("name", event.target.value)} value={character.name} /></label>
             <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => updateCharacter("playerName", event.target.value)} value={character.playerName ?? ""} /></label>
             <label className="form-field"><span>Campaign</span><input maxLength={100} onChange={(event) => updateCharacter("campaign", event.target.value)} value={character.campaign ?? ""} /></label>

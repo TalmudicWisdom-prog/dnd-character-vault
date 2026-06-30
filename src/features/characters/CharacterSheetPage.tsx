@@ -7,6 +7,7 @@ import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } f
 import { db } from "../../storage/database";
 import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
+import { CharacterPortraitField } from "./CharacterPortraitField";
 import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import { rollFormula } from "../../dice/dice";
@@ -326,7 +327,6 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     character.characterClass,
     `Level ${character.level}`,
   ].filter(Boolean).join(" / ");
-  const characterInitial = character.name.trim().slice(0, 1).toLocaleUpperCase() || "V";
   const conditionsSummary = sheet.notes.trim() ? "Notes" : "Clear";
   const activeSaveCount = abilityIds.filter((ability) => sheet.savingThrows[ability]).length;
   const activeSkillCount = skillIds.filter((skill) => sheet.skillProficiencies[skill]).length;
@@ -357,9 +357,13 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   return (
     <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
       <section className="dashboard" aria-labelledby="sheet-character-title">
-        <div className="portrait-frame" aria-label={`${character.name} portrait placeholder`}>
-          <span aria-hidden="true">{characterInitial}</span>
-        </div>
+        <CharacterPortraitField
+          characterName={character.name}
+          compact
+          label="Portrait"
+          onChange={(portraitDataUrl) => updateCharacterField({ portraitDataUrl })}
+          value={character.portraitDataUrl ?? ""}
+        />
 
         <header className="sheet-character-header">
           <span className="eyebrow">Live play HUD</span>

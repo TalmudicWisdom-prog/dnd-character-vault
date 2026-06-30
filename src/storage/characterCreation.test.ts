@@ -24,6 +24,7 @@ describe("guided character creation", () => {
         background: "Sage",
         level: 5,
         concept: "Careful battlefield scholar",
+        portraitDataUrl: "data:image/jpeg;base64,portrait",
         backstory: "Raised in a tower library.",
       },
       sheet: {
@@ -48,6 +49,7 @@ describe("guided character creation", () => {
 
     expect(character.background).toBe("Sage");
     expect(character.concept).toBe("Careful battlefield scholar");
+    expect(character.portraitDataUrl).toBe("data:image/jpeg;base64,portrait");
     expect(sheet?.abilityScores.int).toBe(18);
     expect(sheet?.proficiencyBonus).toBe(3);
     expect(sheet?.spellSlots["3"]).toBe(2);
@@ -228,6 +230,7 @@ describe("guided character creation", () => {
     const character = await createCharacter({ name: "Old Style", characterClass: "Fighter", ancestry: "Human" });
     expect(character.background).toBe("");
     expect(character.backstory).toBe("");
+    expect(character.portraitDataUrl).toBe("");
     expect(character.level).toBe(1);
   });
 
