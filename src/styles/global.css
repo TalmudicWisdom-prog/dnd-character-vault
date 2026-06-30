@@ -548,6 +548,162 @@ h1, h2, strong { color: var(--ink); }
 .roll-assistant-card span { color: var(--accent); font-weight: 900; }
 .roll-assistant-card small, .roll-assistant-card p { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
 
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(280px, 1fr) minmax(360px, 1.35fr);
+  gap: var(--space-5);
+  align-items: stretch;
+  margin-bottom: var(--space-4);
+}
+.portrait-frame {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  color: var(--sheet-accent);
+  background: var(--sheet-panel);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+.portrait-frame span { font-family: Georgia, serif; font-size: clamp(4rem, 11vw, 8rem); font-weight: 500; }
+.dashboard .sheet-character-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  align-content: center;
+  margin: 0;
+  padding: var(--space-7);
+  background: var(--sheet-panel);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+.dashboard .sheet-character-header h1 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  font-weight: 500;
+  line-height: 0.96;
+}
+.dashboard .sheet-character-header p { margin: 0; color: var(--sheet-text-muted); font-size: 1.05rem; }
+.dashboard-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-2); }
+.combat-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.combat-summary .hp-summary-card,
+.combat-summary .conditions-card,
+.combat-summary .inspiration-status,
+.combat-summary .important-combat-status { grid-column: 1 / -1; }
+.inspiration-status, .important-combat-status {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  color: var(--sheet-text);
+  background: var(--sheet-panel);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+.inspiration-status span, .important-combat-status strong { color: var(--sheet-text-muted); font-size: 0.72rem; font-weight: 850; letter-spacing: 0.06em; text-transform: uppercase; }
+.inspiration-status strong { font-family: Georgia, serif; font-size: 1.35rem; font-weight: 500; }
+.important-combat-status span { display: grid; gap: 3px; min-width: 86px; }
+.abilities-panel { align-items: stretch; }
+.senses-passives-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.saves-skills-grid { display: grid; grid-template-columns: 0.75fr 1.25fr; gap: var(--space-3); }
+.abilities-subpanel {
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--sheet-panel-strong);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-md);
+}
+.compact-module-header { margin-bottom: var(--space-3); }
+.compact-module-header h3 { margin: 3px 0 0; font-family: Georgia, serif; font-size: 1.1rem; font-weight: 500; }
+.skill-proficiency-summary { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.skill-proficiency-summary span { padding: 7px 9px; color: var(--sheet-text); background: var(--sheet-panel); border: 1px solid var(--sheet-border); border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 800; }
+.ability-score-chip input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  color: var(--sheet-text);
+  background: var(--sheet-panel);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.gameplay-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+.gameplay-grid .layout-card[data-layout-card-id] { grid-column: auto; }
+.gameplay-card {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 100%;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  padding: var(--space-4);
+}
+.module-header {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: start;
+}
+.module-header h2 { margin: 3px 0 0; }
+.module-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.module-body { min-width: 0; max-width: 100%; }
+.module-summary {
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  gap: var(--space-1);
+  min-height: 92px;
+  align-content: center;
+  padding: var(--space-3);
+  background: var(--sheet-panel-strong);
+  border: 1px solid var(--sheet-border);
+  border-radius: var(--radius-md);
+}
+.module-summary span, .module-summary small { color: var(--sheet-text-muted); font-size: 0.78rem; font-weight: 750; line-height: 1.35; }
+.module-summary strong { font-family: Georgia, serif; font-size: 1.35rem; font-weight: 500; }
+.hp-module-summary { min-height: 150px; }
+.compact-deltas { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: var(--space-2); }
+.module-detail { min-width: 0; max-width: 100%; border-top: 1px solid var(--sheet-border); }
+.module-detail > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--sheet-accent);
+  font-weight: 850;
+  cursor: pointer;
+}
+.module-detail-body { min-width: 0; max-width: 100%; display: grid; gap: var(--space-3); padding-top: var(--space-3); }
+.module-detail-body > * { min-width: 0; max-width: 100%; }
+.module-detail .panel,
+.module-detail .inventory-section,
+.module-detail .soul-reaper-section {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 !important;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .inventory-section { margin-top: 16px; }
 .inventory-section .form-section-heading p { margin-top: 8px; }
 .container-tabs { display: flex; gap: 8px; padding-bottom: 10px; overflow-x: auto; scrollbar-width: thin; }
@@ -794,10 +950,14 @@ h1, h2, strong { color: var(--ink); }
   .editor-side { position: static; }
   .character-card { display: block; }
   .character-actions { border-top: 1px solid var(--line); border-left: 0; }
+  .dashboard { grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr); }
+  .dashboard .combat-summary { grid-column: 1 / -1; }
   .sheet-character-header, .sheet-layout-stack { grid-template-columns: 1fr; }
+  .gameplay-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .combat-summary-region { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hp-summary-card { grid-column: 1 / -1; }
   .ability-score-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .senses-passives-grid, .saves-skills-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .layout-card[data-layout-card-id] { grid-column: auto; }
   .play-grid, .proficiency-grid, .pdf-viewer-layout { grid-template-columns: 1fr; }
   .ability-grid { grid-template-columns: repeat(3, 1fr); }
@@ -817,6 +977,14 @@ h1, h2, strong { color: var(--ink); }
   .page { padding: max(30px, env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom)); }
   .page-header, .section-heading, .setting-section, .guidance-panel { align-items: stretch; flex-direction: column; }
   .page-header { margin-bottom: 30px; }
+  .dashboard { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; margin-bottom: 10px; }
+  .portrait-frame { min-height: 132px; }
+  .portrait-frame span { font-size: 3rem; }
+  .dashboard .sheet-character-header { min-height: 132px; padding: 14px; }
+  .dashboard .sheet-character-header h1 { font-size: 2rem; }
+  .dashboard .combat-summary, .dashboard .sheet-header-meta { grid-column: 1 / -1; }
+  .dashboard-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .dashboard-actions .button-link, .dashboard-actions button { width: 100%; }
   .sheet-character-header { gap: 10px; margin-bottom: 10px; }
   .sheet-character-title-block { min-height: 132px; padding: 18px; }
   .sheet-character-title-block h1 { font-size: 2.35rem; }
@@ -829,6 +997,8 @@ h1, h2, strong { color: var(--ink); }
   .abilities-senses-region { padding: 12px; margin-bottom: 10px; }
   .sheet-region-heading { align-items: stretch; display: grid; }
   .ability-score-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .saves-skills-grid, .gameplay-grid { grid-template-columns: 1fr; }
+  .senses-passives-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ability-score-chip, .sense-chip { min-height: 88px; padding: 8px; }
   .ability-score-chip span, .sense-chip span { font-size: 0.62rem; }
   .ability-score-chip strong, .sense-chip strong { font-size: 1.35rem; }

@@ -4,8 +4,6 @@ export const defaultSheetLayoutOrder = [
   "attacks",
   "dice",
   "spells",
-  "abilities",
-  "proficiencies",
   "notes",
   "features",
   "inventory",

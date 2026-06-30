@@ -48,8 +48,6 @@ const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
   "level-preview": "Next level preview",
   roleplay: "Biography",
   "health-combat": "Health and combat",
-  abilities: "Ability scores",
-  proficiencies: "Saving throws and skills",
   attacks: "Attacks and damage",
   training: "Proficiencies and languages",
   spells: "Spells",
@@ -105,6 +103,38 @@ function LayoutCard({ children, customizeMode, dragging, id, index, style, title
       {children}
     </div>
   );
+}
+
+type GameplayCardProps = {
+  actions?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  eyebrow: string;
+  summary: ReactNode;
+  title: string;
+};
+
+function GameplayCard({ actions, children, defaultOpen = false, eyebrow, summary, title }: GameplayCardProps) {
+  return (
+    <article className="panel sheet-section gameplay-card">
+      <div className="module-header">
+        <div>
+          <span className="card-label">{eyebrow}</span>
+          <h2>{title}</h2>
+        </div>
+        {actions && <div className="module-actions">{actions}</div>}
+      </div>
+      <div className="module-body">{summary}</div>
+      <details className="module-detail" open={defaultOpen}>
+        <summary>Details</summary>
+        <div className="module-detail-body">{children}</div>
+      </details>
+    </article>
+  );
+}
+
+function textCount(value: string) {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
 
 export function CharacterSheetPage({ characterId }: { characterId: string }) {
@@ -296,6 +326,19 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     character.characterClass,
     `Level ${character.level}`,
   ].filter(Boolean).join(" / ");
+  const characterInitial = character.name.trim().slice(0, 1).toLocaleUpperCase() || "V";
+  const conditionsSummary = sheet.notes.trim() ? "Notes" : "Clear";
+  const activeSaveCount = abilityIds.filter((ability) => sheet.savingThrows[ability]).length;
+  const activeSkillCount = skillIds.filter((skill) => sheet.skillProficiencies[skill]).length;
+  const passiveInsight = 10 + skillModifier(sheet, "insight");
+  const passiveInvestigation = 10 + skillModifier(sheet, "investigation");
+  const attackNoteCount = textCount(sheet.attacks) + textCount(sheet.weapons) + textCount(sheet.damageNotes);
+  const preparedSpellCount = textCount(sheet.preparedSpells);
+  const cantripCount = textCount(sheet.cantrips);
+  const featureCount = textCount(sheet.classFeatures) + textCount(sheet.speciesTraits) + textCount(sheet.backgroundFeature) + textCount(sheet.feats) + textCount(sheet.specialAbilities);
+  const noteCount = textCount(sheet.notes);
+  const usedSlotCount = Object.values(sheet.spellSlotsUsed).reduce((total, used) => total + used, 0);
+  const totalSlotCount = Object.values(sheet.spellSlots).reduce((total, maximum) => total + maximum, 0);
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
     customizeMode: customizeLayout,
@@ -313,80 +356,123 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   return (
     <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
-      <header className="sheet-character-header" aria-labelledby="sheet-character-title">
-        <div className="sheet-character-title-block">
-          <span className="eyebrow">Play tools</span>
+      <section className="dashboard" aria-labelledby="sheet-character-title">
+        <div className="portrait-frame" aria-label={`${character.name} portrait placeholder`}>
+          <span aria-hidden="true">{characterInitial}</span>
+        </div>
+
+        <header className="sheet-character-header">
+          <span className="eyebrow">Live play HUD</span>
           <h1 id="sheet-character-title">{character.name}</h1>
           <p>{characterSubtitle || "Touch-friendly live play sheet"}</p>
-        </div>
-        <div className="sheet-header-panel">
-          <div className="sheet-header-meta">
-            <span>{character.campaign || "No campaign set"}</span>
-            <strong>{status}</strong>
+          <div className="dashboard-actions">
+            {customizeLayout && <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>}
+            <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
+            <a className="primary-button compact button-link" href={`#spellbook/${characterId}`}>Spellbook</a>
+            <button className="secondary-button compact" onClick={() => void exportCharacter()} type="button">Export</button>
+            <a className="secondary-button compact button-link" href={`#character/${characterId}`}>Profile</a>
           </div>
-          <div className="header-action-group">
-            {customizeLayout && <button className="secondary-button" onClick={resetLayout} type="button">Reset Layout</button>}
-            <button className={customizeLayout ? "primary-button" : "secondary-button"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
-            <a className="primary-button button-link" href={`#spellbook/${characterId}`}>Spellbook</a>
-            <button className="secondary-button" onClick={() => void exportCharacter()} type="button">Export Character</button>
-            <a className="secondary-button button-link" href={`#character/${characterId}`}>Profile</a>
-            <a className="secondary-button button-link" href="#characters">Characters</a>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <section className="combat-summary-region" aria-label="Combat summary">
-        <button className="combat-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
-          <span>Armor Class</span>
-          <strong>{sheet.armorClass}</strong>
-          <small>Defense</small>
-        </button>
-        <button className="combat-summary-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula) : scrollToSheetSection("health-combat")} type="button">
-          <span>Initiative</span>
-          <strong>{formatModifier(sheet.initiative)}</strong>
-          <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
-        </button>
-        <button className="combat-summary-card hp-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
-          <span>Hit Points</span>
-          <strong>{sheet.currentHp}/{sheet.maxHp}</strong>
-          <small>{sheet.temporaryHp} temporary</small>
-          <i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i>
-        </button>
-        <button className="combat-summary-card" onClick={() => scrollToSheetSection("notes")} type="button">
-          <span>Conditions</span>
-          <strong>{sheet.notes.trim() ? "Notes" : "Clear"}</strong>
-          <small>Jump to play notes</small>
-        </button>
+        <div className="combat-summary" aria-label="Combat summary">
+          <button className="combat-summary-card armor-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+            <span>Armor Class</span>
+            <strong>{sheet.armorClass}</strong>
+            <small>Defense</small>
+          </button>
+          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula) : scrollToSheetSection("health-combat")} type="button">
+            <span>Initiative</span>
+            <strong>{formatModifier(sheet.initiative)}</strong>
+            <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
+          </button>
+          <button className="combat-summary-card hp-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+            <span>Hit Points</span>
+            <strong>{sheet.currentHp}/{sheet.maxHp}</strong>
+            <small>{sheet.temporaryHp} temporary</small>
+            <i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i>
+          </button>
+          <button className="combat-summary-card conditions-card" onClick={() => scrollToSheetSection("notes")} type="button">
+            <span>Conditions</span>
+            <strong>{conditionsSummary}</strong>
+            <small>Play notes</small>
+          </button>
+          <div className="inspiration-status" aria-label="Inspiration status">
+            <span>Heroic Inspiration</span>
+            <strong>Ready</strong>
+          </div>
+          <div className="important-combat-status">
+            <span><strong>Speed</strong>{sheet.speed}</span>
+            <span><strong>Hit Dice</strong>{sheet.hitDice || "Unset"}</span>
+            <span><strong>Death Saves</strong>{sheet.deathSaveSuccesses}S / {sheet.deathSaveFailures}F</span>
+          </div>
+        </div>
+
+        <div className="sheet-header-meta">
+          <span>{character.campaign || "No campaign set"}</span>
+          <strong>{status}</strong>
+        </div>
       </section>
 
-      <section className="abilities-senses-region" aria-labelledby="abilities-senses-title">
+      <section className="abilities-panel abilities-senses-region" aria-labelledby="abilities-senses-title">
         <div className="sheet-region-heading">
           <div>
             <span className="card-label">Abilities, saves, senses</span>
             <h2 id="abilities-senses-title">At-a-glance checks</h2>
           </div>
-          <button className="secondary-button compact" onClick={() => scrollToSheetSection("abilities")} type="button">Edit scores</button>
+          <label className="form-field compact-field"><span>Proficiency</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label>
         </div>
         <div className="ability-score-dashboard">
           {abilityIds.map((ability) => (
-            <button className="ability-score-chip" key={ability} onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">
+            <label className="ability-score-chip" key={ability}>
               <span>{abilityFullLabels[ability]}</span>
               <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
-              <small>{sheet.abilityScores[ability] ?? 10}</small>
-            </button>
+              <input aria-label={`${abilityFullLabels[ability]} score`} min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
+              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">Roll</button>
+            </label>
           ))}
-          <button className="sense-chip" onClick={() => scrollToSheetSection("proficiencies")} type="button">
+        </div>
+        <div className="senses-passives-grid">
+          <div className="sense-chip">
             <span>Passive Perception</span>
             <strong>{passivePerception}</strong>
-          </button>
-          <button className="sense-chip" onClick={() => scrollToSheetSection("health-combat")} type="button">
+          </div>
+          <div className="sense-chip">
+            <span>Passive Insight</span>
+            <strong>{passiveInsight}</strong>
+          </div>
+          <div className="sense-chip">
+            <span>Passive Investigation</span>
+            <strong>{passiveInvestigation}</strong>
+          </div>
+          <div className="sense-chip">
             <span>Speed</span>
             <strong>{sheet.speed}</strong>
-          </button>
-          <button className="sense-chip" onClick={() => scrollToSheetSection("proficiencies")} type="button">
-            <span>Proficiency</span>
-            <strong>{formatModifier(sheet.proficiencyBonus)}</strong>
-          </button>
+          </div>
+        </div>
+        <div className="saves-skills-grid">
+          <section className="abilities-subpanel">
+            <div className="module-header compact-module-header"><div><span className="card-label">Saving throws</span><h3>{activeSaveCount} proficient</h3></div></div>
+            <div className="check-list">
+              {abilityIds.map((ability) => {
+                const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
+                return <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`)} type="button">Roll</button></label>;
+              })}
+            </div>
+          </section>
+          <section className="abilities-subpanel">
+            <div className="module-header compact-module-header"><div><span className="card-label">Skills</span><h3>{activeSkillCount} proficient</h3></div></div>
+            <div className="skill-proficiency-summary">
+              <span>Perception {formatModifier(skillModifier(sheet, "perception"))}</span>
+              <span>Insight {formatModifier(skillModifier(sheet, "insight"))}</span>
+              <span>Investigation {formatModifier(skillModifier(sheet, "investigation"))}</span>
+            </div>
+            <details className="module-detail skill-detail">
+              <summary>Edit skill proficiencies</summary>
+              <div className="check-list skills-list">
+                {skillIds.map((skill) => <label className="proficiency-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>)}
+              </div>
+            </details>
+          </section>
         </div>
       </section>
 
@@ -412,23 +498,30 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </div>}
 
-      <div className={customizeLayout ? "sheet-layout-stack customizing" : "sheet-layout-stack"} aria-label="Gameplay modules">
+      <div className={customizeLayout ? "sheet-layout-stack gameplay-grid customizing" : "sheet-layout-stack gameplay-grid"} aria-label="Gameplay modules">
       <LayoutCard {...layoutProps("dice")}>
-      <article className="panel sheet-section dice-tools-panel">
-        <div className="form-section-heading"><div><span className="card-label">Optional rolling</span><h2>Dice</h2><p>Roll here when useful, or keep using physical dice.</p></div></div>
+      <GameplayCard
+        eyebrow="Optional rolling"
+        title="Dice"
+        summary={<div className="module-summary"><span>Table dice</span><strong>Quick roller</strong><small>Local only</small></div>}
+        defaultOpen
+      >
         <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("roll-helper")}>
-      <article className="panel sheet-section roll-assistant-panel">
-        <div className="form-section-heading">
-          <div><span className="card-label">Live play helper</span><h2>What Do I Roll?</h2><p>Character-specific shortcuts based on this sheet's saved bonuses and proficiencies.</p></div>
+      <GameplayCard
+        eyebrow="Live play helper"
+        title="Rolls"
+        summary={<div className="module-summary"><span>Roll assistant</span><strong>{rollRows.length} prompts</strong><small>Mode: {rollMode}</small></div>}
+        actions={
           <div className="mode-toggle">
             <button className={rollMode === "beginner" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("beginner")} type="button">Beginner</button>
             <button className={rollMode === "veteran" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("veteran")} type="button">Veteran</button>
           </div>
-        </div>
+        }
+      >
         <div className="roll-assistant-grid">
           {rollRows.map((row) => <article className="roll-assistant-card" key={row.id}>
             <div><strong>{row.label}</strong><span>{row.formula}</span>{row.bonus !== null && <small>Total bonus {formatModifier(row.bonus)}</small>}</div>
@@ -436,12 +529,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             {rollMode === "beginner" && <p>{row.explanation}</p>}
           </article>)}
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("identity")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Overview</span><h2>Character identity</h2></div></div>
+      <GameplayCard
+        eyebrow="Overview"
+        title="Identity"
+        summary={<div className="module-summary"><span>{character.campaign || "No campaign"}</span><strong>{character.background || "Background unset"}</strong><small>{character.concept || "No concept yet"}</small></div>}
+      >
         <div className="form-grid">
           <label className="form-field"><span>Name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ name: event.target.value })} value={character.name} /></label>
           <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ playerName: event.target.value })} value={character.playerName} /></label>
@@ -452,19 +548,16 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field full-width"><span>Background / Origin</span><input maxLength={100} onChange={(event) => void updateCharacterField({ background: event.target.value })} value={character.background} /></label>
           <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => void updateCharacterField({ concept: event.target.value })} value={character.concept} /></label>
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("level-preview")}>
-      <article className="panel sheet-section level-up-preview">
-        <div className="form-section-heading">
-          <div>
-            <span className="card-label">Level up foundation</span>
-            <h2>Next level preview</h2>
-            <p>This is a reminder panel only. It does not change your character automatically.</p>
-          </div>
-          <span className="status-badge">Manual control</span>
-        </div>
+      <GameplayCard
+        eyebrow="Level up foundation"
+        title="Next level"
+        summary={<div className="module-summary"><span>Current {levelPreview.currentLevel}</span><strong>{levelPreview.nextLevel ? `Next ${levelPreview.nextLevel}` : "Max level"}</strong><small>{levelPreview.proficiencyChanges ? `Proficiency becomes ${formatModifier(levelPreview.nextProficiencyBonus)}` : "Manual control"}</small></div>}
+        actions={<span className="status-badge">Manual control</span>}
+      >
         <div className="level-up-grid">
           <div><small>Current level</small><strong>{levelPreview.currentLevel}</strong></div>
           <div><small>Next level</small><strong>{levelPreview.nextLevel ?? "Max"}</strong></div>
@@ -475,12 +568,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         <div className="level-up-field-list">
           {levelPreview.fields.map((field) => <span key={field}>{field} <LevelUpHint /></span>)}
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("roleplay")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Biography</span><h2>Biography and roleplay</h2></div></div>
+      <GameplayCard
+        eyebrow="Biography"
+        title="Biography"
+        summary={<div className="module-summary"><span>{character.personalityNotes ? "Personality saved" : "Personality empty"}</span><strong>{character.goals ? "Goals noted" : "No goals yet"}</strong><small>{character.backstory ? "Backstory available" : "No backstory yet"}</small></div>}
+      >
         <div className="form-grid">
           <label className="form-field"><span>Personality notes</span><textarea onChange={(event) => void updateCharacterField({ personalityNotes: event.target.value })} rows={5} value={character.personalityNotes} /></label>
           <label className="form-field"><span>Goals</span><textarea onChange={(event) => void updateCharacterField({ goals: event.target.value })} rows={5} value={character.goals} /></label>
@@ -488,10 +584,16 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field"><span>Roleplay notes</span><textarea onChange={(event) => void updateCharacterField({ roleplayNotes: event.target.value })} rows={5} value={character.roleplayNotes} /></label>
           <label className="form-field full-width"><span>Backstory</span><textarea onChange={(event) => void updateCharacterField({ backstory: event.target.value, summary: event.target.value.slice(0, 20000) })} rows={8} value={character.backstory} /></label>
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("health-combat")}>
+      <GameplayCard
+        eyebrow="HP details"
+        title="Health"
+        summary={<div className="module-summary hp-module-summary"><span>{sheet.currentHp}/{sheet.maxHp} HP</span><strong>{sheet.temporaryHp} temp</strong><small>{hpPreview || "Ready for damage or healing"}</small><div className="hp-quick-deltas compact-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div></div>}
+        actions={<button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula)} type="button">Roll initiative</button>}
+      >
       <div className="play-grid">
         <article className="panel hp-panel">
           <div className="form-section-heading"><div><span className="card-label">Hit points</span><h2>Health</h2></div></div>
@@ -538,72 +640,47 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         </article>
       </div>
-      </LayoutCard>
-
-      <LayoutCard {...layoutProps("abilities")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Core abilities</span><h2>Ability scores</h2><p>These remain editable, but are normally adjusted during level-up choices.</p></div></div>
-        <div className="ability-grid">
-          {abilityIds.map((ability) => (
-            <label className="ability-card" key={ability}>
-              <span>{abilityLabels[ability]}</span>
-              <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
-              <input min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
-              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`)} type="button">Roll</button>
-              <LevelUpHint />
-            </label>
-          ))}
-        </div>
-      </article>
-      </LayoutCard>
-
-      <LayoutCard {...layoutProps("proficiencies")}>
-      <div className="proficiency-grid">
-        <article className="panel sheet-section">
-          <div className="form-section-heading"><div><span className="card-label">Proficiencies</span><h2>Saving throws</h2><p>Proficiency bonus: <strong>{formatModifier(sheet.proficiencyBonus)}</strong> <span className="level-up-hint">Usually changed during level up.</span></p></div><label className="form-field compact-field"><span>Override</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label></div>
-          <div className="check-list">
-            {abilityIds.map((ability) => {
-              const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
-              return <label className="proficiency-row" key={ability}><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`)} type="button">Roll</button></label>;
-            })}
-          </div>
-        </article>
-        <article className="panel sheet-section">
-          <div className="form-section-heading"><div><span className="card-label">Proficiencies</span><h2>Skills</h2></div></div>
-          <div className="check-list skills-list">
-            {skillIds.map((skill) => <label className="proficiency-row" key={skill}><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small></label>)}
-          </div>
-        </article>
-      </div>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("attacks")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Attacks, weapons, and damage</h2></div></div>
+      <GameplayCard
+        eyebrow="Weapons and actions"
+        title="Attacks"
+        summary={<div className="module-summary"><span>{textCount(sheet.attacks)} attack lines</span><strong>{textCount(sheet.weapons)} weapon notes</strong><small>{attackNoteCount ? `${attackNoteCount} total combat notes` : "No attacks recorded"}</small></div>}
+        actions={<button className="primary-button compact" onClick={() => rollNow("Attack", "d20")} type="button">Roll d20</button>}
+      >
         <div className="form-grid">
           <label className="form-field"><span>Attacks</span><textarea onChange={(event) => edit((current) => ({ ...current, attacks: event.target.value }))} rows={5} value={sheet.attacks} /></label>
           <label className="form-field"><span>Weapons</span><textarea onChange={(event) => edit((current) => ({ ...current, weapons: event.target.value }))} rows={5} value={sheet.weapons} /></label>
           <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => edit((current) => ({ ...current, damageNotes: event.target.value }))} rows={4} value={sheet.damageNotes} /></label>
           <div className="full-width"><DiceRoller compact context="Use this for attack or damage formulas from your notes." initialFormula="d20" label="Attack roller" /></div>
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("training")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Training</span><h2>Proficiencies & Languages</h2></div></div>
+      <GameplayCard
+        eyebrow="Training"
+        title="Training"
+        summary={<div className="module-summary"><span>{sheet.languages ? "Languages saved" : "No languages"}</span><strong>{sheet.toolProficiencies ? "Tools noted" : "Tools empty"}</strong><small>Armor, weapons, tools, languages</small></div>}
+      >
         <div className="form-grid">
           <label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, armorProficiencies: event.target.value }))} rows={4} value={sheet.armorProficiencies} /></label>
           <label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, weaponProficiencies: event.target.value }))} rows={4} value={sheet.weaponProficiencies} /></label>
           <label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, toolProficiencies: event.target.value }))} rows={4} value={sheet.toolProficiencies} /></label>
           <label className="form-field"><span>Languages</span><textarea onChange={(event) => edit((current) => ({ ...current, languages: event.target.value }))} rows={4} value={sheet.languages} /></label>
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("spells")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Magic</span><h2>Spells</h2><p>Use this quick section for casting stats and prepared notes, or open the full spellbook.</p></div><div className="header-action-group"><button className="secondary-button" onClick={shortRest} type="button">Short Rest</button><button className="primary-button" onClick={longRest} type="button">Long Rest</button><a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></div></div>
+      <GameplayCard
+        eyebrow="Spellbook and slots"
+        title="Spells"
+        summary={<div className="module-summary"><span>{preparedSpellCount} prepared</span><strong>{cantripCount} cantrips</strong><small>{totalSlotCount ? `${Math.max(0, totalSlotCount - usedSlotCount)} / ${totalSlotCount} slots remaining` : "No slots set"}</small></div>}
+        actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></>}
+      >
         <div className="form-grid">
           <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
           <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label>
@@ -620,12 +697,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>;
           })}
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("features")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">Features</span><h2>Features & Traits</h2></div></div>
+      <GameplayCard
+        eyebrow="Class features"
+        title="Features"
+        summary={<div className="module-summary"><span>{textCount(sheet.classFeatures)} class lines</span><strong>{textCount(sheet.speciesTraits)} species lines</strong><small>{featureCount ? `${featureCount} total feature notes` : "No features recorded"}</small></div>}
+      >
         <div className="form-grid">
           <label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, classFeatures: event.target.value }))} rows={6} value={sheet.classFeatures} /></label>
           <label className="form-field"><span>Species traits</span><textarea onChange={(event) => edit((current) => ({ ...current, speciesTraits: event.target.value }))} rows={6} value={sheet.speciesTraits} /></label>
@@ -633,21 +713,37 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, feats: event.target.value }))} rows={5} value={sheet.feats} /></label>
           <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => edit((current) => ({ ...current, specialAbilities: event.target.value }))} rows={6} value={sheet.specialAbilities} /></label>
         </div>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("notes")}>
-      <article className="panel sheet-section">
-        <div className="form-section-heading"><div><span className="card-label">During play</span><h2>Character notes</h2></div></div>
+      <GameplayCard
+        eyebrow="Notes and journal"
+        title="Notes"
+        summary={<div className="module-summary"><span>{conditionsSummary}</span><strong>{noteCount} note lines</strong><small>{sheet.notes.trim() ? sheet.notes.trim().slice(0, 90) : "Conditions, reminders, session notes"}</small></div>}
+        actions={<button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Open notes</button>}
+      >
         <label className="form-field full-width"><span>Notes</span><textarea onChange={(event) => edit((current) => ({ ...current, notes: event.target.value }))} placeholder="Conditions, reminders, NPC names, session details..." rows={12} value={sheet.notes} /></label>
-      </article>
+      </GameplayCard>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("soul-reaper")}>
+      <GameplayCard
+        eyebrow="Optional class track"
+        title="Soul Reaper"
+        summary={<div className="module-summary"><span>DM-granted</span><strong>Class track</strong><small>Open details if this character uses it</small></div>}
+      >
       <SoulReaperSection characterId={characterId} characterLevel={character.level} />
+      </GameplayCard>
       </LayoutCard>
       <LayoutCard {...layoutProps("inventory")}>
+      <GameplayCard
+        eyebrow="Equipment and items"
+        title="Inventory"
+        summary={<div className="module-summary"><span>Character-owned gear</span><strong>Containers and items</strong><small>Add, edit, equip, and favorite items</small></div>}
+      >
       <InventorySection characterId={characterId} />
+      </GameplayCard>
       </LayoutCard>
       </div>
     </section>

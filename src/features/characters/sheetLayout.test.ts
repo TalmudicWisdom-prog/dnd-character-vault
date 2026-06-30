@@ -60,6 +60,16 @@ describe("character sheet layout customization", () => {
     expect(majorGameplayModuleSections.every((section) => normalized.includes(section))).toBe(true);
   });
 
+  it("keeps structural abilities and saves out of the draggable gameplay order", () => {
+    const normalized = normalizeSheetLayoutOrder(["abilities", "proficiencies", "spells"]);
+
+    expect(defaultSheetLayoutOrder).not.toContain("abilities");
+    expect(defaultSheetLayoutOrder).not.toContain("proficiencies");
+    expect(normalized).not.toContain("abilities");
+    expect(normalized).not.toContain("proficiencies");
+    expect(normalized[0]).toBe("spells");
+  });
+
   it("saves custom layout order per character", async () => {
     const character = await createCharacter({ name: "Willow", characterClass: "Druid", ancestry: "Human" });
     const sheet = createEmptyCharacterSheet(character.id);
