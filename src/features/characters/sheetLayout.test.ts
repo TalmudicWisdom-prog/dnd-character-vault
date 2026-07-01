@@ -3,11 +3,16 @@ import { db } from "../../storage/database";
 import { createCharacter } from "../../storage/characters";
 import { createEmptyCharacterSheet, getOrCreateCharacterSheet, saveCharacterSheet } from "../../storage/characterSheets";
 import {
+  chooseSheetNavigatorSection,
+  closeSheetNavigator,
   defaultSheetLayoutOrder,
   livePlayShortcutSections,
   majorGameplayModuleSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
+  openSheetNavigator,
+  selectSheetNavigatorSection,
+  sheetNavigatorSections,
   sheetSectionDomId,
 } from "./sheetLayout";
 
@@ -41,6 +46,51 @@ describe("character sheet layout customization", () => {
       livePlayShortcutSections.map((section) => sheetSectionDomId(section.id)),
     );
     expect(livePlayShortcutSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
+  });
+
+  it("defines navigator options for every major live sheet area", () => {
+    expect(sheetNavigatorSections.map((section) => section.label)).toEqual([
+      "Dashboard",
+      "Abilities, Saves, Senses",
+      "Skills",
+      "Actions",
+      "Spells",
+      "Inventory",
+      "Speed & Defenses",
+      "Features & Traits",
+      "Proficiencies & Training",
+      "Background / Biography",
+      "Notes",
+      "Dice / Rolls",
+      "HP / Combat",
+    ]);
+    expect(sheetNavigatorSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
+  });
+
+  it("opens and closes the sheet navigator modal state", () => {
+    const opened = openSheetNavigator({ open: false });
+    expect(opened.open).toBe(true);
+
+    const closed = closeSheetNavigator(opened);
+    expect(closed.open).toBe(false);
+  });
+
+  it("selects a navigator section without changing the character sheet route", () => {
+    const currentRoute = "#sheet/character-123";
+    const selected = selectSheetNavigatorSection("inventory", currentRoute);
+
+    expect(selected).toEqual({
+      targetId: sheetSectionDomId("inventory"),
+      routeHash: currentRoute,
+    });
+  });
+
+  it("closes the navigator and returns the intended scroll target when a section is chosen", () => {
+    const result = chooseSheetNavigatorSection({ open: true }, "skills", "#sheet/character-123");
+
+    expect(result.state.open).toBe(false);
+    expect(result.routeHash).toBe("#sheet/character-123");
+    expect(result.targetId).toBe("sheet-section-skills");
   });
 
   it("keeps every major gameplay module available in phone layouts", () => {

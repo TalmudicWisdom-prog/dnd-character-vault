@@ -8,6 +8,7 @@ import { db } from "../../storage/database";
 import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
+import { SheetNavigator } from "./SheetNavigator";
 import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import { rollFormula, type DiceRollResult } from "../../dice/dice";
@@ -21,9 +22,12 @@ import {
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
+  selectSheetNavigatorSection,
+  sheetNavigatorSections,
   sheetSectionDomId,
   type SheetLayoutPlacement,
   type SheetLayoutSectionId,
+  type SheetNavigatorSection,
 } from "./sheetLayout";
 
 const abilityLabels: Record<AbilityId, string> = {
@@ -297,12 +301,21 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   };
 
   const scrollToSheetSection = (sectionId: SheetLayoutSectionId) => {
-    const target = document.getElementById(sheetSectionDomId(sectionId));
+    scrollToSheetTargetId(sheetSectionDomId(sectionId));
+  };
+
+  const scrollToSheetTargetId = (targetId: string) => {
+    const target = document.getElementById(targetId);
     if (!target) return;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start", inline: "nearest" });
     if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+  };
+
+  const navigateSheet = (section: SheetNavigatorSection) => {
+    const { targetId } = selectSheetNavigatorSection(section.id, window.location.hash);
+    scrollToSheetTargetId(targetId);
   };
 
   const updateLayoutOrder = (change: (currentOrder: readonly string[]) => SheetLayoutSectionId[]) => {
@@ -390,7 +403,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   return (
     <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
-      <section className="dashboard" aria-labelledby="sheet-character-title">
+      <section className="dashboard" id="sheet-section-dashboard" aria-labelledby="sheet-character-title" tabIndex={-1}>
         <CharacterPortraitField
           characterName={character.name}
           compact
@@ -452,7 +465,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </section>
 
-      <section className="abilities-panel abilities-senses-region" aria-labelledby="abilities-senses-title">
+      <SheetNavigator onNavigate={navigateSheet} sections={sheetNavigatorSections} />
+
+      <section className="abilities-panel abilities-senses-region" id="sheet-section-abilities" aria-labelledby="abilities-senses-title" tabIndex={-1}>
         <div className="sheet-region-heading">
           <div>
             <span className="card-label">Abilities, saves, senses</span>
@@ -499,7 +514,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
               })}
             </div>
           </section>
-          <section className="abilities-subpanel">
+          <section className="abilities-subpanel" id="sheet-section-skills" tabIndex={-1}>
             <div className="module-header compact-module-header"><div><span className="card-label">Skills</span><h3>{activeSkillCount} proficient</h3></div></div>
             <div className="skill-proficiency-summary">
               <span>Perception {formatModifier(skillModifier(sheet, "perception"))}</span>
@@ -664,7 +679,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         </article>
 
-        <article className="panel combat-panel">
+        <article className="panel combat-panel" id="sheet-section-speed-defenses" tabIndex={-1}>
           <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Defenses and movement</h2></div></div>
           <div className="combat-stats">
             <label className="big-stat"><span>Armor Class</span><input min={0} onChange={(event) => edit((current) => ({ ...current, armorClass: Number(event.target.value) }))} type="number" value={sheet.armorClass} /></label>
