@@ -449,6 +449,38 @@ h1, h2, strong { color: var(--ink); }
 }
 .ability-score-chip strong, .sense-chip strong { font-family: Georgia, serif; font-size: 1.6rem; font-weight: 500; }
 .ability-score-chip small { color: var(--sheet-text-muted); font-size: 0.9rem; font-weight: 850; }
+.ability-score-chip b { font: inherit; letter-spacing: inherit; }
+.ability-label-short { display: none; }
+.ability-legend-card {
+  grid-column: span 3;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  align-content: center;
+  padding: var(--space-3);
+  color: var(--sheet-text);
+  background: color-mix(in srgb, var(--sheet-gem) 10%, var(--sheet-panel-strong));
+  border: 1px solid color-mix(in srgb, var(--sheet-gem) 35%, var(--sheet-border));
+  border-radius: var(--radius-sm);
+}
+.ability-legend-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.ability-legend-heading span {
+  color: var(--sheet-text-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ability-legend-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  margin: 0;
+}
+.ability-legend-card dl div { min-width: 0; display: flex; gap: 5px; align-items: baseline; }
+.ability-legend-card dt { color: var(--sheet-accent); font-size: 0.72rem; font-weight: 950; }
+.ability-legend-card dd { min-width: 0; margin: 0; color: var(--sheet-text-muted); font-size: 0.72rem; font-weight: 800; overflow-wrap: anywhere; }
+.ability-legend-toggle { align-self: end; }
 .sense-chip { border-color: color-mix(in srgb, var(--sheet-gem) 35%, var(--sheet-border)); }
 .sheet-status { display: flex; align-items: center; gap: 9px; width: fit-content; margin: -24px 0 24px auto; color: var(--muted); font-size: 0.78rem; font-weight: 750; }
 .play-jump-bar { position: sticky; top: 8px; z-index: 4; display: flex; gap: 8px; margin-bottom: 16px; padding: 8px; overflow-x: auto; background: color-mix(in srgb, var(--sheet-panel) 92%, transparent); border: 1px solid var(--sheet-border); border-radius: 14px; box-shadow: var(--shadow-panel); scrollbar-width: thin; }
@@ -1091,6 +1123,10 @@ h1, h2, strong { color: var(--ink); }
   .combat-summary-region { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hp-summary-card { grid-column: 1 / -1; }
   .ability-score-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ability-label-long { display: none; }
+  .ability-label-short { display: inline; }
+  .ability-legend-card { grid-column: 1 / -1; min-height: 0; }
+  .ability-legend-card dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .senses-passives-grid, .saves-skills-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .layout-card[data-layout-card-id] { grid-column: auto; }
   .play-grid, .proficiency-grid, .pdf-viewer-layout { grid-template-columns: 1fr; }
@@ -1146,12 +1182,16 @@ h1, h2, strong { color: var(--ink); }
   .hp-summary-card { grid-column: 1 / -1; }
   .abilities-senses-region { padding: 12px; margin-bottom: 10px; }
   .sheet-region-heading { align-items: stretch; display: grid; }
+  .ability-legend-toggle { justify-self: start; }
   .ability-score-dashboard { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
   .saves-skills-grid, .gameplay-grid { grid-template-columns: 1fr; }
   .senses-passives-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ability-score-chip, .sense-chip { min-height: 88px; padding: 8px; }
   .ability-score-chip span, .sense-chip span { font-size: 0.62rem; }
   .ability-score-chip strong, .sense-chip strong { font-size: 1.35rem; }
+  .ability-legend-card { padding: 10px; }
+  .ability-legend-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ability-legend-card dt, .ability-legend-card dd { font-size: 0.66rem; }
   .page-actions button { width: 100%; }
   .page-actions .button-link { width: 100%; }
   .summary-grid { margin-bottom: 35px; }

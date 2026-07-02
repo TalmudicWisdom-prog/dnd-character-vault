@@ -38,6 +38,12 @@ const abilityFullLabels: Record<AbilityId, string> = {
   str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma",
 };
 
+const abilityLegendRows = abilityIds.map((ability) => ({
+  id: ability,
+  shortLabel: abilityLabels[ability],
+  fullLabel: abilityFullLabels[ability],
+}));
+
 const skillLabels: Record<SkillId, string> = {
   acrobatics: "Acrobatics", animalHandling: "Animal Handling", arcana: "Arcana",
   athletics: "Athletics", deception: "Deception", history: "History", insight: "Insight",
@@ -173,6 +179,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [quickRoll, setQuickRoll] = useState("");
   const [inlineRolls, setInlineRolls] = useState<Record<string, InlineRollResult>>({});
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
+  const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
   const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
@@ -298,6 +305,11 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const setAssistantMode = (mode: RollAssistantMode) => {
     setRollMode(mode);
     localStorage.setItem("vault:roll-mode", mode);
+  };
+
+  const setAbilityLegendVisible = (visible: boolean) => {
+    setShowAbilityLegend(visible);
+    localStorage.setItem("vault:ability-legend-hidden", visible ? "false" : "true");
   };
 
   const scrollToSheetSection = (sectionId: SheetLayoutSectionId) => {
@@ -474,17 +486,27 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <h2 id="abilities-senses-title">At-a-glance checks</h2>
           </div>
           <label className="form-field compact-field"><span>Proficiency</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label>
+          {!showAbilityLegend && <button className="secondary-button compact ability-legend-toggle" onClick={() => setAbilityLegendVisible(true)} type="button">Show legend</button>}
         </div>
         <div className="ability-score-dashboard">
           {abilityIds.map((ability) => (
             <label className="ability-score-chip" key={ability}>
-              <span>{abilityFullLabels[ability]}</span>
+              <span><b className="ability-label-long">{abilityFullLabels[ability]}</b><b className="ability-label-short">{abilityLabels[ability]}</b></span>
               <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
               <input aria-label={`${abilityFullLabels[ability]} score`} min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
               <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`, `ability-${ability}`)} type="button">Roll</button>
               <InlineRollFeedback result={inlineRolls[`ability-${ability}`]} />
             </label>
           ))}
+          {showAbilityLegend && <aside className="ability-legend-card" aria-label="Ability abbreviation legend">
+            <div className="ability-legend-heading">
+              <span>Legend</span>
+              <button className="text-button" onClick={() => setAbilityLegendVisible(false)} type="button">Hide</button>
+            </div>
+            <dl>
+              {abilityLegendRows.map((row) => <div key={row.id}><dt>{row.shortLabel}</dt><dd>{row.fullLabel}</dd></div>)}
+            </dl>
+          </aside>}
         </div>
         <div className="senses-passives-grid">
           <div className="sense-chip">
