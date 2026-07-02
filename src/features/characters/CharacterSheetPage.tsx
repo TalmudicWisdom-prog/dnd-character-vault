@@ -180,6 +180,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [inlineRolls, setInlineRolls] = useState<Record<string, InlineRollResult>>({});
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
+  const [activeModuleId, setActiveModuleId] = useState<SheetLayoutSectionId | null>(null);
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
   const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
@@ -224,6 +225,20 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     window.addEventListener("vault:flush", flush);
     return () => window.removeEventListener("vault:flush", flush);
   }, [sheet, status]);
+
+  useEffect(() => {
+    if (!activeModuleId) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveModuleId(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeModuleId]);
 
   const edit = (change: (current: CharacterSheet) => CharacterSheet) => {
     editVersion.current += 1;
@@ -327,6 +342,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   const navigateSheet = (section: SheetNavigatorSection) => {
     const { targetId } = selectSheetNavigatorSection(section.id, window.location.hash);
+    if (isSheetLayoutSectionId(section.id)) {
+      setActiveModuleId(section.id);
+      return;
+    }
     scrollToSheetTargetId(targetId);
   };
 
@@ -399,6 +418,97 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const usedSlotCount = Object.values(sheet.spellSlotsUsed).reduce((total, used) => total + used, 0);
   const totalSlotCount = Object.values(sheet.spellSlots).reduce((total, maximum) => total + maximum, 0);
 
+  const renderModuleDetail = (id: SheetLayoutSectionId) => {
+    switch (id) {
+      case "dice":
+        return <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />;
+      case "roll-helper":
+        return <div className="roll-assistant-grid">
+          {rollRows.map((row) => <article className="roll-assistant-card" key={row.id}>
+            <div><strong>{row.label}</strong><span>{row.formula}</span>{row.bonus !== null && <small>Total bonus {formatModifier(row.bonus)}</small>}</div>
+            <button className="primary-button compact" onClick={() => row.rollable ? rollNow(row.label, row.formula, `assistant-${row.id}`) : setQuickRoll(`${row.label}: ${row.explanation}`)} type="button">{row.rollable ? "Roll" : "Explain"}</button>
+            {row.rollable && <InlineRollFeedback result={inlineRolls[`assistant-${row.id}`]} />}
+            {rollMode === "beginner" && <p>{row.explanation}</p>}
+          </article>)}
+        </div>;
+      case "identity":
+        return <div className="form-grid">
+          <label className="form-field"><span>Name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ name: event.target.value })} value={character.name} /></label>
+          <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ playerName: event.target.value })} value={character.playerName} /></label>
+          <label className="form-field"><span>Campaign</span><input maxLength={100} onChange={(event) => void updateCharacterField({ campaign: event.target.value })} value={character.campaign} /></label>
+          <label className="form-field level-up-field"><span>Level <LevelUpHint /></span><input max={20} min={1} onChange={(event) => void updateCharacterField({ level: Number(event.target.value) }).then(() => edit((current) => ({ ...current, proficiencyBonus: proficiencyBonusForLevel(Number(event.target.value)) })))} type="number" value={character.level} /></label>
+          <label className="form-field"><span>Class</span><input maxLength={100} onChange={(event) => void updateCharacterField({ characterClass: event.target.value })} value={character.characterClass} /></label>
+          <label className="form-field"><span>Species / Ancestry</span><input maxLength={100} onChange={(event) => void updateCharacterField({ ancestry: event.target.value })} value={character.ancestry} /></label>
+          <label className="form-field full-width"><span>Background / Origin</span><input maxLength={100} onChange={(event) => void updateCharacterField({ background: event.target.value })} value={character.background} /></label>
+          <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => void updateCharacterField({ concept: event.target.value })} value={character.concept} /></label>
+        </div>;
+      case "level-preview":
+        return <>
+          <div className="level-up-grid">
+            <div><small>Current level</small><strong>{levelPreview.currentLevel}</strong></div>
+            <div><small>Next level</small><strong>{levelPreview.nextLevel ?? "Max"}</strong></div>
+            <div><small>Proficiency now</small><strong>{formatModifier(levelPreview.currentProficiencyBonus)}</strong></div>
+            <div><small>Proficiency next</small><strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong></div>
+          </div>
+          {levelPreview.proficiencyChanges && <p className="inline-message">At level {levelPreview.nextLevel}, proficiency bonus changes to <strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong>.</p>}
+          <div className="level-up-field-list">{levelPreview.fields.map((field) => <span key={field}>{field} <LevelUpHint /></span>)}</div>
+        </>;
+      case "roleplay":
+        return <div className="form-grid">
+          <label className="form-field"><span>Personality notes</span><textarea onChange={(event) => void updateCharacterField({ personalityNotes: event.target.value })} rows={5} value={character.personalityNotes} /></label>
+          <label className="form-field"><span>Goals</span><textarea onChange={(event) => void updateCharacterField({ goals: event.target.value })} rows={5} value={character.goals} /></label>
+          <label className="form-field"><span>Important relationships</span><textarea onChange={(event) => void updateCharacterField({ importantRelationships: event.target.value })} rows={5} value={character.importantRelationships} /></label>
+          <label className="form-field"><span>Roleplay notes</span><textarea onChange={(event) => void updateCharacterField({ roleplayNotes: event.target.value })} rows={5} value={character.roleplayNotes} /></label>
+          <label className="form-field full-width"><span>Backstory</span><textarea onChange={(event) => void updateCharacterField({ backstory: event.target.value, summary: event.target.value.slice(0, 20000) })} rows={8} value={character.backstory} /></label>
+        </div>;
+      case "health-combat":
+        return <div className="play-grid">
+          <article className="panel hp-panel">
+            <div className="form-section-heading"><div><span className="card-label">Hit points</span><h2>Health</h2></div></div>
+            <div className="hp-values">
+              <label className="stat-field"><span>Current</span><input min={0} onChange={(event) => edit((current) => ({ ...current, currentHp: Number(event.target.value) }))} type="number" value={sheet.currentHp} /></label>
+              <span className="hp-divider">/</span>
+              <label className="stat-field level-up-field"><span>Maximum <LevelUpHint /></span><input min={0} onChange={(event) => edit((current) => ({ ...current, maxHp: Number(event.target.value) }))} type="number" value={sheet.maxHp} /></label>
+              <label className="stat-field temp-hp"><span>Temporary</span><input min={0} onChange={(event) => edit((current) => ({ ...current, temporaryHp: Number(event.target.value) }))} type="number" value={sheet.temporaryHp} /></label>
+            </div>
+            <div className="hp-controls">
+              <div className="hp-before-after"><strong>Before</strong><span>{sheet.currentHp}/{sheet.maxHp} HP · {sheet.temporaryHp} temp</span>{hpPreview && <><strong>Last change</strong><span>{hpPreview}</span></>}</div>
+              <div className="hp-entry-grid"><label className="form-field"><span>Damage input</span><input min={0} onChange={(event) => setDamageAmount(Number(event.target.value))} type="number" value={damageAmount} /></label><label className="form-field"><span>Healing input</span><input min={0} onChange={(event) => setHealingAmount(Number(event.target.value))} type="number" value={healingAmount} /></label></div>
+              <div className="hp-action-buttons"><button className="touch-button damage-button" onClick={() => void changeHp("damage", damageAmount)} type="button">Apply Damage</button><button className="touch-button healing-button" onClick={() => void changeHp("healing", healingAmount)} type="button">Apply Healing</button></div>
+              <div className="hp-quick-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div>
+            </div>
+          </article>
+          <article className="panel combat-panel" id="sheet-section-speed-defenses" tabIndex={-1}>
+            <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Defenses and movement</h2></div></div>
+            <div className="combat-stats"><label className="big-stat"><span>Armor Class</span><input min={0} onChange={(event) => edit((current) => ({ ...current, armorClass: Number(event.target.value) }))} type="number" value={sheet.armorClass} /></label><label className="big-stat"><span>Initiative</span><input onChange={(event) => edit((current) => ({ ...current, initiative: Number(event.target.value) }))} type="number" value={sheet.initiative} /></label><label className="big-stat"><span>Speed</span><input min={0} onChange={(event) => edit((current) => ({ ...current, speed: Number(event.target.value) }))} type="number" value={sheet.speed} /></label></div>
+            <div className="form-grid combat-extra-grid"><label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label><label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label><label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label><div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "combat-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["combat-initiative"]} /></div><div className="inline-roll-control"><button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice, "combat-hit-dice")} type="button">Roll hit dice</button><InlineRollFeedback result={inlineRolls["combat-hit-dice"]} /></div><button className="secondary-button compact" onClick={() => setActiveModuleId("notes")} type="button">Conditions / notes</button></div>
+          </article>
+        </div>;
+      case "attacks":
+        return <div className="form-grid">
+          <label className="form-field"><span>Attacks</span><textarea onChange={(event) => edit((current) => ({ ...current, attacks: event.target.value }))} rows={5} value={sheet.attacks} /></label>
+          <label className="form-field"><span>Weapons</span><textarea onChange={(event) => edit((current) => ({ ...current, weapons: event.target.value }))} rows={5} value={sheet.weapons} /></label>
+          <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => edit((current) => ({ ...current, damageNotes: event.target.value }))} rows={4} value={sheet.damageNotes} /></label>
+          <div className="full-width"><DiceRoller compact context="Use this for attack or damage formulas from your notes." initialFormula="d20" label="Attack roller" /></div>
+        </div>;
+      case "training":
+        return <div className="form-grid"><label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, armorProficiencies: event.target.value }))} rows={4} value={sheet.armorProficiencies} /></label><label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, weaponProficiencies: event.target.value }))} rows={4} value={sheet.weaponProficiencies} /></label><label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, toolProficiencies: event.target.value }))} rows={4} value={sheet.toolProficiencies} /></label><label className="form-field"><span>Languages</span><textarea onChange={(event) => edit((current) => ({ ...current, languages: event.target.value }))} rows={4} value={sheet.languages} /></label></div>;
+      case "spells":
+        return <>
+          <div className="form-grid"><label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label><label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label><label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => edit((current) => ({ ...current, spellAttackBonus: Number(event.target.value) }))} type="number" value={sheet.spellAttackBonus} /></label><label className="form-field level-up-field"><span>Spell slots <LevelUpHint /></span><div className="slot-grid">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => <label key={level}><small>L{level}</small><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSlots: { ...current.spellSlots, [level]: Number(event.target.value) } }))} type="number" value={sheet.spellSlots[level] ?? 0} /></label>)}</div></label><label className="form-field"><span>Cantrips</span><textarea onChange={(event) => edit((current) => ({ ...current, cantrips: event.target.value }))} rows={5} value={sheet.cantrips} /></label><label className="form-field"><span>Prepared spells</span><textarea onChange={(event) => edit((current) => ({ ...current, preparedSpells: event.target.value }))} rows={5} value={sheet.preparedSpells} /></label><label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => edit((current) => ({ ...current, spellNotes: event.target.value }))} rows={5} value={sheet.spellNotes} /></label></div>
+          <div className="spell-slot-tracker">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => { const maximum = sheet.spellSlots[level] ?? 0; const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum); return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>; })}</div>
+        </>;
+      case "features":
+        return <div className="form-grid"><label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, classFeatures: event.target.value }))} rows={6} value={sheet.classFeatures} /></label><label className="form-field"><span>Species traits</span><textarea onChange={(event) => edit((current) => ({ ...current, speciesTraits: event.target.value }))} rows={6} value={sheet.speciesTraits} /></label><label className="form-field"><span>Background feature</span><textarea onChange={(event) => edit((current) => ({ ...current, backgroundFeature: event.target.value }))} rows={5} value={sheet.backgroundFeature} /></label><label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, feats: event.target.value }))} rows={5} value={sheet.feats} /></label><label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => edit((current) => ({ ...current, specialAbilities: event.target.value }))} rows={6} value={sheet.specialAbilities} /></label></div>;
+      case "notes":
+        return <label className="form-field full-width"><span>Notes</span><textarea onChange={(event) => edit((current) => ({ ...current, notes: event.target.value }))} placeholder="Conditions, reminders, NPC names, session details..." rows={12} value={sheet.notes} /></label>;
+      case "soul-reaper":
+        return <SoulReaperSection characterId={characterId} characterLevel={character.level} />;
+      case "inventory":
+        return <InventorySection characterId={characterId} />;
+    }
+  };
+
   const layoutProps = (id: SheetLayoutSectionId) => ({
     customizeMode: customizeLayout,
     dragging: draggingSectionId === id,
@@ -438,24 +548,24 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </header>
 
         <div className="combat-summary" aria-label="Combat summary">
-          <button className="combat-summary-card armor-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+          <button className="combat-summary-card armor-card" onClick={() => setActiveModuleId("health-combat")} type="button">
             <span>Armor Class</span>
             <strong>{sheet.armorClass}</strong>
             <small>Defense</small>
           </button>
-          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "dashboard-initiative") : scrollToSheetSection("health-combat")} type="button">
+          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "dashboard-initiative") : setActiveModuleId("health-combat")} type="button">
             <span>Initiative</span>
             <strong>{formatModifier(sheet.initiative)}</strong>
             <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
             <InlineRollFeedback result={inlineRolls["dashboard-initiative"]} />
           </button>
-          <button className="combat-summary-card hp-summary-card" onClick={() => scrollToSheetSection("health-combat")} type="button">
+          <button className="combat-summary-card hp-summary-card" onClick={() => setActiveModuleId("health-combat")} type="button">
             <span>Hit Points</span>
             <strong>{sheet.currentHp}/{sheet.maxHp}</strong>
             <small>{sheet.temporaryHp} temporary</small>
             <i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i>
           </button>
-          <button className="combat-summary-card conditions-card" onClick={() => scrollToSheetSection("notes")} type="button">
+          <button className="combat-summary-card conditions-card" onClick={() => setActiveModuleId("notes")} type="button">
             <span>Conditions</span>
             <strong>{conditionsSummary}</strong>
             <small>Play notes</small>
@@ -557,9 +667,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
       <nav aria-label="Live play shortcuts" className="play-jump-bar">
         {livePlayShortcutSections.map((section) => (
-          <button data-shortcut-target={section.targetId} key={section.id} onClick={() => scrollToSheetSection(section.id)} type="button">{section.label}</button>
+          <button data-shortcut-target={section.targetId} key={section.id} onClick={() => setActiveModuleId(section.id)} type="button">{section.label}</button>
         ))}
-        <a href={`#spellbook/${characterId}`}>Book</a>
+        <button onClick={() => setActiveModuleId("spells")} type="button">Book</button>
         <button className={customizeLayout ? "play-jump-action active" : "play-jump-action"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Layout"}</button>
       </nav>
 
@@ -573,6 +683,27 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>
           <button className="primary-button compact" onClick={() => setCustomizeLayout(false)} type="button">Done</button>
         </div>
+      </div>}
+
+      {activeModuleId && <div className="module-overlay" onMouseDown={() => setActiveModuleId(null)} role="presentation">
+        <section
+          aria-labelledby="module-overlay-title"
+          aria-modal="true"
+          className="module-overlay-dialog"
+          onMouseDown={(event) => event.stopPropagation()}
+          role="dialog"
+        >
+          <div className="module-overlay-header">
+            <div>
+              <span className="card-label">Live play module</span>
+              <h2 id="module-overlay-title">{layoutSectionTitles[activeModuleId]}</h2>
+            </div>
+            <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={() => setActiveModuleId(null)} type="button">X</button>
+          </div>
+          <div className="module-overlay-body">
+            {renderModuleDetail(activeModuleId)}
+          </div>
+        </section>
       </div>}
 
       <div className={customizeLayout ? "sheet-layout-stack gameplay-grid customizing" : "sheet-layout-stack gameplay-grid"} aria-label="Gameplay modules">
