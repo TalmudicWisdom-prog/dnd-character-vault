@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { SheetNavigatorSection } from "./sheetLayout";
+import type { SheetNavigatorSectionId } from "./sheetLayout";
 import { sheetNavigatorSectionForTarget } from "./sheetLayout";
 
 const focusableSelector = [
@@ -14,6 +15,28 @@ const focusableSelector = [
 type SheetNavigatorProps = {
   onNavigate: (section: SheetNavigatorSection) => void;
   sections: SheetNavigatorSection[];
+};
+
+const compactNavigatorLabels: Record<SheetNavigatorSectionId, { icon: string; label: string }> = {
+  dashboard: { icon: "D", label: "Dashboard" },
+  "health-combat": { icon: "H", label: "HP" },
+  abilities: { icon: "A", label: "Abilities" },
+  skills: { icon: "S", label: "Skills" },
+  "speed-defenses": { icon: "M", label: "Speed" },
+  "roll-helper": { icon: "R", label: "Rolls" },
+  dice: { icon: "D20", label: "Dice" },
+  attacks: { icon: "A", label: "Actions" },
+  spells: { icon: "S", label: "Spells" },
+  inventory: { icon: "I", label: "Inventory" },
+  features: { icon: "F", label: "Features" },
+  training: { icon: "T", label: "Training" },
+  roleplay: { icon: "B", label: "Bio" },
+  notes: { icon: "N", label: "Notes" },
+  book: { icon: "P", label: "Book" },
+  layout: { icon: "L", label: "Layout" },
+  identity: { icon: "I", label: "Identity" },
+  "level-preview": { icon: "L", label: "Level" },
+  "soul-reaper": { icon: "S", label: "Soul" },
 };
 
 export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
@@ -143,16 +166,21 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
               <button className="secondary-button compact" onClick={close} type="button">Close</button>
             </div>
             <div className="sheet-navigator-options">
-              {sections.map((section) => (
-                <button
-                  className={section.targetId === activeTargetId ? "sheet-navigator-option active" : "sheet-navigator-option"}
-                  key={section.id}
-                  onClick={() => selectSection(section)}
-                  type="button"
-                >
-                  {section.label}
-                </button>
-              ))}
+              {sections.map((section) => {
+                const compact = compactNavigatorLabels[section.id];
+                return (
+                  <button
+                    aria-label={`Open ${section.label}`}
+                    className={section.targetId === activeTargetId ? "sheet-navigator-option active" : "sheet-navigator-option"}
+                    key={section.id}
+                    onClick={() => selectSection(section)}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="sheet-navigator-option-icon">{compact.icon}</span>
+                    <span className="sheet-navigator-option-label">{compact.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
