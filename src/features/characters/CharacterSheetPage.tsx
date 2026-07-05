@@ -714,7 +714,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary"><span>Table dice</span><strong>Quick roller</strong><small>Local only</small></div>}
         defaultOpen
       >
-        <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />
+        {renderModuleDetail("dice")}
       </GameplayCard>
       </LayoutCard>
 
@@ -730,14 +730,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         }
       >
-        <div className="roll-assistant-grid">
-          {rollRows.map((row) => <article className="roll-assistant-card" key={row.id}>
-            <div><strong>{row.label}</strong><span>{row.formula}</span>{row.bonus !== null && <small>Total bonus {formatModifier(row.bonus)}</small>}</div>
-            <button className="primary-button compact" onClick={() => row.rollable ? rollNow(row.label, row.formula, `assistant-${row.id}`) : setQuickRoll(`${row.label}: ${row.explanation}`)} type="button">{row.rollable ? "Roll" : "Explain"}</button>
-            {row.rollable && <InlineRollFeedback result={inlineRolls[`assistant-${row.id}`]} />}
-            {rollMode === "beginner" && <p>{row.explanation}</p>}
-          </article>)}
-        </div>
+        {renderModuleDetail("roll-helper")}
       </GameplayCard>
       </LayoutCard>
 
@@ -747,16 +740,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Identity"
         summary={<div className="module-summary"><span>{character.campaign || "No campaign"}</span><strong>{character.background || "Background unset"}</strong><small>{character.concept || "No concept yet"}</small></div>}
       >
-        <div className="form-grid">
-          <label className="form-field"><span>Name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ name: event.target.value })} value={character.name} /></label>
-          <label className="form-field"><span>Player name</span><input maxLength={100} onChange={(event) => void updateCharacterField({ playerName: event.target.value })} value={character.playerName} /></label>
-          <label className="form-field"><span>Campaign</span><input maxLength={100} onChange={(event) => void updateCharacterField({ campaign: event.target.value })} value={character.campaign} /></label>
-          <label className="form-field level-up-field"><span>Level <LevelUpHint /></span><input max={20} min={1} onChange={(event) => void updateCharacterField({ level: Number(event.target.value) }).then(() => edit((current) => ({ ...current, proficiencyBonus: proficiencyBonusForLevel(Number(event.target.value)) })))} type="number" value={character.level} /></label>
-          <label className="form-field"><span>Class</span><input maxLength={100} onChange={(event) => void updateCharacterField({ characterClass: event.target.value })} value={character.characterClass} /></label>
-          <label className="form-field"><span>Species / Ancestry</span><input maxLength={100} onChange={(event) => void updateCharacterField({ ancestry: event.target.value })} value={character.ancestry} /></label>
-          <label className="form-field full-width"><span>Background / Origin</span><input maxLength={100} onChange={(event) => void updateCharacterField({ background: event.target.value })} value={character.background} /></label>
-          <label className="form-field full-width"><span>Short concept</span><input maxLength={500} onChange={(event) => void updateCharacterField({ concept: event.target.value })} value={character.concept} /></label>
-        </div>
+        {renderModuleDetail("identity")}
       </GameplayCard>
       </LayoutCard>
 
@@ -767,16 +751,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary"><span>Current {levelPreview.currentLevel}</span><strong>{levelPreview.nextLevel ? `Next ${levelPreview.nextLevel}` : "Max level"}</strong><small>{levelPreview.proficiencyChanges ? `Proficiency becomes ${formatModifier(levelPreview.nextProficiencyBonus)}` : "Manual control"}</small></div>}
         actions={<span className="status-badge">Manual control</span>}
       >
-        <div className="level-up-grid">
-          <div><small>Current level</small><strong>{levelPreview.currentLevel}</strong></div>
-          <div><small>Next level</small><strong>{levelPreview.nextLevel ?? "Max"}</strong></div>
-          <div><small>Proficiency now</small><strong>{formatModifier(levelPreview.currentProficiencyBonus)}</strong></div>
-          <div><small>Proficiency next</small><strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong></div>
-        </div>
-        {levelPreview.proficiencyChanges && <p className="inline-message">At level {levelPreview.nextLevel}, proficiency bonus changes to <strong>{formatModifier(levelPreview.nextProficiencyBonus)}</strong>.</p>}
-        <div className="level-up-field-list">
-          {levelPreview.fields.map((field) => <span key={field}>{field} <LevelUpHint /></span>)}
-        </div>
+        {renderModuleDetail("level-preview")}
       </GameplayCard>
       </LayoutCard>
 
@@ -786,13 +761,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Biography"
         summary={<div className="module-summary"><span>{character.personalityNotes ? "Personality saved" : "Personality empty"}</span><strong>{character.goals ? "Goals noted" : "No goals yet"}</strong><small>{character.backstory ? "Backstory available" : "No backstory yet"}</small></div>}
       >
-        <div className="form-grid">
-          <label className="form-field"><span>Personality notes</span><textarea onChange={(event) => void updateCharacterField({ personalityNotes: event.target.value })} rows={5} value={character.personalityNotes} /></label>
-          <label className="form-field"><span>Goals</span><textarea onChange={(event) => void updateCharacterField({ goals: event.target.value })} rows={5} value={character.goals} /></label>
-          <label className="form-field"><span>Important relationships</span><textarea onChange={(event) => void updateCharacterField({ importantRelationships: event.target.value })} rows={5} value={character.importantRelationships} /></label>
-          <label className="form-field"><span>Roleplay notes</span><textarea onChange={(event) => void updateCharacterField({ roleplayNotes: event.target.value })} rows={5} value={character.roleplayNotes} /></label>
-          <label className="form-field full-width"><span>Backstory</span><textarea onChange={(event) => void updateCharacterField({ backstory: event.target.value, summary: event.target.value.slice(0, 20000) })} rows={8} value={character.backstory} /></label>
-        </div>
+        {renderModuleDetail("roleplay")}
       </GameplayCard>
       </LayoutCard>
 
@@ -803,52 +772,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary hp-module-summary"><span>{sheet.currentHp}/{sheet.maxHp} HP</span><strong>{sheet.temporaryHp} temp</strong><small>{hpPreview || "Ready for damage or healing"}</small><div className="hp-quick-deltas compact-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div></div>}
         actions={<div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "health-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["health-initiative"]} /></div>}
       >
-      <div className="play-grid">
-        <article className="panel hp-panel">
-          <div className="form-section-heading"><div><span className="card-label">Hit points</span><h2>Health</h2></div></div>
-          <div className="hp-values">
-            <label className="stat-field"><span>Current</span><input min={0} onChange={(event) => edit((current) => ({ ...current, currentHp: Number(event.target.value) }))} type="number" value={sheet.currentHp} /></label>
-            <span className="hp-divider">/</span>
-            <label className="stat-field level-up-field"><span>Maximum <LevelUpHint /></span><input min={0} onChange={(event) => edit((current) => ({ ...current, maxHp: Number(event.target.value) }))} type="number" value={sheet.maxHp} /></label>
-            <label className="stat-field temp-hp"><span>Temporary</span><input min={0} onChange={(event) => edit((current) => ({ ...current, temporaryHp: Number(event.target.value) }))} type="number" value={sheet.temporaryHp} /></label>
-          </div>
-          <div className="hp-controls">
-            <div className="hp-before-after">
-              <strong>Before</strong><span>{sheet.currentHp}/{sheet.maxHp} HP · {sheet.temporaryHp} temp</span>
-              {hpPreview && <><strong>Last change</strong><span>{hpPreview}</span></>}
-            </div>
-            <div className="hp-entry-grid">
-              <label className="form-field"><span>Damage input</span><input min={0} onChange={(event) => setDamageAmount(Number(event.target.value))} type="number" value={damageAmount} /></label>
-              <label className="form-field"><span>Healing input</span><input min={0} onChange={(event) => setHealingAmount(Number(event.target.value))} type="number" value={healingAmount} /></label>
-            </div>
-            <div className="hp-action-buttons">
-              <button className="touch-button damage-button" onClick={() => void changeHp("damage", damageAmount)} type="button">Apply Damage</button>
-              <button className="touch-button healing-button" onClick={() => void changeHp("healing", healingAmount)} type="button">Apply Healing</button>
-            </div>
-            <div className="hp-quick-deltas" aria-label="Quick HP changes">
-              {[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}
-              {[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}
-            </div>
-          </div>
-        </article>
-
-        <article className="panel combat-panel" id="sheet-section-speed-defenses" tabIndex={-1}>
-          <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Defenses and movement</h2></div></div>
-          <div className="combat-stats">
-            <label className="big-stat"><span>Armor Class</span><input min={0} onChange={(event) => edit((current) => ({ ...current, armorClass: Number(event.target.value) }))} type="number" value={sheet.armorClass} /></label>
-            <label className="big-stat"><span>Initiative</span><input onChange={(event) => edit((current) => ({ ...current, initiative: Number(event.target.value) }))} type="number" value={sheet.initiative} /></label>
-            <label className="big-stat"><span>Speed</span><input min={0} onChange={(event) => edit((current) => ({ ...current, speed: Number(event.target.value) }))} type="number" value={sheet.speed} /></label>
-          </div>
-          <div className="form-grid combat-extra-grid">
-            <label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label>
-            <label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label>
-            <label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label>
-            <div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "combat-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["combat-initiative"]} /></div>
-            <div className="inline-roll-control"><button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice, "combat-hit-dice")} type="button">Roll hit dice</button><InlineRollFeedback result={inlineRolls["combat-hit-dice"]} /></div>
-            <button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Conditions / notes</button>
-          </div>
-        </article>
-      </div>
+      {renderModuleDetail("health-combat")}
       </GameplayCard>
       </LayoutCard>
 
@@ -859,12 +783,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary"><span>{textCount(sheet.attacks)} attack lines</span><strong>{textCount(sheet.weapons)} weapon notes</strong><small>{attackNoteCount ? `${attackNoteCount} total combat notes` : "No attacks recorded"}</small></div>}
         actions={<div className="inline-roll-control"><button className="primary-button compact" onClick={() => rollNow("Attack", "d20", "attacks-d20")} type="button">Roll d20</button><InlineRollFeedback result={inlineRolls["attacks-d20"]} /></div>}
       >
-        <div className="form-grid">
-          <label className="form-field"><span>Attacks</span><textarea onChange={(event) => edit((current) => ({ ...current, attacks: event.target.value }))} rows={5} value={sheet.attacks} /></label>
-          <label className="form-field"><span>Weapons</span><textarea onChange={(event) => edit((current) => ({ ...current, weapons: event.target.value }))} rows={5} value={sheet.weapons} /></label>
-          <label className="form-field full-width"><span>Damage notes</span><textarea onChange={(event) => edit((current) => ({ ...current, damageNotes: event.target.value }))} rows={4} value={sheet.damageNotes} /></label>
-          <div className="full-width"><DiceRoller compact context="Use this for attack or damage formulas from your notes." initialFormula="d20" label="Attack roller" /></div>
-        </div>
+        {renderModuleDetail("attacks")}
       </GameplayCard>
       </LayoutCard>
 
@@ -874,12 +793,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Training"
         summary={<div className="module-summary"><span>{sheet.languages ? "Languages saved" : "No languages"}</span><strong>{sheet.toolProficiencies ? "Tools noted" : "Tools empty"}</strong><small>Armor, weapons, tools, languages</small></div>}
       >
-        <div className="form-grid">
-          <label className="form-field"><span>Armor proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, armorProficiencies: event.target.value }))} rows={4} value={sheet.armorProficiencies} /></label>
-          <label className="form-field"><span>Weapon proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, weaponProficiencies: event.target.value }))} rows={4} value={sheet.weaponProficiencies} /></label>
-          <label className="form-field"><span>Tool proficiencies</span><textarea onChange={(event) => edit((current) => ({ ...current, toolProficiencies: event.target.value }))} rows={4} value={sheet.toolProficiencies} /></label>
-          <label className="form-field"><span>Languages</span><textarea onChange={(event) => edit((current) => ({ ...current, languages: event.target.value }))} rows={4} value={sheet.languages} /></label>
-        </div>
+        {renderModuleDetail("training")}
       </GameplayCard>
       </LayoutCard>
 
@@ -890,22 +804,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary"><span>{preparedSpellCount} prepared</span><strong>{cantripCount} cantrips</strong><small>{totalSlotCount ? `${Math.max(0, totalSlotCount - usedSlotCount)} / ${totalSlotCount} slots remaining` : "No slots set"}</small></div>}
         actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></>}
       >
-        <div className="form-grid">
-          <label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label>
-          <label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label>
-          <label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => edit((current) => ({ ...current, spellAttackBonus: Number(event.target.value) }))} type="number" value={sheet.spellAttackBonus} /></label>
-          <label className="form-field level-up-field"><span>Spell slots <LevelUpHint /></span><div className="slot-grid">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => <label key={level}><small>L{level}</small><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSlots: { ...current.spellSlots, [level]: Number(event.target.value) } }))} type="number" value={sheet.spellSlots[level] ?? 0} /></label>)}</div></label>
-          <label className="form-field"><span>Cantrips</span><textarea onChange={(event) => edit((current) => ({ ...current, cantrips: event.target.value }))} rows={5} value={sheet.cantrips} /></label>
-          <label className="form-field"><span>Prepared spells</span><textarea onChange={(event) => edit((current) => ({ ...current, preparedSpells: event.target.value }))} rows={5} value={sheet.preparedSpells} /></label>
-          <label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => edit((current) => ({ ...current, spellNotes: event.target.value }))} rows={5} value={sheet.spellNotes} /></label>
-        </div>
-        <div className="spell-slot-tracker">
-          {Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => {
-            const maximum = sheet.spellSlots[level] ?? 0;
-            const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum);
-            return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>;
-          })}
-        </div>
+        {renderModuleDetail("spells")}
       </GameplayCard>
       </LayoutCard>
 
@@ -915,13 +814,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Features"
         summary={<div className="module-summary"><span>{textCount(sheet.classFeatures)} class lines</span><strong>{textCount(sheet.speciesTraits)} species lines</strong><small>{featureCount ? `${featureCount} total feature notes` : "No features recorded"}</small></div>}
       >
-        <div className="form-grid">
-          <label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, classFeatures: event.target.value }))} rows={6} value={sheet.classFeatures} /></label>
-          <label className="form-field"><span>Species traits</span><textarea onChange={(event) => edit((current) => ({ ...current, speciesTraits: event.target.value }))} rows={6} value={sheet.speciesTraits} /></label>
-          <label className="form-field"><span>Background feature</span><textarea onChange={(event) => edit((current) => ({ ...current, backgroundFeature: event.target.value }))} rows={5} value={sheet.backgroundFeature} /></label>
-          <label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, feats: event.target.value }))} rows={5} value={sheet.feats} /></label>
-          <label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => edit((current) => ({ ...current, specialAbilities: event.target.value }))} rows={6} value={sheet.specialAbilities} /></label>
-        </div>
+        {renderModuleDetail("features")}
       </GameplayCard>
       </LayoutCard>
 
@@ -932,7 +825,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         summary={<div className="module-summary"><span>{conditionsSummary}</span><strong>{noteCount} note lines</strong><small>{sheet.notes.trim() ? sheet.notes.trim().slice(0, 90) : "Conditions, reminders, session notes"}</small></div>}
         actions={<button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Open notes</button>}
       >
-        <label className="form-field full-width"><span>Notes</span><textarea onChange={(event) => edit((current) => ({ ...current, notes: event.target.value }))} placeholder="Conditions, reminders, NPC names, session details..." rows={12} value={sheet.notes} /></label>
+        {renderModuleDetail("notes")}
       </GameplayCard>
       </LayoutCard>
 
@@ -942,7 +835,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Soul Reaper"
         summary={<div className="module-summary"><span>DM-granted</span><strong>Class track</strong><small>Open details if this character uses it</small></div>}
       >
-      <SoulReaperSection characterId={characterId} characterLevel={character.level} />
+      {renderModuleDetail("soul-reaper")}
       </GameplayCard>
       </LayoutCard>
       <LayoutCard {...layoutProps("inventory")}>
@@ -951,7 +844,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Inventory"
         summary={<div className="module-summary"><span>Character-owned gear</span><strong>Containers and items</strong><small>Add, edit, equip, and favorite items</small></div>}
       >
-      <InventorySection characterId={characterId} />
+      {renderModuleDetail("inventory")}
       </GameplayCard>
       </LayoutCard>
       </div>
