@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import dashboardNavigatorIcon from "../../assets/navigator-dashboard.jpeg";
 import type { SheetNavigatorSection } from "./sheetLayout";
 import type { SheetNavigatorSectionId } from "./sheetLayout";
 import { sheetNavigatorSectionForTarget } from "./sheetLayout";
@@ -17,8 +18,8 @@ type SheetNavigatorProps = {
   sections: SheetNavigatorSection[];
 };
 
-const compactNavigatorLabels: Record<SheetNavigatorSectionId, { icon: string; label: string }> = {
-  dashboard: { icon: "D", label: "Dashboard" },
+const compactNavigatorLabels: Record<SheetNavigatorSectionId, { icon: string; label: string; imageSrc?: string }> = {
+  dashboard: { icon: "D", imageSrc: dashboardNavigatorIcon, label: "Dashboard" },
   "health-combat": { icon: "H", label: "HP" },
   abilities: { icon: "A", label: "Abilities" },
   skills: { icon: "S", label: "Skills" },
@@ -172,11 +173,14 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
                   <button
                     aria-label={`Open ${section.label}`}
                     className={section.targetId === activeTargetId ? "sheet-navigator-option active" : "sheet-navigator-option"}
+                    data-section-id={section.id}
                     key={section.id}
                     onClick={() => selectSection(section)}
                     type="button"
                   >
-                    <span aria-hidden="true" className="sheet-navigator-option-icon">{compact.icon}</span>
+                    <span aria-hidden="true" className={compact.imageSrc ? "sheet-navigator-option-icon image-icon" : "sheet-navigator-option-icon"}>
+                      {compact.imageSrc ? <img alt="" src={compact.imageSrc} /> : compact.icon}
+                    </span>
                     <span className="sheet-navigator-option-label">{compact.label}</span>
                   </button>
                 );
