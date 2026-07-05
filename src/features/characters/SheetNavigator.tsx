@@ -178,9 +178,8 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
                     onClick={() => selectSection(section)}
                     type="button"
                   >
-                    <span aria-hidden="true" className={compact.imageSrc ? "sheet-navigator-option-icon image-icon" : "sheet-navigator-option-icon"}>
-                      {compact.imageSrc ? <img alt="" src={compact.imageSrc} /> : compact.icon}
-                    </span>
+                    {compact.imageSrc && <img alt="" aria-hidden="true" className="sheet-navigator-option-background" src={compact.imageSrc} />}
+                    {!compact.imageSrc && <span aria-hidden="true" className="sheet-navigator-option-icon">{compact.icon}</span>}
                     <span className="sheet-navigator-option-label">{compact.label}</span>
                   </button>
                 );
