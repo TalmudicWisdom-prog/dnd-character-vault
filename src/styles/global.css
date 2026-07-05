@@ -865,9 +865,13 @@ h1, h2, strong { color: var(--ink); }
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   z-index: 0;
 }
 .sheet-navigator-option[data-section-id="dashboard"] {
+  align-content: end;
+  justify-items: center;
+  padding: 8px;
   background: #070605;
   border-color: color-mix(in srgb, var(--fantasy-gold) 66%, var(--sheet-border));
 }
@@ -1468,5 +1472,6 @@ h1, h2, strong { color: var(--ink); }
   .sheet-navigator-option { min-height: 56px; grid-template-columns: auto minmax(0, 1fr); align-content: center; justify-items: start; padding: 7px 8px; text-align: left; }
   .sheet-navigator-option-icon { width: 26px; height: 26px; }
   .sheet-navigator-option-label { font-size: 0.72rem; }
-  .sheet-navigator-option[data-section-id="dashboard"] .sheet-navigator-option-label { justify-self: start; align-self: end; }
+  .sheet-navigator-option[data-section-id="dashboard"] { grid-template-columns: 1fr; align-content: end; justify-items: center; text-align: center; }
+  .sheet-navigator-option[data-section-id="dashboard"] .sheet-navigator-option-label { justify-self: center; align-self: end; }
 }
