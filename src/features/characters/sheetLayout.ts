@@ -28,6 +28,8 @@ export const structuralSheetSectionIds = [
   "abilities",
   "skills",
   "speed-defenses",
+  "book",
+  "layout",
 ] as const;
 
 export type StructuralSheetSectionId = typeof structuralSheetSectionIds[number];
@@ -45,18 +47,21 @@ export type SheetNavigatorSection = {
 
 export const sheetNavigatorSections: SheetNavigatorSection[] = [
   { id: "dashboard", label: "Dashboard", targetId: sheetNavigatorDomId("dashboard") },
+  { id: "health-combat", label: "HP / Combat", targetId: sheetNavigatorDomId("health-combat") },
   { id: "abilities", label: "Abilities, Saves, Senses", targetId: sheetNavigatorDomId("abilities") },
   { id: "skills", label: "Skills", targetId: sheetNavigatorDomId("skills") },
+  { id: "speed-defenses", label: "Speed & Defenses", targetId: sheetNavigatorDomId("speed-defenses") },
+  { id: "roll-helper", label: "Rolls", targetId: sheetNavigatorDomId("roll-helper") },
+  { id: "dice", label: "Dice", targetId: sheetNavigatorDomId("dice") },
   { id: "attacks", label: "Actions", targetId: sheetNavigatorDomId("attacks") },
   { id: "spells", label: "Spells", targetId: sheetNavigatorDomId("spells") },
   { id: "inventory", label: "Inventory", targetId: sheetNavigatorDomId("inventory") },
-  { id: "speed-defenses", label: "Speed & Defenses", targetId: sheetNavigatorDomId("speed-defenses") },
   { id: "features", label: "Features & Traits", targetId: sheetNavigatorDomId("features") },
   { id: "training", label: "Proficiencies & Training", targetId: sheetNavigatorDomId("training") },
   { id: "roleplay", label: "Background / Biography", targetId: sheetNavigatorDomId("roleplay") },
   { id: "notes", label: "Notes", targetId: sheetNavigatorDomId("notes") },
-  { id: "roll-helper", label: "Dice / Rolls", targetId: sheetNavigatorDomId("roll-helper") },
-  { id: "health-combat", label: "HP / Combat", targetId: sheetNavigatorDomId("health-combat") },
+  { id: "book", label: "Book / PDF", targetId: sheetNavigatorDomId("book") },
+  { id: "layout", label: "Layout", targetId: sheetNavigatorDomId("layout") },
 ];
 
 export function sheetNavigatorSectionForTarget(targetId: string) {
@@ -91,18 +96,6 @@ export function chooseSheetNavigatorSection(
     state: closeSheetNavigator(state),
   };
 }
-
-export const livePlayShortcutSections: { id: SheetLayoutSectionId; label: string; targetId: string }[] = [
-  { id: "health-combat", label: "HP", targetId: sheetSectionDomId("health-combat") },
-  { id: "roll-helper", label: "Rolls", targetId: sheetSectionDomId("roll-helper") },
-  { id: "dice", label: "Dice", targetId: sheetSectionDomId("dice") },
-  { id: "attacks", label: "Actions", targetId: sheetSectionDomId("attacks") },
-  { id: "spells", label: "Spells", targetId: sheetSectionDomId("spells") },
-  { id: "inventory", label: "Gear", targetId: sheetSectionDomId("inventory") },
-  { id: "features", label: "Features", targetId: sheetSectionDomId("features") },
-  { id: "notes", label: "Notes", targetId: sheetSectionDomId("notes") },
-  { id: "roleplay", label: "Bio", targetId: sheetSectionDomId("roleplay") },
-];
 
 export const majorGameplayModuleSections: SheetLayoutSectionId[] = [
   "health-combat",

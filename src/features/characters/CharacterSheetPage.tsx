@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { AbilityId, CharacterSheet, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
@@ -18,7 +18,6 @@ import { createCharacterBackup, downloadBackup } from "../../storage/backups";
 import {
   defaultSheetLayoutOrder,
   isSheetLayoutSectionId,
-  livePlayShortcutSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
@@ -28,6 +27,7 @@ import {
   type SheetLayoutPlacement,
   type SheetLayoutSectionId,
   type SheetNavigatorSection,
+  type SheetNavigatorSectionId,
 } from "./sheetLayout";
 
 const abilityLabels: Record<AbilityId, string> = {
@@ -67,6 +67,25 @@ const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
   "soul-reaper": "Soul Reaper",
   inventory: "Inventory",
 };
+
+const overlaySectionTitles: Record<SheetNavigatorSectionId, string> = {
+  ...layoutSectionTitles,
+  dashboard: "Dashboard",
+  abilities: "Abilities, Saves, Senses",
+  skills: "Skills",
+  "speed-defenses": "Speed and defenses",
+  book: "Book and PDF tools",
+  layout: "Customize layout",
+};
+
+const focusableOverlaySelector = [
+  "button:not([disabled])",
+  "a[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
 
 function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
@@ -118,14 +137,13 @@ function LayoutCard({ children, customizeMode, dragging, id, index, style, title
 
 type GameplayCardProps = {
   actions?: ReactNode;
-  children: ReactNode;
-  defaultOpen?: boolean;
   eyebrow: string;
   summary: ReactNode;
   title: string;
+  onOpenDetails: () => void;
 };
 
-function GameplayCard({ actions, children, defaultOpen = false, eyebrow, summary, title }: GameplayCardProps) {
+function GameplayCard({ actions, eyebrow, onOpenDetails, summary, title }: GameplayCardProps) {
   return (
     <article className="panel sheet-section gameplay-card">
       <div className="module-header">
@@ -136,10 +154,7 @@ function GameplayCard({ actions, children, defaultOpen = false, eyebrow, summary
         {actions && <div className="module-actions">{actions}</div>}
       </div>
       <div className="module-body">{summary}</div>
-      <details className="module-detail" open={defaultOpen}>
-        <summary>Details</summary>
-        <div className="module-detail-body">{children}</div>
-      </details>
+      <button className="secondary-button compact module-detail-button" onClick={onOpenDetails} type="button">Show details</button>
     </article>
   );
 }
@@ -180,9 +195,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [inlineRolls, setInlineRolls] = useState<Record<string, InlineRollResult>>({});
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
-  const [activeModuleId, setActiveModuleId] = useState<SheetLayoutSectionId | null>(null);
+  const [activeModuleId, setActiveModuleId] = useState<SheetNavigatorSectionId | null>(null);
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
+  const moduleDialogRef = useRef<HTMLElement | null>(null);
   const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
   const editVersion = useRef(0);
 
@@ -229,16 +245,37 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   useEffect(() => {
     if (!activeModuleId) return;
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setActiveModuleId(null);
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
+    window.requestAnimationFrame(() => {
+      moduleDialogRef.current?.querySelector<HTMLElement>(focusableOverlaySelector)?.focus();
+    });
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [activeModuleId]);
+
+  const trapModuleFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(moduleDialogRef.current?.querySelectorAll<HTMLElement>(focusableOverlaySelector) ?? []);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const edit = (change: (current: CharacterSheet) => CharacterSheet) => {
     editVersion.current += 1;
@@ -327,10 +364,6 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     localStorage.setItem("vault:ability-legend-hidden", visible ? "false" : "true");
   };
 
-  const scrollToSheetSection = (sectionId: SheetLayoutSectionId) => {
-    scrollToSheetTargetId(sheetSectionDomId(sectionId));
-  };
-
   const scrollToSheetTargetId = (targetId: string) => {
     const target = document.getElementById(targetId);
     if (!target) return;
@@ -343,6 +376,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const navigateSheet = (section: SheetNavigatorSection) => {
     const { targetId } = selectSheetNavigatorSection(section.id, window.location.hash);
     if (isSheetLayoutSectionId(section.id)) {
+      setActiveModuleId(section.id);
+      return;
+    }
+    if (section.id !== "dashboard") {
       setActiveModuleId(section.id);
       return;
     }
@@ -417,6 +454,125 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const noteCount = textCount(sheet.notes);
   const usedSlotCount = Object.values(sheet.spellSlotsUsed).reduce((total, used) => total + used, 0);
   const totalSlotCount = Object.values(sheet.spellSlots).reduce((total, maximum) => total + maximum, 0);
+
+  const renderAbilityScores = () => (
+    <div className="ability-score-dashboard">
+      {abilityIds.map((ability) => (
+        <label className="ability-score-chip" key={ability}>
+          <span><b className="ability-label-long">{abilityFullLabels[ability]}</b><b className="ability-label-short">{abilityLabels[ability]}</b></span>
+          <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
+          <input aria-label={`${abilityFullLabels[ability]} score`} min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
+          <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`, `ability-${ability}`)} type="button">Roll</button>
+          <InlineRollFeedback result={inlineRolls[`ability-${ability}`]} />
+        </label>
+      ))}
+      {showAbilityLegend && <aside className="ability-legend-card" aria-label="Ability abbreviation legend">
+        <div className="ability-legend-heading">
+          <span>Legend</span>
+          <button className="text-button" onClick={() => setAbilityLegendVisible(false)} type="button">Hide</button>
+        </div>
+        <dl>
+          {abilityLegendRows.map((row) => <div key={row.id}><dt>{row.shortLabel}</dt><dd>{row.fullLabel}</dd></div>)}
+        </dl>
+      </aside>}
+    </div>
+  );
+
+  const renderSensesPassives = () => (
+    <div className="senses-passives-grid">
+      <div className="sense-chip">
+        <span>Passive Perception</span>
+        <strong>{passivePerception}</strong>
+      </div>
+      <div className="sense-chip">
+        <span>Passive Insight</span>
+        <strong>{passiveInsight}</strong>
+      </div>
+      <div className="sense-chip">
+        <span>Passive Investigation</span>
+        <strong>{passiveInvestigation}</strong>
+      </div>
+      <div className="sense-chip">
+        <span>Speed</span>
+        <strong>{sheet.speed}</strong>
+      </div>
+    </div>
+  );
+
+  const renderSavingThrowsPanel = () => (
+    <section className="abilities-subpanel">
+      <div className="module-header compact-module-header"><div><span className="card-label">Saving throws</span><h3>{activeSaveCount} proficient</h3></div></div>
+      <div className="check-list">
+        {abilityIds.map((ability) => {
+          const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
+          return <div className="proficiency-row rollable-proficiency-row" key={ability}><label className="proficiency-toggle"><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span></label><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`, `save-${ability}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`save-${ability}`]} /></div>;
+        })}
+      </div>
+    </section>
+  );
+
+  const renderSkillsPanel = ({ expanded = false, withId = false }: { expanded?: boolean; withId?: boolean } = {}) => {
+    const skillRows = <div className="check-list skills-list">
+      {skillIds.map((skill) => <div className="proficiency-row rollable-proficiency-row" key={skill}><label className="proficiency-toggle"><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span></label><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small><button className="secondary-button compact" onClick={() => rollNow(`${skillLabels[skill]} check`, `d20${formatModifier(skillModifier(sheet, skill))}`, `skill-${skill}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`skill-${skill}`]} /></div>)}
+    </div>;
+
+    return <section className="abilities-subpanel" id={withId ? "sheet-section-skills" : undefined} tabIndex={withId ? -1 : undefined}>
+      <div className="module-header compact-module-header"><div><span className="card-label">Skills</span><h3>{activeSkillCount} proficient</h3></div></div>
+      <div className="skill-proficiency-summary">
+        <span>Perception {formatModifier(skillModifier(sheet, "perception"))}</span>
+        <span>Insight {formatModifier(skillModifier(sheet, "insight"))}</span>
+        <span>Investigation {formatModifier(skillModifier(sheet, "investigation"))}</span>
+      </div>
+      {expanded ? <div className="module-detail-body skill-detail-body">{skillRows}</div> : <details className="module-detail skill-detail"><summary>Edit skill proficiencies</summary><div className="module-detail-body">{skillRows}</div></details>}
+    </section>;
+  };
+
+  const renderAbilitiesSavesSensesDetail = () => (
+    <div className="abilities-overlay-detail">
+      <div className="sheet-region-heading">
+        <div>
+          <span className="card-label">Abilities, saves, senses</span>
+          <h2>At-a-glance checks</h2>
+        </div>
+        <label className="form-field compact-field"><span>Proficiency</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label>
+        {!showAbilityLegend && <button className="secondary-button compact ability-legend-toggle" onClick={() => setAbilityLegendVisible(true)} type="button">Show legend</button>}
+      </div>
+      {renderAbilityScores()}
+      {renderSensesPassives()}
+      <div className="saves-skills-grid">
+        {renderSavingThrowsPanel()}
+        {renderSkillsPanel({ expanded: true })}
+      </div>
+    </div>
+  );
+
+  const renderBookDetail = () => (
+    <div className="book-overlay-actions">
+      <div className="module-summary">
+        <span>Reference tools</span>
+        <strong>Spellbook and PDF shelf</strong>
+        <small>Opening these tools is an intentional route change. The navigator itself keeps you on this sheet.</small>
+      </div>
+      <div className="layout-customize-actions">
+        <a className="primary-button button-link" href={`#spellbook/${characterId}`}>Open spellbook</a>
+        <a className="secondary-button button-link" href="#library">Open PDF Library</a>
+      </div>
+    </div>
+  );
+
+  const renderLayoutDetail = () => (
+    <div className="layout-overlay-actions">
+      <div className="module-summary">
+        <span>Per character</span>
+        <strong>{customizeLayout ? "Layout editing is on" : "Customize module order"}</strong>
+        <small>Only gameplay modules are draggable. Dashboard and abilities stay fixed.</small>
+      </div>
+      <div className="layout-customize-actions">
+        <button className={customizeLayout ? "primary-button" : "secondary-button"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done editing" : "Start customizing"}</button>
+        <button className="secondary-button" onClick={resetLayout} type="button">Reset layout</button>
+      </div>
+    </div>
+  );
 
   const renderModuleDetail = (id: SheetLayoutSectionId) => {
     switch (id) {
@@ -509,6 +665,26 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     }
   };
 
+  const renderOverlayDetail = (id: SheetNavigatorSectionId) => {
+    if (isSheetLayoutSectionId(id)) return renderModuleDetail(id);
+    switch (id) {
+      case "abilities":
+        return renderAbilitiesSavesSensesDetail();
+      case "skills":
+        return renderSkillsPanel({ expanded: true });
+      case "speed-defenses":
+        return renderModuleDetail("health-combat");
+      case "book":
+        return renderBookDetail();
+      case "layout":
+        return renderLayoutDetail();
+      case "dashboard":
+        return null;
+    }
+  };
+
+  const openModuleOverlay = (id: SheetNavigatorSectionId) => setActiveModuleId(id);
+
   const layoutProps = (id: SheetLayoutSectionId) => ({
     customizeMode: customizeLayout,
     dragging: draggingSectionId === id,
@@ -598,80 +774,15 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <label className="form-field compact-field"><span>Proficiency</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label>
           {!showAbilityLegend && <button className="secondary-button compact ability-legend-toggle" onClick={() => setAbilityLegendVisible(true)} type="button">Show legend</button>}
         </div>
-        <div className="ability-score-dashboard">
-          {abilityIds.map((ability) => (
-            <label className="ability-score-chip" key={ability}>
-              <span><b className="ability-label-long">{abilityFullLabels[ability]}</b><b className="ability-label-short">{abilityLabels[ability]}</b></span>
-              <strong>{formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}</strong>
-              <input aria-label={`${abilityFullLabels[ability]} score`} min={1} max={30} onChange={(event) => edit((current) => ({ ...current, abilityScores: { ...current.abilityScores, [ability]: Number(event.target.value) } }))} type="number" value={sheet.abilityScores[ability] ?? 10} />
-              <button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} check`, `d20${formatModifier(abilityModifier(sheet.abilityScores[ability] ?? 10))}`, `ability-${ability}`)} type="button">Roll</button>
-              <InlineRollFeedback result={inlineRolls[`ability-${ability}`]} />
-            </label>
-          ))}
-          {showAbilityLegend && <aside className="ability-legend-card" aria-label="Ability abbreviation legend">
-            <div className="ability-legend-heading">
-              <span>Legend</span>
-              <button className="text-button" onClick={() => setAbilityLegendVisible(false)} type="button">Hide</button>
-            </div>
-            <dl>
-              {abilityLegendRows.map((row) => <div key={row.id}><dt>{row.shortLabel}</dt><dd>{row.fullLabel}</dd></div>)}
-            </dl>
-          </aside>}
-        </div>
-        <div className="senses-passives-grid">
-          <div className="sense-chip">
-            <span>Passive Perception</span>
-            <strong>{passivePerception}</strong>
-          </div>
-          <div className="sense-chip">
-            <span>Passive Insight</span>
-            <strong>{passiveInsight}</strong>
-          </div>
-          <div className="sense-chip">
-            <span>Passive Investigation</span>
-            <strong>{passiveInvestigation}</strong>
-          </div>
-          <div className="sense-chip">
-            <span>Speed</span>
-            <strong>{sheet.speed}</strong>
-          </div>
-        </div>
+        {renderAbilityScores()}
+        {renderSensesPassives()}
         <div className="saves-skills-grid">
-          <section className="abilities-subpanel">
-            <div className="module-header compact-module-header"><div><span className="card-label">Saving throws</span><h3>{activeSaveCount} proficient</h3></div></div>
-            <div className="check-list">
-              {abilityIds.map((ability) => {
-                const saveModifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (sheet.savingThrows[ability] ? sheet.proficiencyBonus : 0);
-                return <div className="proficiency-row rollable-proficiency-row" key={ability}><label className="proficiency-toggle"><input checked={sheet.savingThrows[ability] ?? false} onChange={(event) => edit((current) => ({ ...current, savingThrows: { ...current.savingThrows, [ability]: event.target.checked } }))} type="checkbox" /><span>{abilityLabels[ability]}</span></label><small>{formatModifier(saveModifier)}</small><button className="secondary-button compact" onClick={() => rollNow(`${abilityLabels[ability]} save`, `d20${formatModifier(saveModifier)}`, `save-${ability}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`save-${ability}`]} /></div>;
-              })}
-            </div>
-          </section>
-          <section className="abilities-subpanel" id="sheet-section-skills" tabIndex={-1}>
-            <div className="module-header compact-module-header"><div><span className="card-label">Skills</span><h3>{activeSkillCount} proficient</h3></div></div>
-            <div className="skill-proficiency-summary">
-              <span>Perception {formatModifier(skillModifier(sheet, "perception"))}</span>
-              <span>Insight {formatModifier(skillModifier(sheet, "insight"))}</span>
-              <span>Investigation {formatModifier(skillModifier(sheet, "investigation"))}</span>
-            </div>
-            <details className="module-detail skill-detail">
-              <summary>Edit skill proficiencies</summary>
-              <div className="check-list skills-list">
-                {skillIds.map((skill) => <div className="proficiency-row rollable-proficiency-row" key={skill}><label className="proficiency-toggle"><input checked={sheet.skillProficiencies[skill] ?? false} onChange={(event) => edit((current) => ({ ...current, skillProficiencies: { ...current.skillProficiencies, [skill]: event.target.checked } }))} type="checkbox" /><span>{skillLabels[skill]}</span></label><small>{abilityLabels[skillAbilities[skill]]} {formatModifier(skillModifier(sheet, skill))}</small><button className="secondary-button compact" onClick={() => rollNow(`${skillLabels[skill]} check`, `d20${formatModifier(skillModifier(sheet, skill))}`, `skill-${skill}`)} type="button">Roll</button><InlineRollFeedback result={inlineRolls[`skill-${skill}`]} /></div>)}
-              </div>
-            </details>
-          </section>
+          {renderSavingThrowsPanel()}
+          {renderSkillsPanel({ withId: true })}
         </div>
       </section>
 
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
-
-      <nav aria-label="Live play shortcuts" className="play-jump-bar">
-        {livePlayShortcutSections.map((section) => (
-          <button data-shortcut-target={section.targetId} key={section.id} onClick={() => setActiveModuleId(section.id)} type="button">{section.label}</button>
-        ))}
-        <button onClick={() => setActiveModuleId("spells")} type="button">Book</button>
-        <button className={customizeLayout ? "play-jump-action active" : "play-jump-action"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Layout"}</button>
-      </nav>
 
       {customizeLayout && <div className="layout-customize-bar">
         <div>
@@ -690,18 +801,20 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           aria-labelledby="module-overlay-title"
           aria-modal="true"
           className="module-overlay-dialog"
+          onKeyDown={trapModuleFocus}
           onMouseDown={(event) => event.stopPropagation()}
+          ref={moduleDialogRef}
           role="dialog"
         >
           <div className="module-overlay-header">
             <div>
               <span className="card-label">Live play module</span>
-              <h2 id="module-overlay-title">{layoutSectionTitles[activeModuleId]}</h2>
+              <h2 id="module-overlay-title">{overlaySectionTitles[activeModuleId]}</h2>
             </div>
             <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={() => setActiveModuleId(null)} type="button">X</button>
           </div>
           <div className="module-overlay-body">
-            {renderModuleDetail(activeModuleId)}
+            {renderOverlayDetail(activeModuleId)}
           </div>
         </section>
       </div>}
@@ -712,10 +825,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Optional rolling"
         title="Dice"
         summary={<div className="module-summary"><span>Table dice</span><strong>Quick roller</strong><small>Local only</small></div>}
-        defaultOpen
-      >
-        {renderModuleDetail("dice")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("dice")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("roll-helper")}>
@@ -723,15 +834,14 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Live play helper"
         title="Rolls"
         summary={<div className="module-summary"><span>Roll assistant</span><strong>{rollRows.length} prompts</strong><small>Mode: {rollMode}</small></div>}
+        onOpenDetails={() => openModuleOverlay("roll-helper")}
         actions={
           <div className="mode-toggle">
             <button className={rollMode === "beginner" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("beginner")} type="button">Beginner</button>
             <button className={rollMode === "veteran" ? "secondary-button compact active" : "secondary-button compact"} onClick={() => setAssistantMode("veteran")} type="button">Veteran</button>
           </div>
         }
-      >
-        {renderModuleDetail("roll-helper")}
-      </GameplayCard>
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("identity")}>
@@ -739,9 +849,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Overview"
         title="Identity"
         summary={<div className="module-summary"><span>{character.campaign || "No campaign"}</span><strong>{character.background || "Background unset"}</strong><small>{character.concept || "No concept yet"}</small></div>}
-      >
-        {renderModuleDetail("identity")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("identity")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("level-preview")}>
@@ -750,9 +859,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Next level"
         summary={<div className="module-summary"><span>Current {levelPreview.currentLevel}</span><strong>{levelPreview.nextLevel ? `Next ${levelPreview.nextLevel}` : "Max level"}</strong><small>{levelPreview.proficiencyChanges ? `Proficiency becomes ${formatModifier(levelPreview.nextProficiencyBonus)}` : "Manual control"}</small></div>}
         actions={<span className="status-badge">Manual control</span>}
-      >
-        {renderModuleDetail("level-preview")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("level-preview")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("roleplay")}>
@@ -760,9 +868,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Biography"
         title="Biography"
         summary={<div className="module-summary"><span>{character.personalityNotes ? "Personality saved" : "Personality empty"}</span><strong>{character.goals ? "Goals noted" : "No goals yet"}</strong><small>{character.backstory ? "Backstory available" : "No backstory yet"}</small></div>}
-      >
-        {renderModuleDetail("roleplay")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("roleplay")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("health-combat")}>
@@ -771,9 +878,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Health"
         summary={<div className="module-summary hp-module-summary"><span>{sheet.currentHp}/{sheet.maxHp} HP</span><strong>{sheet.temporaryHp} temp</strong><small>{hpPreview || "Ready for damage or healing"}</small><div className="hp-quick-deltas compact-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div></div>}
         actions={<div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "health-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["health-initiative"]} /></div>}
-      >
-      {renderModuleDetail("health-combat")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("health-combat")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("attacks")}>
@@ -782,9 +888,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Attacks"
         summary={<div className="module-summary"><span>{textCount(sheet.attacks)} attack lines</span><strong>{textCount(sheet.weapons)} weapon notes</strong><small>{attackNoteCount ? `${attackNoteCount} total combat notes` : "No attacks recorded"}</small></div>}
         actions={<div className="inline-roll-control"><button className="primary-button compact" onClick={() => rollNow("Attack", "d20", "attacks-d20")} type="button">Roll d20</button><InlineRollFeedback result={inlineRolls["attacks-d20"]} /></div>}
-      >
-        {renderModuleDetail("attacks")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("attacks")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("training")}>
@@ -792,9 +897,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Training"
         title="Training"
         summary={<div className="module-summary"><span>{sheet.languages ? "Languages saved" : "No languages"}</span><strong>{sheet.toolProficiencies ? "Tools noted" : "Tools empty"}</strong><small>Armor, weapons, tools, languages</small></div>}
-      >
-        {renderModuleDetail("training")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("training")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("spells")}>
@@ -803,9 +907,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         title="Spells"
         summary={<div className="module-summary"><span>{preparedSpellCount} prepared</span><strong>{cantripCount} cantrips</strong><small>{totalSlotCount ? `${Math.max(0, totalSlotCount - usedSlotCount)} / ${totalSlotCount} slots remaining` : "No slots set"}</small></div>}
         actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></>}
-      >
-        {renderModuleDetail("spells")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("spells")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("features")}>
@@ -813,9 +916,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Class features"
         title="Features"
         summary={<div className="module-summary"><span>{textCount(sheet.classFeatures)} class lines</span><strong>{textCount(sheet.speciesTraits)} species lines</strong><small>{featureCount ? `${featureCount} total feature notes` : "No features recorded"}</small></div>}
-      >
-        {renderModuleDetail("features")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("features")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("notes")}>
@@ -823,10 +925,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Notes and journal"
         title="Notes"
         summary={<div className="module-summary"><span>{conditionsSummary}</span><strong>{noteCount} note lines</strong><small>{sheet.notes.trim() ? sheet.notes.trim().slice(0, 90) : "Conditions, reminders, session notes"}</small></div>}
-        actions={<button className="secondary-button compact" onClick={() => scrollToSheetSection("notes")} type="button">Open notes</button>}
-      >
-        {renderModuleDetail("notes")}
-      </GameplayCard>
+        actions={<button className="secondary-button compact" onClick={() => openModuleOverlay("notes")} type="button">Open notes</button>}
+        onOpenDetails={() => openModuleOverlay("notes")}
+      />
       </LayoutCard>
 
       <LayoutCard {...layoutProps("soul-reaper")}>
@@ -834,18 +935,16 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Optional class track"
         title="Soul Reaper"
         summary={<div className="module-summary"><span>DM-granted</span><strong>Class track</strong><small>Open details if this character uses it</small></div>}
-      >
-      {renderModuleDetail("soul-reaper")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("soul-reaper")}
+      />
       </LayoutCard>
       <LayoutCard {...layoutProps("inventory")}>
       <GameplayCard
         eyebrow="Equipment and items"
         title="Inventory"
         summary={<div className="module-summary"><span>Character-owned gear</span><strong>Containers and items</strong><small>Add, edit, equip, and favorite items</small></div>}
-      >
-      {renderModuleDetail("inventory")}
-      </GameplayCard>
+        onOpenDetails={() => openModuleOverlay("inventory")}
+      />
       </LayoutCard>
       </div>
     </section>

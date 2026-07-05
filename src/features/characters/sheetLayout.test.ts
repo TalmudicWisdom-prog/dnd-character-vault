@@ -6,7 +6,6 @@ import {
   chooseSheetNavigatorSection,
   closeSheetNavigator,
   defaultSheetLayoutOrder,
-  livePlayShortcutSections,
   majorGameplayModuleSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
@@ -26,45 +25,34 @@ describe("character sheet layout customization", () => {
     expect(normalizeSheetLayoutOrder()).toEqual([...defaultSheetLayoutOrder]);
   });
 
-  it("keeps live play shortcuts focused on valid gameplay sections", () => {
-    expect(livePlayShortcutSections.map((section) => section.id)).toEqual([
-      "health-combat",
-      "roll-helper",
-      "dice",
-      "attacks",
-      "spells",
-      "inventory",
-      "features",
-      "notes",
-      "roleplay",
-    ]);
-    expect(livePlayShortcutSections.every((section) => defaultSheetLayoutOrder.includes(section.id))).toBe(true);
-  });
-
-  it("points shortcut navigation at stable sheet section DOM IDs", () => {
-    expect(livePlayShortcutSections.map((section) => section.targetId)).toEqual(
-      livePlayShortcutSections.map((section) => sheetSectionDomId(section.id)),
-    );
-    expect(livePlayShortcutSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
-  });
-
   it("defines navigator options for every major live sheet area", () => {
     expect(sheetNavigatorSections.map((section) => section.label)).toEqual([
       "Dashboard",
+      "HP / Combat",
       "Abilities, Saves, Senses",
       "Skills",
+      "Speed & Defenses",
+      "Rolls",
+      "Dice",
       "Actions",
       "Spells",
       "Inventory",
-      "Speed & Defenses",
       "Features & Traits",
       "Proficiencies & Training",
       "Background / Biography",
       "Notes",
-      "Dice / Rolls",
-      "HP / Combat",
+      "Book / PDF",
+      "Layout",
     ]);
     expect(sheetNavigatorSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
+  });
+
+  it("uses the grid navigator as the only live play shortcut surface", () => {
+    const navigatorIds = sheetNavigatorSections.map((section) => section.id);
+
+    expect(majorGameplayModuleSections.every((section) => navigatorIds.includes(section))).toBe(true);
+    expect(sheetNavigatorSections.find((section) => section.id === "roll-helper")?.label).toBe("Rolls");
+    expect(sheetNavigatorSections.find((section) => section.id === "dice")?.label).toBe("Dice");
   });
 
   it("opens and closes the sheet navigator modal state", () => {
