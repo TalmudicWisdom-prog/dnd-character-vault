@@ -43,6 +43,8 @@ const compactNavigatorLabels: Record<SheetNavigatorSectionId, { icon: string; la
 export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
   const [open, setOpen] = useState(false);
   const [activeTargetId, setActiveTargetId] = useState(sections[0]?.targetId ?? "");
+  const [stuck, setStuck] = useState(false);
+  const barRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -56,6 +58,11 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
     const updateActiveSection = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
+        const bar = barRef.current;
+        const barTop = bar?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+        const stickyTop = bar ? Number.parseFloat(window.getComputedStyle(bar).top) || 0 : 0;
+        setStuck(barTop <= stickyTop + 1);
+
         const candidates = sections
           .map((section) => {
             const element = document.getElementById(section.targetId);
@@ -130,7 +137,7 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
 
   return (
     <>
-      <div className="sheet-navigator-bar" aria-label="Current character sheet section">
+      <div className={stuck ? "sheet-navigator-bar stuck" : "sheet-navigator-bar"} aria-label="Current character sheet section" ref={barRef}>
         <div>
           <span className="card-label">Current section</span>
           <strong>{activeSection.label}</strong>

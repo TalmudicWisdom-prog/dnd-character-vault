@@ -695,10 +695,18 @@ h1, h2, strong { color: var(--ink); }
 
 .dashboard {
   display: grid;
-  grid-template-columns: minmax(190px, 0.68fr) minmax(300px, 1.05fr) minmax(360px, 1.25fr);
-  gap: var(--space-5);
+  grid-template-columns: minmax(132px, 190px) minmax(260px, 0.85fr) minmax(360px, 1.3fr);
+  gap: var(--space-4);
   align-items: stretch;
   margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  background:
+    radial-gradient(circle at 16% 10%, color-mix(in srgb, var(--fantasy-blue) 12%, transparent), transparent 22rem),
+    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--fantasy-gold) 8%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--sheet-panel-strong) 82%, #000), var(--sheet-panel));
+  border: 1px solid color-mix(in srgb, var(--fantasy-gold) 42%, var(--sheet-border));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 255 255 / 0.025);
 }
 .portrait-frame {
   min-height: 260px;
@@ -731,6 +739,7 @@ h1, h2, strong { color: var(--ink); }
 .portrait-picker-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .portrait-picker-controls small { color: var(--muted); font-size: 0.76rem; line-height: 1.35; }
 .portrait-picker.compact {
+  position: relative;
   grid-template-columns: 1fr;
   align-content: stretch;
   padding: 0;
@@ -738,13 +747,28 @@ h1, h2, strong { color: var(--ink); }
   border: 0;
   border-radius: 0;
 }
-.portrait-picker.compact .portrait-frame { min-height: 210px; width: 100%; }
-.portrait-picker.compact .portrait-picker-controls {
-  padding: var(--space-2) 0 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+.portrait-picker.compact .portrait-frame { min-height: 100%; width: 100%; aspect-ratio: 4 / 5; border-radius: var(--radius-md); }
+.portrait-management { position: absolute; right: 8px; bottom: 8px; left: 8px; z-index: 2; }
+.portrait-management summary {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  color: #fff8ef;
+  background: rgb(0 0 0 / 0.58);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 900;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+.portrait-management .portrait-picker-controls {
+  margin-top: 6px;
+  padding: var(--space-2);
+  background: color-mix(in srgb, var(--sheet-panel) 92%, #000);
+  border: 1px solid color-mix(in srgb, var(--fantasy-bronze) 65%, var(--sheet-border));
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
 }
 .dashboard .sheet-character-header {
   min-width: 0;
@@ -753,13 +777,11 @@ h1, h2, strong { color: var(--ink); }
   gap: var(--space-3);
   align-content: center;
   margin: 0;
-  padding: var(--space-7);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--sheet-panel-strong) 78%, transparent), var(--sheet-panel)),
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--fantasy-gold) 8%, transparent), transparent 18rem);
-  border: 1px solid color-mix(in srgb, var(--fantasy-gold) 38%, var(--sheet-border));
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 255 255 / 0.025);
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--sheet-panel-strong) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fantasy-bronze) 45%, var(--sheet-border));
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.02);
 }
 .dashboard .sheet-character-header h1 {
   margin: 0;
@@ -779,16 +801,30 @@ h1, h2, strong { color: var(--ink); }
   align-items: center;
   justify-content: space-between;
   margin: 0 0 var(--space-3);
-  padding: 10px 12px;
+  min-height: 72px;
+  padding: 12px 14px;
   color: var(--sheet-text);
-  background: color-mix(in srgb, var(--sheet-panel) 92%, #000);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sheet-panel-strong) 88%, #000), color-mix(in srgb, var(--sheet-panel) 90%, #000));
   border: 1px solid color-mix(in srgb, var(--fantasy-gold) 36%, var(--sheet-border));
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   backdrop-filter: blur(14px);
+  transition: min-height 160ms ease, padding 160ms ease, border-radius 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 .sheet-navigator-bar > div { min-width: 0; display: grid; gap: 2px; }
 .sheet-navigator-bar strong { overflow: hidden; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-navigator-bar.stuck {
+  min-height: 56px;
+  padding: 6px 9px 6px 12px;
+  background: color-mix(in srgb, var(--fantasy-black) 76%, transparent);
+  border-color: color-mix(in srgb, var(--fantasy-gold) 30%, var(--sheet-border));
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.38);
+  backdrop-filter: blur(18px);
+}
+.sheet-navigator-bar.stuck .card-label { font-size: 0.58rem; letter-spacing: 0.1em; }
+.sheet-navigator-bar.stuck strong { font-size: 0.92rem; }
 .sheet-navigator-trigger {
   width: 42px;
   min-width: 42px;
@@ -802,6 +838,7 @@ h1, h2, strong { color: var(--ink); }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.sheet-navigator-bar.stuck .sheet-navigator-trigger { width: 40px; min-width: 40px; height: 40px; }
 .sheet-navigator-overlay {
   position: fixed;
   inset: 0;
@@ -1289,7 +1326,7 @@ h1, h2, strong { color: var(--ink); }
   .editor-side { position: static; }
   .character-card { display: block; }
   .character-actions { border-top: 1px solid var(--line); border-left: 0; }
-  .dashboard { grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr); }
+  .dashboard { grid-template-columns: minmax(132px, 0.35fr) minmax(0, 1fr); padding: var(--space-3); }
   .dashboard .combat-summary { grid-column: 1 / -1; }
   .sheet-character-header, .sheet-layout-stack { grid-template-columns: 1fr; }
   .gameplay-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1325,23 +1362,25 @@ h1, h2, strong { color: var(--ink); }
   .page { padding: max(30px, env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom)); }
   .page-header, .section-heading, .setting-section, .guidance-panel { align-items: stretch; flex-direction: column; }
   .page-header { margin-bottom: 30px; }
-  .dashboard { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; margin-bottom: 10px; }
-  .dashboard .portrait-picker.compact { grid-column: 1 / -1; grid-template-columns: 118px minmax(0, 1fr); gap: 10px; align-items: center; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 176px; aspect-ratio: 2 / 3; border-radius: var(--radius-md); }
-  .dashboard .portrait-picker.compact .portrait-picker-controls { align-content: center; gap: 7px; padding: 0; }
-  .dashboard .portrait-picker.compact .form-field-label { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
-  .dashboard .portrait-picker.compact .portrait-picker-actions { gap: 6px; }
-  .dashboard .portrait-picker.compact .file-button,
-  .dashboard .portrait-picker.compact .text-button {
-    min-height: 32px;
-    padding: 6px 9px;
-    font-size: 0.72rem;
+  .dashboard { grid-template-columns: 96px minmax(0, 1fr); gap: 9px; margin-bottom: 10px; padding: 10px; }
+  .dashboard .portrait-picker.compact { grid-column: 1; min-height: 132px; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 132px; aspect-ratio: 3 / 4; border-radius: var(--radius-md); }
+  .portrait-management { right: 6px; bottom: 6px; left: 6px; }
+  .portrait-management summary { min-height: 28px; font-size: 0.66rem; }
+  .portrait-management .portrait-picker-controls { padding: 7px; }
+  .portrait-management .form-field-label { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .portrait-management .portrait-picker-actions { gap: 5px; }
+  .portrait-management .file-button,
+  .portrait-management .text-button {
+    min-height: 30px;
+    padding: 5px 7px;
+    font-size: 0.68rem;
     line-height: 1.1;
   }
-  .dashboard .portrait-picker.compact .portrait-picker-controls small { max-width: 22ch; font-size: 0.66rem; line-height: 1.25; }
+  .portrait-management .portrait-picker-controls small { font-size: 0.62rem; line-height: 1.25; }
   .portrait-frame { min-height: 132px; }
   .portrait-frame span { font-size: 3rem; }
-  .dashboard .sheet-character-header { grid-column: 1 / -1; min-height: 132px; padding: 14px; }
+  .dashboard .sheet-character-header { grid-column: 2; min-height: 132px; padding: 12px; }
   .dashboard .sheet-character-header h1 { font-size: 2rem; }
   .dashboard .combat-summary, .dashboard .sheet-header-meta { grid-column: 1 / -1; }
   .dashboard-actions { display: grid; grid-template-columns: 1fr 1fr; }

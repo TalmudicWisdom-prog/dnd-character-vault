@@ -86,22 +86,26 @@ export function CharacterPortraitField({ characterName, compact = false, label =
     setStatus("Picture removed.");
   };
 
+  const controls = (
+    <div className="portrait-picker-controls">
+      <span className="form-field-label">{label}</span>
+      <div className="portrait-picker-actions">
+        <label className="secondary-button compact file-button" htmlFor={inputId}>
+          {value ? "Change picture" : "Add picture"}
+          <input accept="image/*" id={inputId} onChange={(event) => void choosePortrait(event)} type="file" />
+        </label>
+        {value && <button className="text-button danger" onClick={() => void removePortrait()} type="button">Remove</button>}
+      </div>
+      <small>{status || "Stored on this device and included in character backups."}</small>
+    </div>
+  );
+
   return (
     <div className={compact ? "portrait-picker compact" : "portrait-picker"}>
       <div className="portrait-preview portrait-frame" aria-label={value ? `${characterName} character picture` : `${characterName} picture placeholder`}>
         {value ? <img alt="" src={value} /> : <span aria-hidden="true">{characterInitial(characterName)}</span>}
       </div>
-      <div className="portrait-picker-controls">
-        <span className="form-field-label">{label}</span>
-        <div className="portrait-picker-actions">
-          <label className="secondary-button compact file-button" htmlFor={inputId}>
-            {value ? "Change picture" : "Add picture"}
-            <input accept="image/*" id={inputId} onChange={(event) => void choosePortrait(event)} type="file" />
-          </label>
-          {value && <button className="text-button danger" onClick={() => void removePortrait()} type="button">Remove</button>}
-        </div>
-        <small>{status || "Stored on this device and included in character backups."}</small>
-      </div>
+      {compact ? <details className="portrait-management"><summary>Edit portrait</summary>{controls}</details> : controls}
     </div>
   );
 }
