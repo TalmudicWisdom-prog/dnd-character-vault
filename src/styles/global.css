@@ -1519,11 +1519,23 @@ h1, h2, strong { color: var(--ink); }
   .save-toast { right: 14px; bottom: 84px; }
 }
 
+@media (max-width: 430px) {
+  .dashboard { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 9px; }
+  .dashboard .portrait-picker.compact,
+  .dashboard .sheet-character-header,
+  .dashboard .combat-summary,
+  .dashboard .sheet-header-meta { grid-column: 1; }
+  .dashboard .portrait-picker.compact { min-height: 152px; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 152px; aspect-ratio: 16 / 9; }
+  .dashboard .sheet-character-header { min-height: 0; padding: 10px; }
+  .dashboard-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 360px) {
+  .dashboard-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 420px) {
-  .dashboard { grid-template-columns: minmax(76px, 88px) minmax(0, 1fr); gap: 7px; padding: 8px; }
-  .dashboard .portrait-picker.compact { min-height: 124px; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 124px; }
-  .dashboard .sheet-character-header { min-height: 124px; padding: 9px; }
   .dashboard-actions { gap: 5px; }
   .dashboard-actions .button-link, .dashboard-actions button { min-height: 34px; padding-inline: 5px; font-size: 0.68rem; }
   .sheet-navigator-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
