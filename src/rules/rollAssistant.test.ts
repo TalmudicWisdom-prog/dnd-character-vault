@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { createEmptyCharacterSheet } from "../storage/characterSheets";
 import { buildRollAssistantRows, initiativeBonus, savingThrowBonus } from "./rollAssistant";
 
+function initiativeRowFor(sheet: ReturnType<typeof createEmptyCharacterSheet>) {
+  const row = buildRollAssistantRows(sheet).find((rollRow) => rollRow.id === "initiative");
+  if (!row) throw new Error("Initiative row was not created");
+  return row;
+}
+
 describe("what do I roll assistant", () => {
   it("uses stored saving throw proficiencies without class assumptions", () => {
     const sheet = createEmptyCharacterSheet(crypto.randomUUID());
@@ -36,6 +42,53 @@ describe("what do I roll assistant", () => {
     expect(rows["int-save"]).toMatchObject({ formula: "d20+2", bonus: 2 });
     expect(rows["wis-save"]).toMatchObject({ formula: "d20+7", bonus: 7 });
     expect(rows["cha-save"]).toMatchObject({ formula: "d20+0", bonus: 0 });
+  });
+
+  it("uses Dexterity 14 as +2 initiative when no valid saved initiative exists", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.dex = 14;
+    sheet.initiative = 0;
+
+    expect(initiativeBonus(sheet)).toBe(2);
+    expect(initiativeRowFor(sheet)).toMatchObject({ formula: "d20+2", bonus: 2 });
+  });
+
+  it("uses Dexterity 10 as +0 initiative", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.dex = 10;
+    sheet.initiative = 0;
+
+    expect(initiativeBonus(sheet)).toBe(0);
+    expect(initiativeRowFor(sheet)).toMatchObject({ formula: "d20+0", bonus: 0 });
+  });
+
+  it("uses Dexterity 8 as -1 initiative", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.dex = 8;
+    sheet.initiative = 0;
+
+    expect(initiativeBonus(sheet)).toBe(-1);
+    expect(initiativeRowFor(sheet)).toMatchObject({ formula: "d20-1", bonus: -1 });
+  });
+
+  it("uses a valid saved initiative modifier as the initiative source", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.dex = 14;
+    sheet.initiative = 5;
+
+    expect(initiativeBonus(sheet)).toBe(5);
+    expect(initiativeRowFor(sheet)).toMatchObject({ formula: "d20+5", bonus: 5 });
+  });
+
+  it("does not let HP values affect initiative", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.dex = 14;
+    sheet.currentHp = 125;
+    sheet.maxHp = 125;
+    sheet.initiative = 0;
+
+    expect(initiativeBonus(sheet)).toBe(2);
+    expect(initiativeRowFor(sheet)).toMatchObject({ formula: "d20+2", bonus: 2 });
   });
 
   it("extracts a weapon d20 formula from character notes when available", () => {

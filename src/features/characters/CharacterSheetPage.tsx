@@ -13,7 +13,7 @@ import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import { rollFormula, type DiceRollResult } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
-import { buildRollAssistantRows, type RollAssistantMode } from "../../rules/rollAssistant";
+import { buildRollAssistantRows, initiativeBonus, type RollAssistantMode } from "../../rules/rollAssistant";
 import { createCharacterBackup, downloadBackup } from "../../storage/backups";
 import {
   defaultSheetLayoutOrder,
@@ -433,6 +433,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const levelPreview = levelUpPreview(character.level);
   const rollRows = buildRollAssistantRows(sheet);
   const initiativeRow = rollRows.find((row) => row.id === "initiative");
+  const initiativeModifier = initiativeBonus(sheet);
   const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
   const passivePerception = 10 + skillModifier(sheet, "perception");
   const hpMaximum = Math.max(sheet.maxHp, 1);
@@ -636,7 +637,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </article>
           <article className="panel combat-panel" id="sheet-section-speed-defenses" tabIndex={-1}>
             <div className="form-section-heading"><div><span className="card-label">Combat</span><h2>Defenses and movement</h2></div></div>
-            <div className="combat-stats"><label className="big-stat"><span>Armor Class</span><input min={0} onChange={(event) => edit((current) => ({ ...current, armorClass: Number(event.target.value) }))} type="number" value={sheet.armorClass} /></label><label className="big-stat"><span>Initiative</span><input onChange={(event) => edit((current) => ({ ...current, initiative: Number(event.target.value) }))} type="number" value={sheet.initiative} /></label><label className="big-stat"><span>Speed</span><input min={0} onChange={(event) => edit((current) => ({ ...current, speed: Number(event.target.value) }))} type="number" value={sheet.speed} /></label></div>
+            <div className="combat-stats"><label className="big-stat"><span>Armor Class</span><input min={0} onChange={(event) => edit((current) => ({ ...current, armorClass: Number(event.target.value) }))} type="number" value={sheet.armorClass} /></label><label className="big-stat"><span>Initiative</span><input onChange={(event) => edit((current) => ({ ...current, initiative: Number(event.target.value) }))} type="number" value={initiativeModifier} /></label><label className="big-stat"><span>Speed</span><input min={0} onChange={(event) => edit((current) => ({ ...current, speed: Number(event.target.value) }))} type="number" value={sheet.speed} /></label></div>
             <div className="form-grid combat-extra-grid"><label className="form-field level-up-field"><span>Hit Dice <LevelUpHint /></span><input onChange={(event) => edit((current) => ({ ...current, hitDice: event.target.value }))} value={sheet.hitDice} /></label><label className="form-field"><span>Death save successes</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveSuccesses: Number(event.target.value) }))} type="number" value={sheet.deathSaveSuccesses} /></label><label className="form-field"><span>Death save failures</span><input max={3} min={0} onChange={(event) => edit((current) => ({ ...current, deathSaveFailures: Number(event.target.value) }))} type="number" value={sheet.deathSaveFailures} /></label><div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "combat-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["combat-initiative"]} /></div><div className="inline-roll-control"><button className="secondary-button compact" disabled={!sheet.hitDice.trim()} onClick={() => rollNow("Hit Dice", sheet.hitDice, "combat-hit-dice")} type="button">Roll hit dice</button><InlineRollFeedback result={inlineRolls["combat-hit-dice"]} /></div><button className="secondary-button compact" onClick={() => setActiveModuleId("notes")} type="button">Conditions / notes</button></div>
           </article>
         </div>;
@@ -731,7 +732,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </button>
           <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "dashboard-initiative") : setActiveModuleId("health-combat")} type="button">
             <span>Initiative</span>
-            <strong>{formatModifier(sheet.initiative)}</strong>
+            <strong>{formatModifier(initiativeModifier)}</strong>
             <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
             <InlineRollFeedback result={inlineRolls["dashboard-initiative"]} />
           </button>
