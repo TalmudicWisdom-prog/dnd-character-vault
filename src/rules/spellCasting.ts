@@ -1,6 +1,7 @@
 import type { CharacterSheet, Spell } from "../domain/models";
 import { abilityModifier, formatModifier } from "../domain/dndMath";
 import { changeUsedSpellSlots, remainingSpellSlots, type SlotPoolId } from "./spellSlots";
+import { spellcastingAbilityForClass } from "./spellCatalog";
 
 export type SpellRollKind = "attack" | "damage" | "healing" | "other";
 
@@ -45,6 +46,24 @@ export function spellAttackModifier(sheet: CharacterSheet) {
 export function spellSaveDifficulty(sheet: CharacterSheet) {
   if (sheet.spellSaveDc > 0) return sheet.spellSaveDc;
   return sheet.spellcastingAbility ? 8 + sheet.proficiencyBonus + spellcastingAbilityModifier(sheet) : 0;
+}
+
+export function resolvedSpellcastingAbility(spell: Spell, sheet: CharacterSheet) {
+  return spell.castingAbilityOverride
+    ?? spellcastingAbilityForClass(spell.sourceClass)
+    ?? (!spell.definitionId ? sheet.spellcastingAbility : null);
+}
+
+export function spellDetailStatistics(spell: Spell, sheet: CharacterSheet) {
+  const ability = resolvedSpellcastingAbility(spell, sheet);
+  const resolvedSheet = { ...sheet, spellcastingAbility: ability };
+  return {
+    ability,
+    abilityModifier: ability ? spellcastingAbilityModifier(resolvedSheet) : null,
+    saveDc: spell.savingThrowType && ability ? spellSaveDifficulty(resolvedSheet) : null,
+    spellAttack: spell.attackRollRequired && ability ? spellAttackModifier(resolvedSheet) : null,
+    setupWarning: Boolean((spell.savingThrowType || spell.attackRollRequired) && !ability),
+  };
 }
 
 function spellNameLines(value: string) {
@@ -136,7 +155,7 @@ export function spellComponents(spell: Spell) {
 
 export function spellRollOptions(spell: Spell, sheet: CharacterSheet): SpellRollOption[] {
   const options: SpellRollOption[] = [];
-  if (spell.attackRollRequired) {
+  if (spell.attackRollRequired && (sheet.spellcastingAbility || sheet.spellAttackBonus !== 0)) {
     options.push({
       id: "spell-attack",
       label: "Spell attack",

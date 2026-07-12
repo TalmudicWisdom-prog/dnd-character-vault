@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createCharacter, deleteCharacter, duplicateCharacter } from "./characters";
 import { db } from "./database";
 import { srdSpell } from "../rules/srd";
-import { createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, movePinnedSpell, saveSpell, setSpellPinned } from "./spellbooks";
+import { addSpellFromCatalog, createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, movePinnedSpell, replaceCustomSpellWithSrd, saveSpell, setSpellPinned } from "./spellbooks";
 
 const draft = (name: string) => ({
   name, summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "", level: 1,
@@ -63,7 +63,7 @@ describe("character-scoped spellbooks", () => {
       name: "Thunderwave",
       level: 1,
       school: "Evocation",
-      castingTime: "1 action",
+      castingTime: "Action",
       actionType: "action",
       range: "Self",
       verbalComponent: true,
@@ -79,7 +79,43 @@ describe("character-scoped spellbooks", () => {
       source: "SRD",
       homebrew: false,
     });
-    expect(spell.description).toContain("thunderous force");
-    expect(spell.higherLevelScaling).toContain("higher-level");
+    expect(spell.description).toContain("thunderous energy");
+    expect(spell.higherLevelScaling).toContain("spell slot level above 1");
+  });
+
+  it("adds Dispel Magic as a linked SRD definition rather than a custom cantrip", async () => {
+    const character = await createCharacter(draft("Druid"));
+    const definition = srdSpell("dispel-magic")!;
+    const spell = await addSpellFromCatalog(character.id, definition, "Druid");
+
+    expect(spell).toMatchObject({
+      name: "Dispel Magic",
+      level: 3,
+      school: "Abjuration",
+      source: "SRD",
+      homebrew: false,
+      definitionId: "dispel-magic",
+      definitionVersion: "5.2.1",
+      sourceClass: "Druid",
+      verbalComponent: true,
+      somaticComponent: true,
+      materialComponent: false,
+      attackRollRequired: false,
+      savingThrowType: "",
+    });
+    expect(spell.description).toContain("ongoing spell");
+    expect(spell.higherLevelScaling).toContain("automatically end");
+  });
+
+  it("keeps explicit custom creation and safely repairs an exact-name custom spell", async () => {
+    const character = await createCharacter(draft("Druid"));
+    const custom = await createSpell(character.id, "Dispel Magic");
+    const annotated = await saveSpell({ ...custom, notes: "Keep this note" });
+    await setSpellPinned(character.id, custom.id, true);
+
+    expect(custom).toMatchObject({ level: 0, school: "Custom", source: "Homebrew", homebrew: true, definitionId: "" });
+    const repaired = await replaceCustomSpellWithSrd(annotated, srdSpell("dispel-magic")!, "Druid");
+    expect(repaired).toMatchObject({ id: custom.id, level: 3, source: "SRD", homebrew: false, notes: "Keep this note" });
+    expect((await db.spellbooks.get(character.id))?.pinnedSpellIds).toContain(custom.id);
   });
 });

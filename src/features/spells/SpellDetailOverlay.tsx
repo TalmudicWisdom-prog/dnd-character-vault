@@ -7,11 +7,9 @@ import {
   canCastSpellWithSlot,
   consumeSpellSlot,
   isSpellPrepared,
-  spellAttackModifier,
   spellComponents,
   spellRollOptions,
-  spellSaveDifficulty,
-  spellcastingAbilityModifier,
+  spellDetailStatistics,
   validSpellSlotChoices,
   type SpellSlotChoice,
 } from "../../rules/spellCasting";
@@ -32,8 +30,10 @@ function levelLabel(level: number) {
   return level === 0 ? "Cantrip" : `Level ${level}`;
 }
 
+const abilityNames = { str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma" } as const;
+
 function abilityLabel(ability: CharacterSheet["spellcastingAbility"]) {
-  return ability ? ability.toUpperCase() : "Unset";
+  return ability ? abilityNames[ability] : "";
 }
 
 function rollResultSummary(result: DiceRollResult) {
@@ -71,11 +71,15 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
       { pool: "pactMagic", level } as SpellSlotChoice,
     ])).filter((choice) => slotChoiceSummary(sheet, choice).maximum > 0);
   }, [sheet, spell]);
-  const rollOptions = useMemo(() => spellRollOptions(spell, sheet), [sheet, spell]);
+  const detailStatistics = spellDetailStatistics(spell, sheet);
+  const resolvedAbility = detailStatistics.ability;
+  const castingSheet = useMemo(() => ({ ...sheet, spellcastingAbility: resolvedAbility }), [sheet, resolvedAbility]);
+  const rollOptions = useMemo(() => spellRollOptions(spell, castingSheet), [castingSheet, spell]);
   const prepared = isSpellPrepared(sheet, spell);
-  const spellSaveDc = spellSaveDifficulty(sheet);
-  const spellAttack = spellAttackModifier(sheet);
-  const castingModifier = spellcastingAbilityModifier(sheet);
+  const spellSaveDc = detailStatistics.saveDc;
+  const spellAttack = detailStatistics.spellAttack;
+  const castingModifier = detailStatistics.abilityModifier;
+  const needsCastingSetup = detailStatistics.setupWarning;
   const canCast = spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotChoice);
 
   useEffect(() => {
@@ -172,8 +176,8 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
             <div className="spell-detail-tags">
               <SourceBadge source={spell.source} />
               <span>{prepared ? "Prepared" : spell.level === 0 ? "Known cantrip" : "Not marked prepared"}</span>
-              {spell.concentration && <span>Concentration</span>}
-              {spell.ritual && <span>Ritual</span>}
+              {spell.concentration && <span title="The caster must maintain focus and normally can concentrate on only one spell at a time.">Concentration</span>}
+              {spell.ritual && <span title="Eligible casters may cast it as a ritual when their rules allow.">Ritual</span>}
             </div>
           </div>
           <button aria-label={`Close ${spell.name} details`} className="module-overlay-close" onClick={onClose} type="button">X</button>
@@ -203,13 +207,17 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
           <section className="spell-detail-grid" aria-label="Spell details">
             <div><span>Casting time</span><strong>{spell.castingTime}</strong></div>
             <div><span>Range</span><strong>{spell.range}</strong></div>
-            <div><span>Components</span><strong>{spellComponents(spell)}</strong></div>
+            <div><span>Components</span><strong className="component-abbreviations">{spell.verbalComponent && <abbr title="Verbal: the caster must speak magical words.">V</abbr>}{spell.somaticComponent && <abbr title="Somatic: the caster must perform gestures.">S</abbr>}{spell.materialComponent && <abbr title="Material: the spell requires a material component or spellcasting focus, subject to its rules.">M</abbr>}{spellComponents(spell) === "None" && "None"}</strong></div>
             <div><span>Duration</span><strong>{spell.duration}</strong></div>
-            <div><span>Spell attack</span><strong>{formatModifier(spellAttack)}</strong></div>
-            <div><span>Save DC</span><strong>{spellSaveDc || "Unset"}</strong></div>
-            <div><span>Ability</span><strong>{abilityLabel(sheet.spellcastingAbility)} {formatModifier(castingModifier)}</strong></div>
-            <div><span>Proficiency</span><strong>{formatModifier(sheet.proficiencyBonus)}</strong></div>
+            {spellAttack !== null && <div><span title="The modifier added to the caster's spell-attack roll.">Spell Attack</span><strong>{formatModifier(spellAttack)}</strong></div>}
+            {spellSaveDc !== null && <div><span title="The target number a creature must meet on its saving throw.">Save DC</span><strong>{spellSaveDc} · {abilityNames[spell.savingThrowType.toLocaleLowerCase() as keyof typeof abilityNames] ?? spell.savingThrowType} save</strong></div>}
+            {resolvedAbility && castingModifier !== null && <div><span>Spellcasting Ability</span><strong>{abilityLabel(resolvedAbility)} {formatModifier(castingModifier)}</strong></div>}
+            {(spell.attackRollRequired || spell.savingThrowType) && resolvedAbility && <div><span>Proficiency</span><strong>{formatModifier(sheet.proficiencyBonus)}</strong></div>}
           </section>
+
+          {needsCastingSetup && <p className="inline-message setup-warning" role="status">Choose the spell's source class or a casting ability override before using its spellcasting statistics.</p>}
+
+          <details className="spell-rules-help"><summary>What do these spell terms mean?</summary><dl><dt>V - Verbal</dt><dd>The caster must speak magical words.</dd><dt>S - Somatic</dt><dd>The caster must perform gestures.</dd><dt>M - Material</dt><dd>The spell requires a material component or spellcasting focus, subject to its rules.</dd><dt>Concentration</dt><dd>The caster must maintain focus and normally can concentrate on only one spell at a time.</dd><dt>Ritual</dt><dd>Eligible casters may cast it as a ritual when their rules allow.</dd><dt>Save DC</dt><dd>The target number a creature must meet on its saving throw.</dd><dt>Spell Attack</dt><dd>The modifier added to the caster's spell-attack roll.</dd></dl></details>
 
           {spell.materialDetails && <section className="spell-text-panel"><span className="card-label">Materials</span><p>{spell.materialDetails}</p></section>}
 
@@ -228,6 +236,7 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
           {spell.higherLevelScaling && <section className="spell-text-panel"><span className="card-label">At higher levels</span><p>{spell.higherLevelScaling}</p></section>}
           {spell.statusEffects && <section className="spell-text-panel"><span className="card-label">Effects</span><p>{spell.statusEffects}</p></section>}
           {spell.sourceNotes && <section className="spell-text-panel"><span className="card-label">Source / class notes</span><p>{spell.sourceNotes}</p></section>}
+          {spell.notes && <section className="spell-text-panel"><span className="card-label">Character notes</span><p>{spell.notes}</p></section>}
 
           {history.length > 0 && <details className="dice-history spell-cast-history"><summary>Roll / cast history</summary><ol>{history.map((roll) => <li key={roll.id}><strong>{roll.formula}</strong> {roll.breakdown}</li>)}</ol></details>}
           {editContent && <details className="spell-edit-details"><summary>Edit spell data</summary>{editContent}</details>}

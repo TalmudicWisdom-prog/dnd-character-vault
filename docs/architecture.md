@@ -84,6 +84,15 @@ Version 14 adds manual spell slot usage tracking:
 
 Long Rest reset is user-confirmed and manual. No spell slot is spent automatically by casting or rolling a spell.
 
+Version 17 adds stable spell-definition linkage and character-specific casting context:
+
+- `spells.definitionId` and `definitionVersion` link an owned spell to the embedded SRD definition
+- `spells.sourceClass` selects the multiclass source and its normal spellcasting ability
+- `spells.castingAbilityOverride` supports advanced homebrew exceptions
+- `spells.notes` keeps character-specific notes separate from canonical spell text
+
+Older spells and backups receive safe empty defaults. Existing editable spell snapshots remain readable, while linked SRD definitions provide the canonical identity and version.
+
 Character lifecycle operations live in `src/storage/characters.ts`, keeping IndexedDB details outside the interface. All persisted record shapes are validated with Zod at external boundaries. New schema changes must use a new Dexie database version and migration.
 
 Character-owned records always carry a required `characterId`. Inventory writes validate both item and container ownership, spellbook writes validate spell ownership before pinning, and queries use character-scoped indexes. PDF associations are explicit character IDs; associating a PDF with one character does not associate it with any other character.
@@ -96,7 +105,7 @@ Uploaded PDFs remain reference documents. The app does not automatically apply P
 
 ## SRD foundation
 
-`src/rules/srd.ts` contains a small offline SRD 5.2.1 helper layer for abilities, skills, core d20 terms, proficiency bonus by level, class/species/background lists, and spell metadata categories. It is not a complete rules automation engine.
+`src/rules/srd.ts` contains the offline SRD 5.2.1 helper layer for abilities, skills, core d20 terms, proficiency bonus by level, class/species/background lists, and spell metadata categories. The complete 339-spell catalog and descriptions live in the JSON-formatted `src/data/srd-spells-5.2.1.data` asset; catalog search and class-to-ability resolution live in `src/rules/spellCatalog.ts`. This is not a complete rules automation engine.
 
 The Create Character Wizard uses this helper data for beginner explanations, primary ability hints, skill descriptions, and proficiency bonus display. Manual override remains available for all character fields.
 

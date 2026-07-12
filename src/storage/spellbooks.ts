@@ -1,6 +1,7 @@
-import type { Spell, SpellActionType, Spellbook } from "../domain/models";
+import type { Spell, Spellbook } from "../domain/models";
 import { spellSchema, spellbookSchema } from "../domain/models";
 import type { SrdSpell } from "../rules/srd";
+import { actionTypeFromCastingTime, SRD_SPELL_CATALOG_VERSION } from "../rules/spellCatalog";
 import { db } from "./database";
 
 function now() {
@@ -24,7 +25,7 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     level: 0,
     school: "Custom",
     castingTime: "1 action",
-    actionType: "action" satisfies SpellActionType,
+    actionType: "action",
     range: "Self",
     verbalComponent: false,
     somaticComponent: false,
@@ -46,22 +47,17 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     sourceNotes: "",
     source: "Homebrew",
     homebrew: true,
+    definitionId: "",
+    definitionVersion: "",
+    sourceClass: "",
+    castingAbilityOverride: null,
+    notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
   });
 }
 
-function actionTypeFromCastingTime(castingTime: string): SpellActionType {
-  const normalized = castingTime.toLocaleLowerCase();
-  if (normalized.includes("bonus")) return "bonusAction";
-  if (normalized.includes("reaction")) return "reaction";
-  if (normalized.includes("minute")) return "minute";
-  if (normalized.includes("hour")) return "hour";
-  if (normalized.includes("action")) return "action";
-  return "special";
-}
-
-export function createSpellFromSrd(characterId: string, spell: SrdSpell): Spell {
+export function createSpellFromSrd(characterId: string, spell: SrdSpell, sourceClass = ""): Spell {
   const timestamp = now();
   return spellSchema.parse({
     id: crypto.randomUUID(),
@@ -92,9 +88,39 @@ export function createSpellFromSrd(characterId: string, spell: SrdSpell): Spell 
     sourceNotes: `SRD classes: ${spell.classes.join(", ")}`,
     source: "SRD",
     homebrew: false,
+    definitionId: spell.id,
+    definitionVersion: spell.sourceVersion ?? SRD_SPELL_CATALOG_VERSION,
+    sourceClass,
+    castingAbilityOverride: null,
+    notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
   });
+}
+
+export async function addSpellFromCatalog(characterId: string, definition: SrdSpell, sourceClass: string) {
+  if (!sourceClass.trim()) throw new Error("Choose the spell's source class");
+  await getOrCreateSpellbook(characterId);
+  const existing = await db.spells.where("characterId").equals(characterId).toArray();
+  if (existing.some((spell) => spell.definitionId === definition.id)) throw new Error(`${definition.name} is already owned by this character`);
+  const spell = createSpellFromSrd(characterId, definition, sourceClass);
+  await db.spells.add(spell);
+  await db.characters.update(characterId, { updatedAt: spell.updatedAt });
+  return spell;
+}
+
+export async function replaceCustomSpellWithSrd(spell: Spell, definition: SrdSpell, sourceClass: string) {
+  if (!spell.homebrew) throw new Error("Only custom spells can be replaced with catalog data");
+  const replacement = spellSchema.parse({
+    ...createSpellFromSrd(spell.characterId, definition, sourceClass),
+    id: spell.id,
+    notes: spell.notes || spell.sourceNotes,
+    createdAt: spell.createdAt,
+    updatedAt: now(),
+  });
+  await db.spells.put(replacement);
+  await db.characters.update(replacement.characterId, { updatedAt: replacement.updatedAt });
+  return replacement;
 }
 
 export async function createSpell(characterId: string, name: string) {

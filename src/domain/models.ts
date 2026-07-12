@@ -239,6 +239,11 @@ export const spellSchema = z.object({
   sourceNotes: z.string().max(10000),
   source: rulesSourceSchema.default("Manual"),
   homebrew: z.boolean(),
+  definitionId: z.string().max(200).default(""),
+  definitionVersion: z.string().max(50).default(""),
+  sourceClass: z.string().max(100).default(""),
+  castingAbilityOverride: abilityIdSchema.nullable().default(null),
+  notes: z.string().max(20000).default(""),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

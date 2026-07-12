@@ -1602,3 +1602,108 @@ h1, h2, strong { color: var(--ink); }
   .sheet-navigator-option[data-section-id="dashboard"] { grid-template-columns: 1fr; align-content: end; justify-items: center; text-align: center; }
   .sheet-navigator-option[data-section-id="dashboard"] .sheet-navigator-option-label { justify-self: center; align-self: end; }
 }
+.spell-catalog-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.catalog-results {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 44rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.catalog-spell-card {
+  align-items: center;
+}
+
+.catalog-spell-copy {
+  cursor: default;
+}
+
+.catalog-add-controls {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  padding: 0.75rem;
+}
+
+.compact-field {
+  min-width: 10rem;
+}
+
+.owned-label {
+  color: var(--muted-text, #64748b);
+  font-weight: 700;
+}
+
+.custom-spell-form,
+.spell-rules-help {
+  border: 1px solid var(--border-color, #d7dce2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.custom-spell-form p {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.custom-spell-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.catalog-limit-note {
+  color: var(--muted-text, #64748b);
+  margin: 0;
+}
+
+.component-abbreviations {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.component-abbreviations abbr {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2rem;
+}
+
+.spell-rules-help summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.spell-rules-help dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0;
+}
+
+.spell-rules-help dt {
+  font-weight: 700;
+}
+
+.spell-rules-help dd {
+  margin: 0;
+}
+
+.setup-warning {
+  border-left: 4px solid #d97706;
+}
+
+@media (max-width: 720px) {
+  .catalog-add-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .spell-rules-help dl {
+    grid-template-columns: 1fr;
+  }
+}

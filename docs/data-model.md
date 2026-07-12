@@ -32,7 +32,8 @@ Related sheet and inventory tables keep character-owned data independent rather 
 Each character owns one `spellbooks` record and any number of `spells` records.
 
 - `spellbooks` stores the required `characterId` and the manually ordered `pinnedSpellIds` quick-access list.
-- `spells` stores the required `characterId`, complete editable spell metadata, rule text, source notes, source label, and standard/homebrew flag.
+- `spells` stores the required `characterId`, editable spell metadata, rule text, source label, and standard/homebrew flag. SRD-owned spells also store a stable `definitionId` and `definitionVersion`; `sourceClass`, optional `castingAbilityOverride`, and `notes` are character-specific.
+- The embedded 339-record SRD 5.2.1 catalog is application data, not copied into a separate IndexedDB catalog table. Linked spell snapshots keep existing backups and offline imports compatible while the stable definition fields identify the canonical record.
 - A pinned ID is valid only when its spell belongs to the same character.
 
 Deleting a character removes only that character's spellbook and spells. Duplicating a character creates new spell IDs and preserves the pinned order in the copy.

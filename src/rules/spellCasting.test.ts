@@ -9,6 +9,7 @@ import {
   spellAttackModifier,
   spellRollOptions,
   spellSaveDifficulty,
+  spellDetailStatistics,
   validSpellSlotChoices,
   validSpellSlotLevels,
 } from "./spellCasting";
@@ -45,6 +46,34 @@ describe("spell casting helpers", () => {
 
     expect(spellAttackModifier(sheet)).toBe(7);
     expect(spellSaveDifficulty(sheet)).toBe(15);
+  });
+
+  it("shows only the applicable save or attack statistic", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.wis = 18;
+    sheet.proficiencyBonus = 3;
+    const base = { ...createEmptySpell(sheet.characterId, "Spell"), definitionId: "spell", sourceClass: "Druid" };
+
+    expect(spellDetailStatistics({ ...base, savingThrowType: "DEX" }, sheet)).toMatchObject({ ability: "wis", saveDc: 15, spellAttack: null, setupWarning: false });
+    expect(spellDetailStatistics({ ...base, attackRollRequired: true }, sheet)).toMatchObject({ ability: "wis", saveDc: null, spellAttack: 7, setupWarning: false });
+    expect(spellDetailStatistics(base, sheet)).toMatchObject({ saveDc: null, spellAttack: null, setupWarning: false });
+  });
+
+  it("warns instead of producing +0 when a linked spell has no source class", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    const spell = { ...createEmptySpell(sheet.characterId, "Mystery Ray"), definitionId: "mystery-ray", attackRollRequired: true };
+
+    expect(spellDetailStatistics(spell, sheet)).toMatchObject({ ability: null, spellAttack: null, saveDc: null, setupWarning: true });
+    expect(spellRollOptions(spell, sheet).some((option) => option.kind === "attack")).toBe(false);
+  });
+
+  it("uses Intelligence for Void Mage source spells", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.abilityScores.int = 14;
+    sheet.proficiencyBonus = 3;
+    const spell = { ...createEmptySpell(sheet.characterId, "Void Ray"), sourceClass: "Void Mage", attackRollRequired: true };
+
+    expect(spellDetailStatistics(spell, sheet)).toMatchObject({ ability: "int", abilityModifier: 2, spellAttack: 5 });
   });
 
   it("tracks prepared status from cantrip and prepared spell names", () => {
