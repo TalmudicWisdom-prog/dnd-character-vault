@@ -105,6 +105,8 @@ describe("character-scoped spellbooks", () => {
     });
     expect(spell.description).toContain("ongoing spell");
     expect(spell.higherLevelScaling).toContain("automatically end");
+    await expect(addSpellFromCatalog(character.id, definition, "Druid")).rejects.toThrow("already owned");
+    expect(await db.spells.where("characterId").equals(character.id).count()).toBe(1);
   });
 
   it("keeps explicit custom creation and safely repairs an exact-name custom spell", async () => {

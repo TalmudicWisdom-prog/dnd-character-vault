@@ -1621,8 +1621,47 @@ h1, h2, strong { color: var(--ink); }
   align-items: center;
 }
 
-.catalog-spell-copy {
-  cursor: default;
+.catalog-spell-main {
+  min-height: 0;
+  cursor: pointer;
+}
+
+.catalog-spell-main:hover strong,
+.catalog-spell-main:focus-visible strong {
+  color: var(--accent);
+}
+
+.catalog-spell-main:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--fantasy-blue-glow) 72%, transparent);
+  outline-offset: -3px;
+}
+
+.catalog-spell-main:active {
+  background: color-mix(in srgb, var(--fantasy-blue) 12%, transparent);
+}
+
+.catalog-description-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-height: 1.45;
+}
+
+.catalog-card-state {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  justify-items: end;
+  min-width: 104px;
+  padding: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--fantasy-bronze) 55%, var(--line));
+}
+
+.catalog-open-affordance {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .catalog-add-controls {
@@ -1630,6 +1669,14 @@ h1, h2, strong { color: var(--ink); }
   align-items: end;
   gap: 0.65rem;
   padding: 0.75rem;
+}
+
+.catalog-add-panel {
+  gap: 12px;
+}
+
+.catalog-source-class {
+  width: min(100%, 360px);
 }
 
 .compact-field {
@@ -1700,9 +1747,38 @@ h1, h2, strong { color: var(--ink); }
 }
 
 @media (max-width: 720px) {
-  .catalog-add-controls {
-    align-items: stretch;
-    flex-direction: column;
+  .spellbook-page {
+    padding-bottom: calc(116px + env(safe-area-inset-bottom));
+  }
+
+  .catalog-results {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .catalog-spell-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalog-spell-main {
+    min-height: 76px;
+  }
+
+  .catalog-description-preview {
+    display: none;
+  }
+
+  .catalog-card-state {
+    grid-template-columns: 1fr auto;
+    justify-items: start;
+    min-width: 0;
+    padding: 8px 12px;
+    border-top: 1px solid color-mix(in srgb, var(--fantasy-bronze) 55%, var(--line));
+    border-left: 0;
+  }
+
+  .catalog-open-affordance {
+    justify-self: end;
   }
 
   .spell-rules-help dl {

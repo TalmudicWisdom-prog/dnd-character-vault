@@ -5,16 +5,17 @@ import { SourceBadge } from "../../components/SourceBadge";
 import { DiceRoller } from "../../components/DiceRoller";
 import type { RulesSource, Spell, SpellActionType } from "../../domain/models";
 import type { SrdSpell } from "../../rules/srd";
-import { srdSpellMetadata } from "../../rules/srd";
+import { srdSpell, srdSpellMetadata } from "../../rules/srd";
 import { characterSourceClassChoices, findSrdSpellByName, searchSrdSpells, suggestSrdSpells } from "../../rules/spellCatalog";
 import { db } from "../../storage/database";
-import { saveCharacterSheet } from "../../storage/characterSheets";
+import { createEmptyCharacterSheet, saveCharacterSheet } from "../../storage/characterSheets";
 import { applyRestRecovery, buildRestPreview, restLabels, type RestKind } from "../../rules/spellSlots";
 import { SpellDetailOverlay } from "./SpellDetailOverlay";
 import { SpellSlotTracker } from "./SpellSlotTracker";
 import {
   createSpell,
   addSpellFromCatalog,
+  createSpellFromSrd,
   deleteSpell,
   duplicateSpell,
   getOrCreateSpellbook,
@@ -99,16 +100,14 @@ function SpellCard({
   );
 }
 
-function CatalogSpellCard({ spell, owned, sourceChoices, onAdd }: {
+function CatalogSpellCard({ spell, owned, onOpen }: {
   spell: SrdSpell;
   owned: boolean;
-  sourceChoices: string[];
-  onAdd: (sourceClass: string) => void;
+  onOpen: () => void;
 }) {
-  const [sourceClass, setSourceClass] = useState(sourceChoices.length === 1 ? sourceChoices[0] : "");
   return (
     <article className="spell-card catalog-spell-card" data-spell-id={spell.id}>
-      <div className="spell-card-main catalog-spell-copy">
+      <button aria-label={`Open ${spell.name} details`} className="spell-card-main catalog-spell-main" onClick={onOpen} type="button">
         <span className="spell-level-mark">{spell.level === 0 ? "C" : spell.level}</span>
         <span className="spell-card-copy">
           <span className="spell-title-row"><strong>{spell.name}</strong><SourceBadge source="SRD" /></span>
@@ -118,15 +117,10 @@ function CatalogSpellCard({ spell, owned, sourceChoices, onAdd }: {
             {spell.concentration && <small>Concentration</small>}
             {spell.ritual && <small>Ritual</small>}
           </span>
-          <small>{spell.description}</small>
+          <small className="catalog-description-preview">{spell.description}</small>
         </span>
-      </div>
-      <div className="catalog-add-controls">
-        {owned ? <span className="owned-label">Already owned</span> : <>
-          {sourceChoices.length > 1 && <label className="form-field compact-field"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => setSourceClass(event.target.value)} value={sourceClass}><option value="">Choose class</option>{sourceChoices.map((choice) => <option key={choice}>{choice}</option>)}</select></label>}
-          <button className="primary-button compact" disabled={!sourceClass} onClick={() => onAdd(sourceClass)} type="button">Add</button>
-        </>}
-      </div>
+      </button>
+      <div className="catalog-card-state">{owned && <span className="owned-label">Already owned</span>}<span aria-hidden="true" className="catalog-open-affordance">View details</span></div>
     </article>
   );
 }
@@ -243,6 +237,8 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
   const [customSpellName, setCustomSpellName] = useState("");
   const [showCustomSpell, setShowCustomSpell] = useState(false);
   const [selectedSpellId, setSelectedSpellId] = useState("");
+  const [selectedCatalogSpellId, setSelectedCatalogSpellId] = useState("");
+  const [catalogSourceClass, setCatalogSourceClass] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => { void getOrCreateSpellbook(characterId); }, [characterId]);
@@ -255,6 +251,11 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
   const exactCustomMatch = findSrdSpellByName(customSpellName);
   const customSuggestions = useMemo(() => suggestSrdSpells(customSpellName).slice(0, 5), [customSpellName]);
   const ownedDefinitionIds = new Set(spells.map((spell) => spell.definitionId).filter(Boolean));
+  const selectedCatalogDefinition = srdSpell(selectedCatalogSpellId);
+  const catalogSourceChoices = selectedCatalogDefinition ? characterSourceClassChoices(character?.characterClass ?? "", selectedCatalogDefinition) : [];
+  const selectedCatalogSpell = useMemo(() => selectedCatalogDefinition ? createSpellFromSrd(characterId, selectedCatalogDefinition, catalogSourceClass) : null, [characterId, catalogSourceClass, selectedCatalogDefinition]);
+  const catalogSheet = useMemo(() => sheet ?? createEmptyCharacterSheet(characterId), [characterId, sheet]);
+  const ownedCatalogSpell = selectedCatalogDefinition ? spells.find((spell) => spell.definitionId === selectedCatalogDefinition.id) : undefined;
   const visibleSpells = useMemo(() => {
     const query = filters.query.trim().toLocaleLowerCase();
     const filtered = spells.filter((spell) =>
@@ -295,12 +296,29 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
 
   const addCatalogSpell = async (definition: SrdSpell, sourceClass: string) => {
     try {
-      const spell = await addSpellFromCatalog(characterId, definition, sourceClass);
-      setSelectedSpellId(spell.id);
+      await addSpellFromCatalog(characterId, definition, sourceClass);
       setMessage(`${definition.name} added from the SRD catalog as a ${sourceClass} spell`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not add catalog spell");
     }
+  };
+
+  const openCatalogSpell = (definition: SrdSpell) => {
+    const choices = characterSourceClassChoices(character?.characterClass ?? "", definition);
+    setCatalogSourceClass(choices.length === 1 ? choices[0] : "");
+    setSelectedSpellId("");
+    setSelectedCatalogSpellId(definition.id);
+  };
+
+  const closeCatalogSpell = () => {
+    setSelectedCatalogSpellId("");
+    setCatalogSourceClass("");
+  };
+
+  const viewOwnedCatalogSpell = () => {
+    if (!ownedCatalogSpell) return;
+    setSelectedCatalogSpellId("");
+    setSelectedSpellId(ownedCatalogSpell.id);
   };
 
   const repairSpell = async (spell: Spell, definition: SrdSpell) => {
@@ -380,6 +398,23 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         spell={selectedSpell}
       />}
 
+      {selectedCatalogSpell && selectedCatalogDefinition && <SpellDetailOverlay
+        catalog={{
+          classes: selectedCatalogDefinition.classes,
+          sourceClass: catalogSourceClass,
+          sourceChoices: catalogSourceChoices,
+          owned: Boolean(ownedCatalogSpell),
+          onAdd: () => void addCatalogSpell(selectedCatalogDefinition, catalogSourceClass),
+          onSourceClassChange: setCatalogSourceClass,
+          onViewOwned: ownedCatalogSpell && sheet ? viewOwnedCatalogSpell : undefined,
+        }}
+        onActivity={setMessage}
+        onClose={closeCatalogSpell}
+        onSheetChange={updateSheetFromSpellCast}
+        sheet={catalogSheet}
+        spell={selectedCatalogSpell}
+      />}
+
       <article className="panel spell-catalog-panel">
         <div className="form-section-heading"><div><span className="card-label">Available catalog spells</span><h2>Add from Spell Catalog</h2><p>Search all {srdSpellMetadata.count} embedded SRD 5.2.1 spells. Catalog search works offline.</p></div><button className="secondary-button" onClick={() => setShowCustomSpell((shown) => !shown)} type="button">Create Custom Spell</button></div>
         <div className="spell-filters catalog-filters">
@@ -399,7 +434,7 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         </form>}
         {message && <p className="inline-message inventory-message" role="status">{message}</p>}
         <div className="catalog-results" aria-label="Available catalog spells">
-          {catalogResults.length ? catalogResults.map((definition) => <CatalogSpellCard key={definition.id} onAdd={(sourceClass) => void addCatalogSpell(definition, sourceClass)} owned={ownedDefinitionIds.has(definition.id)} sourceChoices={characterSourceClassChoices(character.characterClass, definition)} spell={definition} />) : <div className="spell-empty"><strong>No catalog spells match</strong><span>Clear or adjust the catalog filters.</span></div>}
+          {catalogResults.length ? catalogResults.map((definition) => <CatalogSpellCard key={definition.id} onOpen={() => openCatalogSpell(definition)} owned={ownedDefinitionIds.has(definition.id)} spell={definition} />) : <div className="spell-empty"><strong>No catalog spells match</strong><span>Clear or adjust the catalog filters.</span></div>}
         </div>
         {searchSrdSpells(catalogFilters).length > catalogResults.length && <p className="catalog-limit-note">Showing the first {catalogResults.length} matches. Refine your search to narrow the catalog.</p>}
       </article>

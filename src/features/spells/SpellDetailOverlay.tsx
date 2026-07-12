@@ -16,6 +16,15 @@ import {
 import { remainingSpellSlots } from "../../rules/spellSlots";
 
 type SpellDetailOverlayProps = {
+  catalog?: {
+    classes: string[];
+    sourceChoices: string[];
+    sourceClass: string;
+    owned: boolean;
+    onAdd: () => void;
+    onSourceClassChange: (sourceClass: string) => void;
+    onViewOwned?: () => void;
+  };
   editContent?: ReactNode;
   onActivity?: (message: string) => void;
   onClose: () => void;
@@ -28,6 +37,10 @@ const focusableOverlaySelector = "button, [href], input, select, textarea, summa
 
 function levelLabel(level: number) {
   return level === 0 ? "Cantrip" : `Level ${level}`;
+}
+
+function actionTypeLabel(actionType: Spell["actionType"]) {
+  return ({ action: "Action", bonusAction: "Bonus action", reaction: "Reaction", minute: "Minute+", hour: "Hour+", special: "Special" })[actionType];
 }
 
 const abilityNames = { str: "Strength", dex: "Dexterity", con: "Constitution", int: "Intelligence", wis: "Wisdom", cha: "Charisma" } as const;
@@ -54,7 +67,7 @@ function slotChoiceSummary(sheet: CharacterSheet, choice: SpellSlotChoice) {
   return { maximum, used, remaining: remainingSpellSlots(maximum, used) };
 }
 
-export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetChange, sheet, spell }: SpellDetailOverlayProps) {
+export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, onSheetChange, sheet, spell }: SpellDetailOverlayProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -175,7 +188,7 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
             <h2 id="spell-detail-title">{spell.name}</h2>
             <div className="spell-detail-tags">
               <SourceBadge source={spell.source} />
-              <span>{prepared ? "Prepared" : spell.level === 0 ? "Known cantrip" : "Not marked prepared"}</span>
+              <span>{catalog ? "Catalog spell" : prepared ? "Prepared" : spell.level === 0 ? "Known cantrip" : "Not marked prepared"}</span>
               {spell.concentration && <span title="The caster must maintain focus and normally can concentrate on only one spell at a time.">Concentration</span>}
               {spell.ritual && <span title="Eligible casters may cast it as a ritual when their rules allow.">Ritual</span>}
             </div>
@@ -184,7 +197,13 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
         </header>
 
         <div className="spell-detail-body">
-          <section className="spell-cast-panel">
+          {catalog ? <section className="spell-cast-panel catalog-add-panel">
+            <div className="spell-cast-primary">
+              <div><span className="card-label">Add from Spell Catalog</span><strong>{catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{catalog.owned ? "This character already has the canonical SRD definition." : "The selected class determines the spellcasting ability."}</small></div>
+              {catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
+            </div>
+            {!catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}</select></label>}
+          </section> : <section className="spell-cast-panel">
             <div className="spell-cast-primary">
               <div>
                 <span className="card-label">Cast spell</span>
@@ -202,10 +221,11 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
             </div>}
             {!canCast && <p className="inline-message" role="status">No valid spell slot remains for this spell.</p>}
             {message && <p className="inline-message" role="status">{message}</p>}
-          </section>
+          </section>}
 
           <section className="spell-detail-grid" aria-label="Spell details">
             <div><span>Casting time</span><strong>{spell.castingTime}</strong></div>
+            <div><span>Action type</span><strong>{actionTypeLabel(spell.actionType)}</strong></div>
             <div><span>Range</span><strong>{spell.range}</strong></div>
             <div><span>Components</span><strong className="component-abbreviations">{spell.verbalComponent && <abbr title="Verbal: the caster must speak magical words.">V</abbr>}{spell.somaticComponent && <abbr title="Somatic: the caster must perform gestures.">S</abbr>}{spell.materialComponent && <abbr title="Material: the spell requires a material component or spellcasting focus, subject to its rules.">M</abbr>}{spellComponents(spell) === "None" && "None"}</strong></div>
             <div><span>Duration</span><strong>{spell.duration}</strong></div>
@@ -221,7 +241,9 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
 
           {spell.materialDetails && <section className="spell-text-panel"><span className="card-label">Materials</span><p>{spell.materialDetails}</p></section>}
 
-          {rollOptions.length > 0 && <section className="spell-roll-panel">
+          {catalog && <section className="spell-text-panel"><span className="card-label">Available classes</span><p>{catalog.classes.join(", ")}</p></section>}
+
+          {!catalog && rollOptions.length > 0 && <section className="spell-roll-panel">
             <div className="form-section-heading"><div><span className="card-label">Built-in rolls</span><h3>Spell dice</h3></div></div>
             <div className="spell-roll-grid">
               {rollOptions.map((option) => <article className={`spell-roll-card ${option.kind}`} key={option.id}>

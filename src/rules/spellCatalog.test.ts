@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { srdSpells } from "./srd";
 import {
+  characterSourceClassChoices,
   findSrdSpellByName,
   searchSrdSpells,
   spellcastingAbilityForClass,
@@ -29,6 +30,13 @@ describe("embedded SRD spell catalog", () => {
     expect(spellcastingAbilityForClass("Druid")).toBe("wis");
     expect(spellcastingAbilityForClass("Void Mage")).toBe("int");
     expect(spellcastingAbilityForClass("Black Mage")).toBe("int");
+  });
+
+  it("selects the sole matching character class and requires a choice when several match", () => {
+    const dispelMagic = findSrdSpellByName("Dispel Magic")!;
+
+    expect(characterSourceClassChoices("Druid", dispelMagic)).toEqual(["Druid"]);
+    expect(characterSourceClassChoices("Druid / Wizard", dispelMagic)).toEqual(["Druid", "Wizard"]);
   });
 
   it("suggests close catalog matches before custom creation", () => {
