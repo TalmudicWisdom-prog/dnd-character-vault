@@ -7,6 +7,7 @@ import type { RulesSource, Spell, SpellActionType } from "../../domain/models";
 import { db } from "../../storage/database";
 import { saveCharacterSheet } from "../../storage/characterSheets";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
+import { SpellDetailOverlay } from "./SpellDetailOverlay";
 import {
   createSpell,
   deleteSpell,
@@ -236,6 +237,11 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
     if (selectedSpellId === spell.id) setSelectedSpellId("");
   };
 
+  const updateSheetFromSpellCast = async (nextSheet: NonNullable<typeof sheet>) => {
+    await saveCharacterSheet(nextSheet);
+    setMessage(`${selectedSpell?.name ?? "Spell"} cast and saved locally`);
+  };
+
   const changeSlotUse = async (level: string, change: number) => {
     if (!sheet) return;
     await saveCharacterSheet({
@@ -277,7 +283,14 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         </div>
       </article>}
 
-      {selectedSpell && <SpellEditor key={selectedSpell.id} onClose={() => setSelectedSpellId("")} spell={selectedSpell} />}
+      {selectedSpell && sheet && <SpellDetailOverlay
+        editContent={<SpellEditor key={selectedSpell.id} onClose={() => setSelectedSpellId("")} spell={selectedSpell} />}
+        onActivity={setMessage}
+        onClose={() => setSelectedSpellId("")}
+        onSheetChange={updateSheetFromSpellCast}
+        sheet={sheet}
+        spell={selectedSpell}
+      />}
 
       <article className="panel spellbook-library">
         <div className="form-section-heading"><div><span className="card-label">Character-owned magic</span><h2>All spells</h2><p>{spells.length} {spells.length === 1 ? "spell" : "spells"} stored locally for this character.</p></div></div>

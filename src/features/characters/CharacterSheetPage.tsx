@@ -9,6 +9,7 @@ import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { SheetNavigator } from "./SheetNavigator";
+import { SpellDetailOverlay } from "../spells/SpellDetailOverlay";
 import { levelUpPreview } from "../../rules/levelUp";
 import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
 import { rollFormula, type DiceRollResult } from "../../dice/dice";
@@ -185,6 +186,7 @@ function InlineRollFeedback({ result }: { result?: InlineRollResult }) {
 
 export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
+  const spells = useLiveQuery(() => db.spells.where("characterId").equals(characterId).toArray(), [characterId]) ?? [];
   const [sheet, setSheet] = useState<CharacterSheet | null>(null);
   const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState("Saved locally");
@@ -196,6 +198,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
   const [activeModuleId, setActiveModuleId] = useState<SheetNavigatorSectionId | null>(null);
+  const [selectedSpellId, setSelectedSpellId] = useState("");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
   const moduleDialogRef = useRef<HTMLElement | null>(null);
@@ -342,6 +345,13 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     },
   }));
 
+  const updateSheetFromSpellCast = async (nextSheet: CharacterSheet) => {
+    setStatus("Saving locally...");
+    const updated = await saveCharacterSheet(nextSheet);
+    setSheet(updated);
+    setStatus("Saved locally");
+  };
+
   const longRest = () => {
     if (!sheet) return;
     const hasUsedSlots = Object.values(sheet.spellSlotsUsed).some((used) => used > 0);
@@ -450,7 +460,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const passiveInvestigation = 10 + skillModifier(sheet, "investigation");
   const attackNoteCount = textCount(sheet.attacks) + textCount(sheet.weapons) + textCount(sheet.damageNotes);
   const preparedSpellCount = textCount(sheet.preparedSpells);
-  const cantripCount = textCount(sheet.cantrips);
+  const savedCantripCount = spells.filter((spell) => spell.level === 0).length;
+  const cantripCount = Math.max(textCount(sheet.cantrips), savedCantripCount);
+  const selectedSpell = spells.find((spell) => spell.id === selectedSpellId);
   const featureCount = textCount(sheet.classFeatures) + textCount(sheet.speciesTraits) + textCount(sheet.backgroundFeature) + textCount(sheet.feats) + textCount(sheet.specialAbilities);
   const noteCount = textCount(sheet.notes);
   const usedSlotCount = Object.values(sheet.spellSlotsUsed).reduce((total, used) => total + used, 0);
@@ -653,6 +665,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       case "spells":
         return <>
           <div className="form-grid"><label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label><label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label><label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => edit((current) => ({ ...current, spellAttackBonus: Number(event.target.value) }))} type="number" value={sheet.spellAttackBonus} /></label><label className="form-field level-up-field"><span>Spell slots <LevelUpHint /></span><div className="slot-grid">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => <label key={level}><small>L{level}</small><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSlots: { ...current.spellSlots, [level]: Number(event.target.value) } }))} type="number" value={sheet.spellSlots[level] ?? 0} /></label>)}</div></label><label className="form-field"><span>Cantrips</span><textarea onChange={(event) => edit((current) => ({ ...current, cantrips: event.target.value }))} rows={5} value={sheet.cantrips} /></label><label className="form-field"><span>Prepared spells</span><textarea onChange={(event) => edit((current) => ({ ...current, preparedSpells: event.target.value }))} rows={5} value={sheet.preparedSpells} /></label><label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => edit((current) => ({ ...current, spellNotes: event.target.value }))} rows={5} value={sheet.spellNotes} /></label></div>
+          <div className="sheet-spell-list">
+            <div className="form-section-heading"><div><span className="card-label">Prepared reference</span><h3>{spells.length} saved spells</h3></div><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Manage spellbook</a></div>
+            {spells.length ? <div className="spell-play-grid">{spells.map((spell) => <button className="spell-play-card" key={spell.id} onClick={() => setSelectedSpellId(spell.id)} type="button"><span>{spell.level === 0 ? "Cantrip" : `Level ${spell.level}`}</span><strong>{spell.name}</strong><small>{spell.school} · {spell.castingTime}</small></button>)}</div> : <div className="spell-empty compact-empty"><strong>No saved spells yet</strong><span>Add spells in the full spellbook, then tap one here for play details.</span></div>}
+          </div>
           <div className="spell-slot-tracker">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => { const maximum = sheet.spellSlots[level] ?? 0; const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum); return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>; })}</div>
         </>;
       case "features":
@@ -819,6 +835,14 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           </div>
         </section>
       </div>}
+
+      {selectedSpell && <SpellDetailOverlay
+        onActivity={setQuickRoll}
+        onClose={() => setSelectedSpellId("")}
+        onSheetChange={updateSheetFromSpellCast}
+        sheet={sheet}
+        spell={selectedSpell}
+      />}
 
       <div className={customizeLayout ? "sheet-layout-stack gameplay-grid customizing" : "sheet-layout-stack gameplay-grid"} aria-label="Gameplay modules">
       <LayoutCard {...layoutProps("dice")}>
