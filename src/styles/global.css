@@ -1608,7 +1608,8 @@ h1, h2, strong { color: var(--ink); }
 }
 
 .catalog-results {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
   max-height: 44rem;
   overflow: auto;
@@ -1616,6 +1617,7 @@ h1, h2, strong { color: var(--ink); }
 }
 
 .catalog-spell-card {
+  flex: 0 0 auto;
   align-items: center;
 }
 
