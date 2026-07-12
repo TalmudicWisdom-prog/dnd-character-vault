@@ -1214,6 +1214,13 @@ h1, h2, strong { color: var(--ink); }
 .spell-cast-history, .spell-edit-details { padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .spell-cast-history summary, .spell-edit-details summary { min-height: 44px; color: var(--accent); font-weight: 850; cursor: pointer; }
 .spell-edit-details .spell-editor { margin: 12px 0 0; }
+.spell-slot-tracker-stack { display: grid; gap: 16px; }
+.slot-pool-panel { display: grid; gap: 10px; min-width: 0; }
+.enhanced-slot-tracker { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.enhanced-slot-card { display: grid; gap: 8px; align-content: start; }
+.enhanced-slot-card label { display: grid; gap: 4px; color: var(--muted); font-size: 0.7rem; font-weight: 850; text-transform: uppercase; }
+.enhanced-slot-card input, .enhanced-slot-card select { min-width: 0; width: 100%; min-height: 38px; padding: 7px 9px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.enhanced-slot-card .score-button-row { grid-template-columns: 1fr 1fr; }
 
 .soul-reaper-empty { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .soul-reaper-empty > div { max-width: 680px; }

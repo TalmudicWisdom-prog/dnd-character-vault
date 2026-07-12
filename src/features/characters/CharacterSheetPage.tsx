@@ -10,8 +10,9 @@ import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { SheetNavigator } from "./SheetNavigator";
 import { SpellDetailOverlay } from "../spells/SpellDetailOverlay";
+import { SpellSlotTracker } from "../spells/SpellSlotTracker";
 import { levelUpPreview } from "../../rules/levelUp";
-import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
+import { applyRestRecovery, buildRestPreview, restLabels, type RestKind } from "../../rules/spellSlots";
 import { rollFormula, type DiceRollResult } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, initiativeBonus, type RollAssistantMode } from "../../rules/rollAssistant";
@@ -337,14 +338,6 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     }
   };
 
-  const changeSlotUse = (level: string, change: number) => edit((current) => ({
-    ...current,
-    spellSlotsUsed: {
-      ...current.spellSlotsUsed,
-      [level]: changeUsedSpellSlots(current.spellSlots[level] ?? 0, current.spellSlotsUsed[level] ?? 0, change),
-    },
-  }));
-
   const updateSheetFromSpellCast = async (nextSheet: CharacterSheet) => {
     setStatus("Saving locally...");
     const updated = await saveCharacterSheet(nextSheet);
@@ -352,16 +345,33 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     setStatus("Saved locally");
   };
 
-  const longRest = () => {
+  const restPreviewText = (rest: RestKind) => {
     if (!sheet) return;
-    const hasUsedSlots = Object.values(sheet.spellSlotsUsed).some((used) => used > 0);
-    if (!shouldConfirmLongRest(hasUsedSlots, (message) => window.confirm(message))) return;
-    edit((current) => ({ ...current, spellSlotsUsed: resetUsedSpellSlots(current.spellSlotsUsed) }));
-    setQuickRoll("Long Rest: used spell slots reset.");
+    const preview = buildRestPreview(sheet, rest);
+    const recovering = preview.filter((resource) => resource.recovers);
+    const notRecovering = preview.filter((resource) => !resource.recovers);
+    return [
+      `${restLabels[rest]} recovery preview`,
+      recovering.length ? `Will recover:\n${recovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} -> ${resource.remainingAfter}/${resource.maximum} remaining`).join("\n")}` : "Will recover: nothing",
+      notRecovering.length ? `Will not recover:\n${notRecovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} remaining (${resource.recovery.recoverOn})`).join("\n")}` : "Will not recover: none",
+      "Apply this rest?",
+    ].join("\n\n");
+  };
+
+  const applyRest = (rest: RestKind) => {
+    if (!sheet) return;
+    const message = restPreviewText(rest);
+    if (!message || !window.confirm(message)) return;
+    edit((current) => applyRestRecovery(current, rest));
+    setQuickRoll(`${restLabels[rest]} applied: configured spell resources recovered.`);
+  };
+
+  const longRest = () => {
+    applyRest("longRest");
   };
 
   const shortRest = () => {
-    setQuickRoll("Short Rest noted. No spell slots were reset automatically.");
+    applyRest("shortRest");
   };
 
   const setAssistantMode = (mode: RollAssistantMode) => {
@@ -465,8 +475,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const selectedSpell = spells.find((spell) => spell.id === selectedSpellId);
   const featureCount = textCount(sheet.classFeatures) + textCount(sheet.speciesTraits) + textCount(sheet.backgroundFeature) + textCount(sheet.feats) + textCount(sheet.specialAbilities);
   const noteCount = textCount(sheet.notes);
-  const usedSlotCount = Object.values(sheet.spellSlotsUsed).reduce((total, used) => total + used, 0);
-  const totalSlotCount = Object.values(sheet.spellSlots).reduce((total, maximum) => total + maximum, 0);
+  const usedSlotCount = [...Object.values(sheet.spellSlotsUsed), ...Object.values(sheet.pactMagicSlotsUsed)].reduce((total, used) => total + used, 0);
+  const totalSlotCount = [...Object.values(sheet.spellSlots), ...Object.values(sheet.pactMagicSlots)].reduce((total, maximum) => total + maximum, 0);
 
   const renderAbilityScores = () => (
     <div className="ability-score-dashboard">
@@ -669,7 +679,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
             <div className="form-section-heading"><div><span className="card-label">Prepared reference</span><h3>{spells.length} saved spells</h3></div><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Manage spellbook</a></div>
             {spells.length ? <div className="spell-play-grid">{spells.map((spell) => <button className="spell-play-card" key={spell.id} onClick={() => setSelectedSpellId(spell.id)} type="button"><span>{spell.level === 0 ? "Cantrip" : `Level ${spell.level}`}</span><strong>{spell.name}</strong><small>{spell.school} · {spell.castingTime}</small></button>)}</div> : <div className="spell-empty compact-empty"><strong>No saved spells yet</strong><span>Add spells in the full spellbook, then tap one here for play details.</span></div>}
           </div>
-          <div className="spell-slot-tracker">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => { const maximum = sheet.spellSlots[level] ?? 0; const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum); return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => changeSlotUse(level, 1)} type="button">+</button></div></article>; })}</div>
+          <SpellSlotTracker onChange={(nextSheet) => edit(() => nextSheet)} sheet={sheet} />
         </>;
       case "features":
         return <div className="form-grid"><label className="form-field level-up-field"><span>Class features <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, classFeatures: event.target.value }))} rows={6} value={sheet.classFeatures} /></label><label className="form-field"><span>Species traits</span><textarea onChange={(event) => edit((current) => ({ ...current, speciesTraits: event.target.value }))} rows={6} value={sheet.speciesTraits} /></label><label className="form-field"><span>Background feature</span><textarea onChange={(event) => edit((current) => ({ ...current, backgroundFeature: event.target.value }))} rows={5} value={sheet.backgroundFeature} /></label><label className="form-field level-up-field"><span>Feats <LevelUpHint /></span><textarea onChange={(event) => edit((current) => ({ ...current, feats: event.target.value }))} rows={5} value={sheet.feats} /></label><label className="form-field full-width"><span>Special abilities</span><textarea onChange={(event) => edit((current) => ({ ...current, specialAbilities: event.target.value }))} rows={6} value={sheet.specialAbilities} /></label></div>;

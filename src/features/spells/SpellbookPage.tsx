@@ -6,8 +6,9 @@ import { DiceRoller } from "../../components/DiceRoller";
 import type { RulesSource, Spell, SpellActionType } from "../../domain/models";
 import { db } from "../../storage/database";
 import { saveCharacterSheet } from "../../storage/characterSheets";
-import { changeUsedSpellSlots, remainingSpellSlots, resetUsedSpellSlots, shouldConfirmLongRest } from "../../rules/spellSlots";
+import { applyRestRecovery, buildRestPreview, restLabels, type RestKind } from "../../rules/spellSlots";
 import { SpellDetailOverlay } from "./SpellDetailOverlay";
+import { SpellSlotTracker } from "./SpellSlotTracker";
 import {
   createSpell,
   deleteSpell,
@@ -242,23 +243,30 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
     setMessage(`${selectedSpell?.name ?? "Spell"} cast and saved locally`);
   };
 
-  const changeSlotUse = async (level: string, change: number) => {
+  const updateSpellSlotSheet = async (nextSheet: NonNullable<typeof sheet>) => {
     if (!sheet) return;
-    await saveCharacterSheet({
-      ...sheet,
-      spellSlotsUsed: {
-        ...sheet.spellSlotsUsed,
-        [level]: changeUsedSpellSlots(sheet.spellSlots[level] ?? 0, sheet.spellSlotsUsed[level] ?? 0, change),
-      },
-    });
+    await saveCharacterSheet(nextSheet);
   };
 
-  const longRest = async () => {
+  const restPreviewText = (rest: RestKind) => {
     if (!sheet) return;
-    const hasUsedSlots = Object.values(sheet.spellSlotsUsed).some((used) => used > 0);
-    if (!shouldConfirmLongRest(hasUsedSlots, (message) => window.confirm(message))) return;
-    await saveCharacterSheet({ ...sheet, spellSlotsUsed: resetUsedSpellSlots(sheet.spellSlotsUsed) });
-    setMessage("Long Rest complete. Used spell slots reset.");
+    const preview = buildRestPreview(sheet, rest);
+    const recovering = preview.filter((resource) => resource.recovers);
+    const notRecovering = preview.filter((resource) => !resource.recovers);
+    return [
+      `${restLabels[rest]} recovery preview`,
+      recovering.length ? `Will recover:\n${recovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} -> ${resource.remainingAfter}/${resource.maximum} remaining`).join("\n")}` : "Will recover: nothing",
+      notRecovering.length ? `Will not recover:\n${notRecovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} remaining (${resource.recovery.recoverOn})`).join("\n")}` : "Will not recover: none",
+      "Apply this rest?",
+    ].join("\n\n");
+  };
+
+  const applyRest = async (rest: RestKind) => {
+    if (!sheet) return;
+    const message = restPreviewText(rest);
+    if (!message || !window.confirm(message)) return;
+    await saveCharacterSheet(applyRestRecovery(sheet, rest));
+    setMessage(`${restLabels[rest]} complete. Configured spell resources recovered.`);
   };
 
   if (!character) return <section className="page"><div className="loading-state">Opening spellbook...</div></section>;
@@ -273,13 +281,9 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
       </article>
 
       {sheet && <article className="panel spell-slot-panel">
-        <div className="form-section-heading"><div><span className="card-label">Manual resources</span><h2>Spell slots</h2><p>Track slots by hand. Spell rolls do not spend slots automatically.</p></div><button className="primary-button" onClick={() => void longRest()} type="button">Long Rest reset</button></div>
-        <div className="spell-slot-tracker">
-          {Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => {
-            const maximum = sheet.spellSlots[level] ?? 0;
-            const used = Math.min(sheet.spellSlotsUsed[level] ?? 0, maximum);
-            return <article className="slot-tracker-card" key={level}><strong>Level {level}</strong><span>Max {maximum}</span><span>Used {used}</span><span>Remaining {remainingSpellSlots(maximum, used)}</span><div className="score-button-row"><button disabled={used <= 0} onClick={() => void changeSlotUse(level, -1)} type="button">-</button><button disabled={used >= maximum} onClick={() => void changeSlotUse(level, 1)} type="button">+</button></div></article>;
-          })}
+        <div className="form-section-heading"><div><span className="card-label">Manual resources</span><h2>Spell slots</h2><p>Track slots by hand. Casting spends slots automatically.</p></div><div className="layout-customize-actions"><button className="secondary-button" onClick={() => void applyRest("shortRest")} type="button">Short Rest</button><button className="primary-button" onClick={() => void applyRest("longRest")} type="button">Long Rest</button></div></div>
+        <div>
+          <SpellSlotTracker onChange={(nextSheet) => void updateSpellSlotSheet(nextSheet)} sheet={sheet} />
         </div>
       </article>}
 

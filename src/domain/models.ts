@@ -75,6 +75,11 @@ export type RulesSource = z.infer<typeof rulesSourceSchema>;
 const abilityScoresSchema = z.record(abilityIdSchema, z.number().int().min(1).max(30));
 const savingThrowsSchema = z.record(abilityIdSchema, z.boolean());
 const skillProficienciesSchema = z.record(skillIdSchema, z.boolean());
+export const resourceRecoveryRuleSchema = z.object({
+  recoverOn: z.enum(["shortRest", "longRest", "both", "manual"]).default("longRest"),
+  recoverAmount: z.string().max(100).default("all"),
+});
+export type ResourceRecoveryRule = z.infer<typeof resourceRecoveryRuleSchema>;
 
 export const characterSheetSchema = z.object({
   characterId: z.string().uuid(),
@@ -105,6 +110,10 @@ export const characterSheetSchema = z.object({
   preparedSpells: z.string().max(30000).default(""),
   spellSlots: z.record(z.string(), z.number().int().min(0)).default({}),
   spellSlotsUsed: z.record(z.string(), z.number().int().min(0)).default({}),
+  spellSlotRecovery: z.record(z.string(), resourceRecoveryRuleSchema).default({}),
+  pactMagicSlots: z.record(z.string(), z.number().int().min(0)).default({}),
+  pactMagicSlotsUsed: z.record(z.string(), z.number().int().min(0)).default({}),
+  pactMagicRecovery: z.record(z.string(), resourceRecoveryRuleSchema).default({}),
   spellNotes: z.string().max(30000).default(""),
   classFeatures: z.string().max(30000).default(""),
   speciesTraits: z.string().max(30000).default(""),

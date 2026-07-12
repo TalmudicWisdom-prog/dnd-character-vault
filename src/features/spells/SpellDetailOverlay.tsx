@@ -11,10 +11,11 @@ import {
   spellComponents,
   spellRollOptions,
   spellSaveDifficulty,
-  spellSlotSummary,
   spellcastingAbilityModifier,
-  validSpellSlotLevels,
+  validSpellSlotChoices,
+  type SpellSlotChoice,
 } from "../../rules/spellCasting";
+import { remainingSpellSlots } from "../../rules/spellSlots";
 
 type SpellDetailOverlayProps = {
   editContent?: ReactNode;
@@ -39,22 +40,43 @@ function rollResultSummary(result: DiceRollResult) {
   return `${result.total} (${result.breakdown})`;
 }
 
+function slotChoiceKey(choice: SpellSlotChoice) {
+  return `${choice.pool}-${choice.level}`;
+}
+
+function slotChoiceLabel(choice: SpellSlotChoice) {
+  return choice.pool === "pactMagic" ? `Pact L${choice.level}` : `L${choice.level}`;
+}
+
+function slotChoiceSummary(sheet: CharacterSheet, choice: SpellSlotChoice) {
+  const maximum = choice.pool === "pactMagic" ? sheet.pactMagicSlots[String(choice.level)] ?? 0 : sheet.spellSlots[String(choice.level)] ?? 0;
+  const used = choice.pool === "pactMagic" ? sheet.pactMagicSlotsUsed[String(choice.level)] ?? 0 : sheet.spellSlotsUsed[String(choice.level)] ?? 0;
+  return { maximum, used, remaining: remainingSpellSlots(maximum, used) };
+}
+
 export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetChange, sheet, spell }: SpellDetailOverlayProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
-  const [selectedSlotLevel, setSelectedSlotLevel] = useState<number | null>(null);
+  const [selectedSlotChoice, setSelectedSlotChoice] = useState<SpellSlotChoice | null>(null);
   const [rollResults, setRollResults] = useState<Record<string, DiceRollResult>>({});
   const [history, setHistory] = useState<DiceRollResult[]>([]);
   const [message, setMessage] = useState("");
 
-  const validSlots = useMemo(() => validSpellSlotLevels(sheet, spell), [sheet, spell]);
+  const validSlots = useMemo(() => validSpellSlotChoices(sheet, spell), [sheet, spell]);
+  const visibleSlotChoices = useMemo(() => {
+    if (spell.level === 0) return [];
+    return Array.from({ length: 10 - spell.level }, (_, index) => spell.level + index).flatMap((level) => ([
+      { pool: "spellSlots", level } as SpellSlotChoice,
+      { pool: "pactMagic", level } as SpellSlotChoice,
+    ])).filter((choice) => slotChoiceSummary(sheet, choice).maximum > 0);
+  }, [sheet, spell]);
   const rollOptions = useMemo(() => spellRollOptions(spell, sheet), [sheet, spell]);
   const prepared = isSpellPrepared(sheet, spell);
   const spellSaveDc = spellSaveDifficulty(sheet);
   const spellAttack = spellAttackModifier(sheet);
   const castingModifier = spellcastingAbilityModifier(sheet);
-  const canCast = spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotLevel);
+  const canCast = spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotChoice);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -62,11 +84,11 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
 
   useEffect(() => {
     if (spell.level === 0) {
-      setSelectedSlotLevel(null);
+      setSelectedSlotChoice(null);
       return;
     }
-    setSelectedSlotLevel((current) => current && validSlots.includes(current) ? current : validSlots[0] ?? null);
-  }, [spell.id, spell.level, validSlots.join(",")]);
+    setSelectedSlotChoice((current) => current && validSlots.some((slot) => slotChoiceKey(slot) === slotChoiceKey(current)) ? current : validSlots[0] ?? null);
+  }, [spell.id, spell.level, validSlots.map(slotChoiceKey).join(",")]);
 
   useEffect(() => {
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -122,11 +144,11 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
 
   const castSpell = async () => {
     if (!canCast) return;
-    if (spell.level > 0 && !window.confirm(`Cast ${spell.name} using a Level ${selectedSlotLevel} slot?`)) return;
+    if (spell.level > 0 && !window.confirm(`Cast ${spell.name} using ${selectedSlotChoice ? slotChoiceLabel(selectedSlotChoice) : "a spell"} slot?`)) return;
 
     const rolled = rollOptions.map((option) => recordRoll(option.label, option.formula, option.id)).filter(Boolean);
-    if (spell.level > 0) await onSheetChange(consumeSpellSlot(sheet, spell, selectedSlotLevel));
-    const slotText = spell.level === 0 ? "No spell slot spent." : `Level ${selectedSlotLevel} slot spent.`;
+    if (spell.level > 0) await onSheetChange(consumeSpellSlot(sheet, spell, selectedSlotChoice));
+    const slotText = spell.level === 0 ? "No spell slot spent." : `${selectedSlotChoice ? slotChoiceLabel(selectedSlotChoice) : "Spell"} slot spent.`;
     const nextMessage = `Cast ${spell.name}. ${slotText}${rolled.length ? ` ${rolled.length} roll${rolled.length === 1 ? "" : "s"} recorded.` : ""}`;
     setMessage(nextMessage);
     onActivity?.(nextMessage);
@@ -162,16 +184,16 @@ export function SpellDetailOverlay({ editContent, onActivity, onClose, onSheetCh
             <div className="spell-cast-primary">
               <div>
                 <span className="card-label">Cast spell</span>
-                <strong>{spell.level === 0 ? "Cantrip" : selectedSlotLevel ? `Level ${selectedSlotLevel} slot selected` : "No valid slot available"}</strong>
+                <strong>{spell.level === 0 ? "Cantrip" : selectedSlotChoice ? `${slotChoiceLabel(selectedSlotChoice)} slot selected` : "No valid slot available"}</strong>
                 <small>{spell.level === 0 ? "Cantrips do not spend slots." : "Choose the slot level before casting."}</small>
               </div>
               <button className="primary-button" disabled={!canCast} onClick={() => void castSpell()} type="button">{spell.level === 0 ? "Cast Cantrip" : "Cast"}</button>
             </div>
             {spell.level > 0 && <div className="spell-slot-choice-grid" aria-label="Slot level choice">
-              {Array.from({ length: 10 - spell.level }, (_, index) => spell.level + index).map((level) => {
-                const summary = spellSlotSummary(sheet, level);
+              {visibleSlotChoices.map((choice) => {
+                const summary = slotChoiceSummary(sheet, choice);
                 const disabled = summary.remaining <= 0;
-                return <button className={selectedSlotLevel === level ? "slot-choice active" : "slot-choice"} disabled={disabled} key={level} onClick={() => setSelectedSlotLevel(level)} type="button"><strong>L{level}</strong><span>{summary.remaining}/{summary.maximum} left</span></button>;
+                return <button className={selectedSlotChoice && slotChoiceKey(selectedSlotChoice) === slotChoiceKey(choice) ? "slot-choice active" : "slot-choice"} disabled={disabled} key={slotChoiceKey(choice)} onClick={() => setSelectedSlotChoice(choice)} type="button"><strong>{slotChoiceLabel(choice)}</strong><span>{summary.remaining}/{summary.maximum} left</span></button>;
               })}
             </div>}
             {!canCast && <p className="inline-message" role="status">No valid spell slot remains for this spell.</p>}

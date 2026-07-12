@@ -75,6 +75,12 @@ describe("manual backup and restore", () => {
       currentHp: 17,
       maxHp: 31,
       temporaryHp: 4,
+      spellSlots: { "1": 4, "3": 2 },
+      spellSlotsUsed: { "1": 1, "3": 2 },
+      spellSlotRecovery: { "3": { recoverOn: "manual", recoverAmount: "all" } },
+      pactMagicSlots: { "2": 2 },
+      pactMagicSlotsUsed: { "2": 1 },
+      pactMagicRecovery: { "2": { recoverOn: "shortRest", recoverAmount: "all" } },
       notes: "Concentrating on Call Lightning.",
       sheetLayoutOrder: ["spells", "roll-helper", "health-combat"],
     });
@@ -101,6 +107,10 @@ describe("manual backup and restore", () => {
     expect(restoredCharacter?.portraitDataUrl).toBe("data:image/jpeg;base64,cloud");
     expect(restoredSheet?.abilityScores).toMatchObject({ str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 });
     expect(restoredSheet).toMatchObject({ currentHp: 17, maxHp: 31, temporaryHp: 4, notes: "Concentrating on Call Lightning." });
+    expect(restoredSheet?.spellSlotsUsed).toMatchObject({ "1": 1, "3": 2 });
+    expect(restoredSheet?.spellSlotRecovery["3"]).toMatchObject({ recoverOn: "manual", recoverAmount: "all" });
+    expect(restoredSheet?.pactMagicSlotsUsed).toMatchObject({ "2": 1 });
+    expect(restoredSheet?.pactMagicRecovery["2"]).toMatchObject({ recoverOn: "shortRest", recoverAmount: "all" });
     expect(restoredSheet?.sheetLayoutOrder).toEqual(["spells", "roll-helper", "health-combat"]);
     expect(restoredSpells).toEqual([expect.objectContaining({ name: "Call Lightning", level: 3, description: "Storm cloud follows Cloud." })]);
     expect(restoredItems).toEqual([expect.objectContaining({ name: "Storm Staff", category: "Arcane focus", effectsAndStats: "+1 spell attack", favorite: true })]);

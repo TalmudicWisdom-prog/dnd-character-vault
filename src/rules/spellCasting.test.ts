@@ -9,6 +9,7 @@ import {
   spellAttackModifier,
   spellRollOptions,
   spellSaveDifficulty,
+  validSpellSlotChoices,
   validSpellSlotLevels,
 } from "./spellCasting";
 
@@ -64,9 +65,35 @@ describe("spell casting helpers", () => {
     sheet.spellSlotsUsed = { "1": 2, "2": 0 };
 
     expect(validSpellSlotLevels(sheet, spell)).toEqual([2]);
+    expect(validSpellSlotChoices(sheet, spell)).toEqual([{ pool: "spellSlots", level: 2 }]);
     expect(canCastSpellWithSlot(sheet, spell, 1)).toBe(false);
     expect(canCastSpellWithSlot(sheet, spell, 2)).toBe(true);
     expect(consumeSpellSlot(sheet, spell, 2).spellSlotsUsed["2"]).toBe(1);
+  });
+
+  it("upcasting consumes the selected higher-level slot", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    const spell = { ...createEmptySpell(sheet.characterId, "Cure Wounds"), level: 1 };
+    sheet.spellSlots = { "1": 1, "2": 1 };
+    sheet.spellSlotsUsed = { "1": 0, "2": 0 };
+
+    const cast = consumeSpellSlot(sheet, spell, { pool: "spellSlots", level: 2 });
+
+    expect(cast.spellSlotsUsed).toMatchObject({ "1": 0, "2": 1 });
+  });
+
+  it("separates Pact Magic slot consumption from normal spell slots", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    const spell = { ...createEmptySpell(sheet.characterId, "Hex"), level: 1 };
+    sheet.spellSlots = { "1": 1 };
+    sheet.spellSlotsUsed = { "1": 0 };
+    sheet.pactMagicSlots = { "2": 1 };
+    sheet.pactMagicSlotsUsed = { "2": 0 };
+
+    const cast = consumeSpellSlot(sheet, spell, { pool: "pactMagic", level: 2 });
+
+    expect(cast.spellSlotsUsed["1"]).toBe(0);
+    expect(cast.pactMagicSlotsUsed["2"]).toBe(1);
   });
 
   it("does not consume slots for cantrips and blocks leveled spells with no remaining slot", () => {
