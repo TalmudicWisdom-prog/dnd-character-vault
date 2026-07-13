@@ -4,7 +4,7 @@ import { db } from "./database";
 import { createCharacter } from "./characters";
 import { createInventoryItem, ensureDefaultContainers, saveInventoryItem } from "./inventory";
 import { createEmptyCharacterSheet, saveCharacterSheet } from "./characterSheets";
-import { addSpellFromCatalog, createSpell, saveSpell, setSpellPinned } from "./spellbooks";
+import { addReferenceSpell, addSpellFromCatalog, createSpell, saveAndAddReferenceSpell, saveSpell, setSpellPinned } from "./spellbooks";
 import { characterSourceClassChoices, findCatalogSpellByName } from "../rules/spellCatalog";
 
 describe("manual backup and restore", () => {
@@ -136,6 +136,37 @@ describe("manual backup and restore", () => {
       sourceClass: "Astrologian",
       castingAbilityOverride: "wis",
       rulesComplete: true,
+    });
+  });
+
+  it("preserves a user-completed FFXIV reference definition in backup and restore", async () => {
+    const character = await createCharacter({ name: "Reference Caster", summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "Void Mage", level: 3 });
+    const arms = findCatalogSpellByName("Arms of Hadar")!;
+    const choice = characterSourceClassChoices("Void Mage", arms).find((candidate) => candidate.sourceClass === "Void Mage")!;
+    const reference = await addReferenceSpell(character.id, arms, choice);
+    const completed = await saveAndAddReferenceSpell({
+      ...reference,
+      school: "Conjuration",
+      castingTime: "1 action",
+      actionType: "action",
+      range: "10 feet",
+      duration: "Instantaneous",
+      description: "Local completed rules preserved in a backup.",
+      completionReviewed: true,
+    });
+    const backup = await createCharacterBackup(character.id);
+
+    await db.delete();
+    await db.open();
+    await restoreVaultBackup(await validateVaultBackup(JSON.parse(JSON.stringify(backup)) as unknown), "new");
+
+    expect(await db.spells.get(completed.id)).toMatchObject({
+      referenceDefinitionId: arms.id,
+      referenceClasses: expect.arrayContaining(["Void Mage", "Reaper", "Pictomancer"]),
+      referenceSourcePages: expect.any(Array),
+      sourceClass: "Void Mage",
+      rulesComplete: true,
+      description: "Local completed rules preserved in a backup.",
     });
   });
 });

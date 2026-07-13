@@ -22,15 +22,19 @@ import { SpellDetailOverlay } from "./SpellDetailOverlay";
 import { SpellSlotTracker } from "./SpellSlotTracker";
 import {
   createSpell,
+  addReferenceSpell,
   addSpellFromCatalog,
   createEmptySpell,
   createSpellFromCatalogDefinition,
+  createReferenceSpellDraft,
   deleteSpell,
   duplicateSpell,
   getOrCreateSpellbook,
   movePinnedSpell,
+  missingReferenceCompletionFields,
   replaceCustomSpellWithCatalogDefinition,
   saveSpell,
+  saveAndAddReferenceSpell,
   setSpellPinned,
 } from "../../storage/spellbooks";
 
@@ -149,10 +153,13 @@ function actionTypeFromDefinition(spell: CatalogSpellDefinition): SpellActionTyp
   return normalized.includes("action") ? "action" : "special";
 }
 
-function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) {
+function SpellEditor({ spell, onClose, onSaveAndAdd }: { spell: Spell; onClose: () => void; onSaveAndAdd?: (spell: Spell) => Promise<void> }) {
   const [draft, setDraft] = useState(spell);
   const [status, setStatus] = useState<"saved" | "unsaved" | "saving" | "error">("saved");
+  const [reviewOpen, setReviewOpen] = useState(false);
   const editVersion = useRef(0);
+  const completingReference = Boolean(draft.referenceDefinitionId && onSaveAndAdd);
+  const missingCompletionFields = missingReferenceCompletionFields(draft);
 
   useEffect(() => {
     setDraft(spell);
@@ -160,7 +167,7 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
   }, [spell.id]);
 
   useEffect(() => {
-    if (status !== "unsaved") return;
+    if (onSaveAndAdd || status !== "unsaved") return;
     const timer = window.setTimeout(async () => {
       const version = editVersion.current;
       setStatus("saving");
@@ -175,69 +182,82 @@ function SpellEditor({ spell, onClose }: { spell: Spell; onClose: () => void }) 
       }
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [draft, status]);
+  }, [draft, onSaveAndAdd, status]);
 
   useEffect(() => {
     const flush = () => {
-      if (status === "unsaved") void saveSpell(draft).then((saved) => {
+      if (!onSaveAndAdd && status === "unsaved") void saveSpell(draft).then((saved) => {
         setDraft(saved);
         setStatus("saved");
       });
     };
     window.addEventListener("vault:flush", flush);
     return () => window.removeEventListener("vault:flush", flush);
-  }, [draft, status]);
+  }, [draft, onSaveAndAdd, status]);
 
   const edit = <Key extends keyof Spell>(key: Key, value: Spell[Key]) => {
     editVersion.current += 1;
-    setDraft((current) => ({ ...current, [key]: value }));
+    setDraft((current) => ({ ...current, [key]: value, ...(completingReference && key !== "completionReviewed" ? { completionReviewed: false } : {}) }));
     setStatus("unsaved");
   };
-  const statusLabel = status === "saving" ? "Saving locally..." : status === "unsaved" ? "Unsaved changes" : status === "error" ? "Complete required fields to save" : "Saved locally";
+  const saveCompletedReference = async () => {
+    if (!onSaveAndAdd) return;
+    setStatus("saving");
+    try {
+      await onSaveAndAdd(draft);
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  };
+  const statusLabel = status === "saving" ? "Saving locally..." : status === "unsaved" ? "Unsaved changes" : status === "error" ? "Complete the required fields and review before saving" : completingReference ? "Complete the rules, then save this local definition" : "Saved locally";
 
   return (
     <article className="panel spell-editor">
       <div className="form-section-heading">
-        <div><span className="card-label">Full spell detail</span><h2>{draft.name}</h2></div>
+        <div><span className="card-label">{completingReference ? "Complete & Add local definition" : "Full spell detail"}</span><h2>{draft.name}</h2></div>
         <div className="spell-editor-heading-actions"><span className={status === "error" ? "save-state error" : "save-state"}>{statusLabel}</span><button className="secondary-button compact" onClick={onClose} type="button">Close detail</button></div>
       </div>
 
       <div className="spell-editor-flags">
-        <label className="touch-toggle"><input checked={draft.homebrew} onChange={(event) => edit("homebrew", event.target.checked)} type="checkbox" /><span>Custom / homebrew</span></label>
-        <label className="touch-toggle"><input checked={draft.concentration} onChange={(event) => edit("concentration", event.target.checked)} type="checkbox" /><span>Concentration</span></label>
-        <label className="touch-toggle"><input checked={draft.ritual} onChange={(event) => edit("ritual", event.target.checked)} type="checkbox" /><span>Ritual</span></label>
-        <label className="touch-toggle"><input checked={draft.attackRollRequired} onChange={(event) => edit("attackRollRequired", event.target.checked)} type="checkbox" /><span>Attack roll required</span></label>
+        <label className="touch-toggle"><input checked={draft.homebrew} disabled={completingReference} onChange={(event) => edit("homebrew", event.target.checked)} type="checkbox" /><span>Custom / homebrew</span></label>
+        <label className="touch-toggle"><input checked={draft.concentration} onChange={(event) => edit("concentration", event.target.checked)} type="checkbox" /><span>Concentration{completingReference && " · review required"}</span></label>
+        <label className="touch-toggle"><input checked={draft.ritual} onChange={(event) => edit("ritual", event.target.checked)} type="checkbox" /><span>Ritual{completingReference && " · review required"}</span></label>
+        <label className="touch-toggle"><input checked={draft.attackRollRequired} onChange={(event) => edit("attackRollRequired", event.target.checked)} type="checkbox" /><span>Attack roll required{completingReference && " · review required"}</span></label>
       </div>
 
+      {completingReference && <section className="reference-completion-context"><span className="card-label">Known FFXIV reference metadata</span><p><SourceBadge source={draft.contentSourceId || draft.rulesSourceId} /> Reference ID: {draft.referenceDefinitionId}</p><p>Source pages: {draft.referenceSourcePages.join(", ") || "not supplied"} · Available classes: {draft.referenceClasses.join(", ") || "not supplied"}</p><p>Level and source association are locked to the imported reference. Fields marked * need your supplied rules.</p></section>}
+
       <div className="spell-form-grid">
-        <label className="form-field spell-name-field"><span>Spell name *</span><input maxLength={200} onChange={(event) => edit("name", event.target.value)} required value={draft.name} /></label>
-        <label className="form-field"><span>Spell level</span><select onChange={(event) => edit("level", Number(event.target.value))} value={draft.level}>{Array.from({ length: 10 }, (_, level) => <option key={level} value={level}>{levelLabel(level)}</option>)}</select></label>
-        <label className="form-field"><span>School of magic *</span><input maxLength={100} onChange={(event) => edit("school", event.target.value)} required value={draft.school} /></label>
-        <label className="form-field"><span>Casting time *</span><input maxLength={200} onChange={(event) => edit("castingTime", event.target.value)} required value={draft.castingTime} /></label>
-        <label className="form-field"><span>Action type</span><select onChange={(event) => edit("actionType", event.target.value as SpellActionType)} value={draft.actionType}>{Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label className="form-field"><span>Rules source</span><select onChange={(event) => edit("source", event.target.value as RulesSource)} value={draft.source}><option value="Manual">Manual</option><option value="SRD">SRD</option><option value="Imported PDF">Imported PDF</option><option value="Homebrew">Homebrew</option></select></label>
-        <label className="form-field"><span>Source class</span><input maxLength={100} onChange={(event) => edit("sourceClass", event.target.value)} placeholder="Druid, Wizard..." value={draft.sourceClass} /></label>
+        <label className="form-field spell-name-field"><span>Spell name *</span><input maxLength={200} onChange={(event) => edit("name", event.target.value)} readOnly={completingReference} required value={draft.name} /></label>
+        <label className="form-field"><span>Spell level</span><select disabled={completingReference} onChange={(event) => edit("level", Number(event.target.value))} value={draft.level}>{Array.from({ length: 10 }, (_, level) => <option key={level} value={level}>{levelLabel(level)}</option>)}</select></label>
+        <label className="form-field"><span>School of magic *</span><input aria-label="School of magic" maxLength={100} onChange={(event) => edit("school", event.target.value)} required value={draft.school} /></label>
+        <label className="form-field"><span>Casting time *</span><input aria-label="Casting time" maxLength={200} onChange={(event) => edit("castingTime", event.target.value)} required value={draft.castingTime} /></label>
+        <label className="form-field"><span>Action type{completingReference && " · review required"}</span><select aria-label="Action type" onChange={(event) => edit("actionType", event.target.value as SpellActionType)} value={draft.actionType}>{Object.entries(actionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="form-field"><span>Rules source</span>{completingReference ? <input readOnly value={contentSources.find((source) => source.id === draft.rulesSourceId)?.displayName ?? draft.rulesSourceId} /> : <select onChange={(event) => edit("source", event.target.value as RulesSource)} value={draft.source}><option value="Manual">Manual</option><option value="SRD">SRD</option><option value="Imported PDF">Imported PDF</option><option value="Homebrew">Homebrew</option></select>}</label>
+        <label className="form-field"><span>Source class</span><input maxLength={100} onChange={(event) => edit("sourceClass", event.target.value)} placeholder="Druid, Wizard..." readOnly={completingReference} value={draft.sourceClass} /></label>
         <label className="form-field"><span>Casting ability override</span><select onChange={(event) => edit("castingAbilityOverride", event.target.value ? event.target.value as Spell["castingAbilityOverride"] : null)} value={draft.castingAbilityOverride ?? ""}><option value="">Use source class</option><option value="str">Strength</option><option value="dex">Dexterity</option><option value="con">Constitution</option><option value="int">Intelligence</option><option value="wis">Wisdom</option><option value="cha">Charisma</option></select></label>
-        <label className="form-field"><span>Range *</span><input maxLength={200} onChange={(event) => edit("range", event.target.value)} required value={draft.range} /></label>
-        <label className="form-field"><span>Duration *</span><input maxLength={200} onChange={(event) => edit("duration", event.target.value)} required value={draft.duration} /></label>
-        <fieldset className="spell-components"><legend>Components</legend><label><input checked={draft.verbalComponent} onChange={(event) => edit("verbalComponent", event.target.checked)} type="checkbox" /> V</label><label><input checked={draft.somaticComponent} onChange={(event) => edit("somaticComponent", event.target.checked)} type="checkbox" /> S</label><label><input checked={draft.materialComponent} onChange={(event) => edit("materialComponent", event.target.checked)} type="checkbox" /> M</label></fieldset>
-        <label className="form-field full-width"><span>Material component details</span><input maxLength={1000} onChange={(event) => edit("materialDetails", event.target.value)} placeholder="A tiny ball of bat guano and sulfur..." value={draft.materialDetails} /></label>
+        <label className="form-field"><span>Range *</span><input aria-label="Range" maxLength={200} onChange={(event) => edit("range", event.target.value)} required value={draft.range} /></label>
+        <label className="form-field"><span>Duration *</span><input aria-label="Duration" maxLength={200} onChange={(event) => edit("duration", event.target.value)} required value={draft.duration} /></label>
+        <fieldset className="spell-components"><legend>Components{completingReference && " · review required"}</legend><label><input checked={draft.verbalComponent} onChange={(event) => edit("verbalComponent", event.target.checked)} type="checkbox" /> V</label><label><input checked={draft.somaticComponent} onChange={(event) => edit("somaticComponent", event.target.checked)} type="checkbox" /> S</label><label><input checked={draft.materialComponent} onChange={(event) => edit("materialComponent", event.target.checked)} type="checkbox" /> M</label></fieldset>
+        <label className="form-field full-width"><span>Material component details{completingReference && " · review required"}</span><input maxLength={1000} onChange={(event) => edit("materialDetails", event.target.value)} placeholder="A tiny ball of bat guano and sulfur..." value={draft.materialDetails} /></label>
       </div>
 
       <div className="spell-form-grid spell-effect-grid">
-        <label className="form-field"><span>Damage type</span><input maxLength={100} onChange={(event) => edit("damageType", event.target.value)} placeholder="Fire, force, radiant..." value={draft.damageType} /></label>
-        <label className="form-field"><span>Damage formula / dice</span><input maxLength={200} onChange={(event) => edit("damageFormula", event.target.value)} placeholder="8d6 fire damage" value={draft.damageFormula} /></label>
-        <label className="form-field"><span>Healing formula</span><input maxLength={200} onChange={(event) => edit("healingFormula", event.target.value)} placeholder="1d8 + spellcasting modifier" value={draft.healingFormula} /></label>
+        <label className="form-field"><span>Damage type{completingReference && " · review required"}</span><input maxLength={100} onChange={(event) => edit("damageType", event.target.value)} placeholder="Fire, force, radiant..." value={draft.damageType} /></label>
+        <label className="form-field"><span>Damage formula / dice{completingReference && " · review required"}</span><input maxLength={200} onChange={(event) => edit("damageFormula", event.target.value)} placeholder="8d6 fire damage" value={draft.damageFormula} /></label>
+        <label className="form-field"><span>Healing formula{completingReference && " · review required"}</span><input maxLength={200} onChange={(event) => edit("healingFormula", event.target.value)} placeholder="1d8 + spellcasting modifier" value={draft.healingFormula} /></label>
         <div className="full-width"><DiceRoller compact context="Roll damage or healing here. Slots are not spent automatically." initialFormula={draft.damageFormula || draft.healingFormula || "d20"} label={`${draft.name} roll`} /></div>
-        <label className="form-field"><span>Saving throw type</span><input maxLength={100} onChange={(event) => edit("savingThrowType", event.target.value)} placeholder="DEX, WIS..." value={draft.savingThrowType} /></label>
+        <label className="form-field"><span>Saving throw type{completingReference && " · review required"}</span><input maxLength={100} onChange={(event) => edit("savingThrowType", event.target.value)} placeholder="DEX, WIS..." value={draft.savingThrowType} /></label>
         <label className="form-field"><span>Area of effect type</span><input maxLength={100} onChange={(event) => edit("areaOfEffectType", event.target.value)} placeholder="Sphere, cone, line..." value={draft.areaOfEffectType} /></label>
         <label className="form-field"><span>Area of effect size</span><input maxLength={100} onChange={(event) => edit("areaOfEffectSize", event.target.value)} placeholder="20-foot radius" value={draft.areaOfEffectSize} /></label>
         <label className="form-field full-width"><span>Status effects / conditions applied</span><textarea onChange={(event) => edit("statusEffects", event.target.value)} placeholder="Charmed, restrained, blinded, special conditions..." rows={3} value={draft.statusEffects} /></label>
-        <label className="form-field full-width"><span>Full spell description</span><textarea onChange={(event) => edit("description", event.target.value)} placeholder="Complete rules text and effect..." rows={10} value={draft.description} /></label>
-        <label className="form-field full-width"><span>Higher level scaling</span><textarea onChange={(event) => edit("higherLevelScaling", event.target.value)} placeholder="At Higher Levels..." rows={4} value={draft.higherLevelScaling} /></label>
+        <label className="form-field full-width"><span>Full spell description *</span><textarea aria-label="Full spell description" onChange={(event) => edit("description", event.target.value)} placeholder="Complete rules text and effect..." rows={10} value={draft.description} /></label>
+        <label className="form-field full-width"><span>Higher level scaling{completingReference && " · review required"}</span><textarea onChange={(event) => edit("higherLevelScaling", event.target.value)} placeholder="At Higher Levels..." rows={4} value={draft.higherLevelScaling} /></label>
         <label className="form-field full-width"><span>Source / notes</span><textarea onChange={(event) => edit("sourceNotes", event.target.value)} placeholder="Book and page, DM rulings, preparation notes..." rows={4} value={draft.sourceNotes} /></label>
         <label className="form-field full-width"><span>Character notes</span><textarea onChange={(event) => edit("notes", event.target.value)} placeholder="Preparation choices, reminders, or character-specific changes..." rows={4} value={draft.notes} /></label>
       </div>
+      {completingReference && <section className="reference-completion-review"><div className="form-section-heading"><div><span className="card-label">Review completed spell</span><h3>Check the rules before adding</h3><p>Confirm the action type, V/S/M, concentration, ritual, saving throw or attack, and damage or healing choices—even when the correct choice is “none.”</p></div><button className="secondary-button compact" onClick={() => setReviewOpen(true)} type="button">Review completed spell</button></div>{reviewOpen && <><p>{missingCompletionFields.length ? `Still required: ${missingCompletionFields.join(", ")}.` : "Required rule text is present."}</p><label className="touch-toggle"><input checked={draft.completionReviewed} onChange={(event) => edit("completionReviewed", event.target.checked)} type="checkbox" /><span>I reviewed all rule fields and intentionally supplied or left blank optional mechanics.</span></label><button className="primary-button" disabled={missingReferenceCompletionFields(draft).length > 0} onClick={() => void saveCompletedReference()} type="button">Save and Add to Character</button></>}</section>}
     </article>
   );
 }
@@ -255,6 +275,7 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
   const [selectedSpellId, setSelectedSpellId] = useState("");
   const [selectedCatalogSpellId, setSelectedCatalogSpellId] = useState("");
   const [catalogSourceChoiceValue, setCatalogSourceChoiceValue] = useState("");
+  const [completionDraft, setCompletionDraft] = useState<Spell | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => { void getOrCreateSpellbook(characterId); }, [characterId]);
@@ -269,7 +290,7 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
   const catalogResults = catalogMatches.slice(0, 60);
   const exactCustomMatch = findCatalogSpellByName(customSpellName);
   const customSuggestions = useMemo(() => suggestCatalogSpells(customSpellName, enabledSourceIds).slice(0, 5), [customSpellName, enabledSourceKey]);
-  const ownedDefinitionIds = new Set(spells.map((spell) => spell.definitionId).filter(Boolean));
+  const ownedDefinitionIds = new Set(spells.flatMap((spell) => [spell.definitionId, spell.referenceDefinitionId]).filter(Boolean));
   const selectedCatalogDefinition = catalogSpell(selectedCatalogSpellId);
   const catalogSourceChoices = selectedCatalogDefinition ? characterSourceClassChoices(character?.characterClass ?? "", selectedCatalogDefinition, enabledSourceIds) : [];
   const selectedCatalogChoice = selectedCatalogDefinition ? catalogSourceChoice(selectedCatalogDefinition, catalogSourceChoiceValue, enabledSourceIds) : undefined;
@@ -296,7 +317,7 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
     ?? selectedCatalogDefinition?.sourcePage
     ?? null;
   const catalogSheet = useMemo(() => sheet ?? createEmptyCharacterSheet(characterId), [characterId, sheet]);
-  const ownedCatalogSpell = selectedCatalogDefinition ? spells.find((spell) => spell.definitionId === selectedCatalogDefinition.id) : undefined;
+  const ownedCatalogSpell = selectedCatalogDefinition ? spells.find((spell) => spell.definitionId === selectedCatalogDefinition.id || spell.referenceDefinitionId === selectedCatalogDefinition.id) : undefined;
   const visibleSpells = useMemo(() => {
     const query = filters.query.trim().toLocaleLowerCase();
     const filtered = spells.filter((spell) =>
@@ -368,10 +389,40 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
 
   const completeCatalogDefinition = () => {
     if (!selectedCatalogDefinition) return;
-    setCustomSpellName(selectedCatalogDefinition.name);
-    setShowCustomSpell(true);
+    const choice = catalogSourceChoice(selectedCatalogDefinition, catalogSourceChoiceValue, enabledSourceIds);
+    if (!choice) {
+      setMessage("Choose the FFXIV source class before completing this spell.");
+      return;
+    }
+    setCompletionDraft(createReferenceSpellDraft(characterId, selectedCatalogDefinition, choice));
     closeCatalogSpell();
-    setMessage(`${selectedCatalogDefinition.name} has no complete definition in the supplied guide. Review the source page, then create and complete a custom definition before casting.`);
+    setMessage(`${selectedCatalogDefinition.name} is ready for a local FFXIV completion. Its known level, source pages, reference ID, and class association were preserved.`);
+  };
+
+  const addCatalogReference = async () => {
+    if (!selectedCatalogDefinition) return;
+    try {
+      const choice = catalogSourceChoice(selectedCatalogDefinition, catalogSourceChoiceValue, enabledSourceIds);
+      if (!choice) throw new Error("Choose the FFXIV source class before adding this reference.");
+      const reference = await addReferenceSpell(characterId, selectedCatalogDefinition, choice);
+      closeCatalogSpell();
+      setSelectedSpellId(reference.id);
+      setMessage(`${reference.name} was added as a reference-only FFXIV spell. Complete its local rules before casting.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not add reference spell");
+    }
+  };
+
+  const saveCompletedReference = async (draft: Spell) => {
+    try {
+      const saved = await saveAndAddReferenceSpell(draft);
+      setCompletionDraft(null);
+      setSelectedSpellId(saved.id);
+      setMessage(`${saved.name} was saved as a local completed definition and added to this character.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save completed spell");
+      throw error;
+    }
   };
 
   const repairSpell = async (spell: Spell, definition: CatalogSpellDefinition) => {
@@ -445,8 +496,19 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         </div>
       </article>}
 
-      {selectedSpell && <SpellDetailOverlay
-        editContent={<SpellEditor key={selectedSpell.id} onClose={() => setSelectedSpellId("")} spell={selectedSpell} />}
+      {completionDraft && <SpellDetailOverlay
+        editContent={<SpellEditor key={completionDraft.id} onClose={() => setCompletionDraft(null)} onSaveAndAdd={saveCompletedReference} spell={completionDraft} />}
+        editorOpen
+        onActivity={setMessage}
+        onClose={() => setCompletionDraft(null)}
+        onSheetChange={updateSheetFromSpellCast}
+        sheet={catalogSheet}
+        spell={completionDraft}
+      />}
+
+      {selectedSpell && !completionDraft && <SpellDetailOverlay
+        editContent={<SpellEditor key={selectedSpell.id} onClose={() => setSelectedSpellId("")} onSaveAndAdd={selectedSpell.referenceDefinitionId ? saveCompletedReference : undefined} spell={selectedSpell} />}
+        editorOpen={Boolean(selectedSpell.referenceDefinitionId && !selectedSpell.rulesComplete)}
         onActivity={setMessage}
         onClose={() => setSelectedSpellId("")}
         onSheetChange={updateSheetFromSpellCast}
@@ -469,7 +531,8 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
           associationPage: selectedCatalogSourcePage,
           owned: Boolean(ownedCatalogSpell),
           onAdd: () => void addCatalogSpell(selectedCatalogDefinition, catalogSourceChoiceValue),
-          onCompleteDefinition: selectedCatalogDefinition.definitionStatus === "unavailable" ? completeCatalogDefinition : undefined,
+          onCompleteAndAdd: selectedCatalogDefinition.definitionStatus === "unavailable" ? completeCatalogDefinition : undefined,
+          onAddReferenceOnly: selectedCatalogDefinition.definitionStatus === "unavailable" ? () => void addCatalogReference() : undefined,
           onSourceClassChange: setCatalogSourceChoiceValue,
           onViewOwned: ownedCatalogSpell ? viewOwnedCatalogSpell : undefined,
         }}

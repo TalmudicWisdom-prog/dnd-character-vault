@@ -3,7 +3,7 @@ import { createCharacter, deleteCharacter, duplicateCharacter } from "./characte
 import { db } from "./database";
 import { srdSpell } from "../rules/srd";
 import { catalogSpell, characterSourceClassChoices, findCatalogSpellByName } from "../rules/spellCatalog";
-import { addSpellFromCatalog, createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, movePinnedSpell, replaceCustomSpellWithSrd, saveSpell, setSpellPinned } from "./spellbooks";
+import { addReferenceSpell, addSpellFromCatalog, createReferenceSpellDraft, createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, missingReferenceCompletionFields, movePinnedSpell, replaceCustomSpellWithSrd, saveAndAddReferenceSpell, saveSpell, setSpellPinned } from "./spellbooks";
 
 const draft = (name: string) => ({
   name, summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "", level: 1,
@@ -155,5 +155,55 @@ describe("character-scoped spellbooks", () => {
 
     await expect(addSpellFromCatalog(character.id, hunger, choice)).rejects.toThrow("complete rules are unavailable");
     expect(await db.spells.where("characterId").equals(character.id).count()).toBe(0);
+  });
+
+  it("prefills an incomplete FFXIV reference and saves a local completed definition without altering the catalog", async () => {
+    const character = await createCharacter({ ...draft("Void Mage"), characterClass: "Void Mage" });
+    const arms = findCatalogSpellByName("Arms of Hadar")!;
+    const choice = characterSourceClassChoices("Void Mage", arms).find((candidate) => candidate.sourceClass === "Void Mage")!;
+    const catalogSnapshot = structuredClone(arms);
+    const draftSpell = createReferenceSpellDraft(character.id, arms, choice);
+
+    expect(draftSpell).toMatchObject({
+      name: "Arms of Hadar",
+      level: 1,
+      source: "Homebrew",
+      homebrew: true,
+      rulesSourceId: "ffxiv-companion-dawntrail",
+      contentSourceId: "ffxiv-companion-dawntrail",
+      referenceDefinitionId: "ffxiv-companion-dawntrail:unavailable:arms-of-hadar",
+      sourceClass: "Void Mage",
+      castingAbilityOverride: "int",
+      rulesComplete: false,
+    });
+    expect(draftSpell.referenceClasses).toEqual(expect.arrayContaining(["Void Mage", "Reaper", "Pictomancer"]));
+    expect(missingReferenceCompletionFields(draftSpell)).toEqual(expect.arrayContaining(["school", "casting time", "range", "duration", "description"]));
+
+    const referenceOnly = await addReferenceSpell(character.id, arms, choice);
+    expect(referenceOnly.rulesComplete).toBe(false);
+    await expect(addReferenceSpell(character.id, arms, choice)).rejects.toThrow("already owned");
+
+    const completed = await saveAndAddReferenceSpell({
+      ...referenceOnly,
+      school: "Conjuration",
+      castingTime: "1 action",
+      actionType: "action",
+      range: "10 feet",
+      duration: "Instantaneous",
+      verbalComponent: true,
+      somaticComponent: true,
+      description: "User-supplied local spell rules for this character.",
+      completionReviewed: true,
+    });
+    expect(completed).toMatchObject({
+      rulesComplete: true,
+      referenceDefinitionId: arms.id,
+      sourceClass: "Void Mage",
+      castingAbilityOverride: "int",
+      verbalComponent: true,
+      somaticComponent: true,
+    });
+    expect(await db.spells.where("characterId").equals(character.id).count()).toBe(1);
+    expect(arms).toEqual(catalogSnapshot);
   });
 });

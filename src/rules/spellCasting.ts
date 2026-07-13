@@ -116,6 +116,10 @@ export function canCastSpellWithSlot(sheet: CharacterSheet, spell: Spell, slotCh
   return remainingSpellSlots(maximum, used) > 0;
 }
 
+export function canCastSpell(sheet: CharacterSheet, spell: Spell, slotChoice: SpellSlotChoice | number | null) {
+  return spell.rulesComplete && (spell.level === 0 || canCastSpellWithSlot(sheet, spell, slotChoice));
+}
+
 export function consumeSpellSlot(sheet: CharacterSheet, spell: Spell, slotChoice: SpellSlotChoice | number | null) {
   if (spell.level === 0) return sheet;
   const choice = normalizeSlotChoice(slotChoice);

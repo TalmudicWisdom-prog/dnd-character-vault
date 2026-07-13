@@ -9,7 +9,7 @@ import {
   type CatalogSpellDefinition,
   SRD_SPELL_CATALOG_VERSION,
 } from "../rules/spellCatalog";
-import { SRD_CONTENT_SOURCE_ID, contentSource } from "../rules/contentSources";
+import { FFXIV_CONTENT_SOURCE_ID, SRD_CONTENT_SOURCE_ID, contentSource } from "../rules/contentSources";
 import { db } from "./database";
 
 function now() {
@@ -64,6 +64,10 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     sourceSubclass: "",
     castingAbilityOverride: null,
     rulesComplete: false,
+    referenceDefinitionId: "",
+    referenceClasses: [],
+    referenceSourcePages: [],
+    completionReviewed: false,
     notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -177,10 +181,108 @@ export function createSpellFromCatalogDefinition(characterId: string, definition
     sourceSubclass: choice?.subclassName ?? "",
     castingAbilityOverride: choice?.castingAbility ?? null,
     rulesComplete: true,
+    referenceDefinitionId: "",
+    referenceClasses: [],
+    referenceSourcePages: [],
+    completionReviewed: false,
     notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
   });
+}
+
+function uniqueReferencePages(definition: CatalogSpellDefinition) {
+  return [...new Set([definition.sourcePage, ...definition.associations
+    .filter((association) => association.contentSourceId === FFXIV_CONTENT_SOURCE_ID)
+    .map((association) => association.page)]
+    .filter((page): page is number => page !== null))].sort((left, right) => left - right);
+}
+
+function referenceNotes(definition: CatalogSpellDefinition, choice?: CatalogSourceChoice) {
+  const pages = uniqueReferencePages(definition);
+  const classes = [...new Set(definition.associations
+    .filter((association) => association.contentSourceId === FFXIV_CONTENT_SOURCE_ID)
+    .map((association) => association.sourceClass))];
+  return [
+    `FFXIV catalog reference: ${definition.id}`,
+    `Source: ${contentSource(FFXIV_CONTENT_SOURCE_ID)?.displayName ?? FFXIV_CONTENT_SOURCE_ID}`,
+    pages.length ? `Source pages: ${pages.join(", ")}` : "",
+    classes.length ? `Available FFXIV classes: ${classes.join(", ")}` : "",
+    choice ? `Chosen source class: ${choice.sourceClass}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+export function createReferenceSpellDraft(characterId: string, definition: CatalogSpellDefinition, choice?: CatalogSourceChoice): Spell {
+  if (definition.definitionStatus !== "unavailable" || definition.level === null) throw new Error(`${definition.name} is not an incomplete catalog reference`);
+  const timestamp = now();
+  const referenceClasses = [...new Set(definition.associations
+    .filter((association) => association.contentSourceId === FFXIV_CONTENT_SOURCE_ID)
+    .map((association) => association.sourceClass))];
+  return spellSchema.parse({
+    ...createEmptySpell(characterId, definition.name),
+    level: definition.level,
+    school: "Unspecified",
+    castingTime: "Unspecified",
+    actionType: "special",
+    range: "Unspecified",
+    duration: "Unspecified",
+    sourceNotes: referenceNotes(definition, choice),
+    source: "Homebrew",
+    homebrew: true,
+    definitionId: `local:${definition.id}`,
+    definitionVersion: definition.sourceVersion,
+    rulesSourceId: definition.rulesSourceId,
+    contentSourceId: choice?.contentSourceId ?? FFXIV_CONTENT_SOURCE_ID,
+    sourcePage: choice?.page ?? definition.sourcePage,
+    sourceClass: choice?.sourceClass ?? "",
+    sourceSubclass: choice?.subclassName ?? "",
+    castingAbilityOverride: choice?.castingAbility ?? null,
+    rulesComplete: false,
+    referenceDefinitionId: definition.id,
+    referenceClasses,
+    referenceSourcePages: uniqueReferencePages(definition),
+    completionReviewed: false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+export function missingReferenceCompletionFields(spell: Spell) {
+  if (!spell.referenceDefinitionId) return [];
+  const missing: string[] = [];
+  if (!spell.school.trim() || spell.school === "Custom" || spell.school === "Unspecified") missing.push("school");
+  if (!spell.castingTime.trim() || spell.castingTime === "Unspecified") missing.push("casting time");
+  if (!spell.range.trim() || spell.range === "Unspecified") missing.push("range");
+  if (!spell.duration.trim() || spell.duration === "Unspecified") missing.push("duration");
+  if (!spell.description.trim()) missing.push("description");
+  if (!spell.completionReviewed) missing.push("review of action type, components, concentration, ritual, save/attack, and damage or healing fields");
+  return missing;
+}
+
+export async function addReferenceSpell(characterId: string, definition: CatalogSpellDefinition, choice?: CatalogSourceChoice) {
+  if (!choice?.sourceClass.trim()) throw new Error("Choose the spell's source class");
+  await getOrCreateSpellbook(characterId);
+  const existing = await db.spells.where("characterId").equals(characterId).toArray();
+  if (existing.some((spell) => spell.referenceDefinitionId === definition.id || spell.definitionId === definition.id)) throw new Error(`${definition.name} is already owned by this character`);
+  const reference = createReferenceSpellDraft(characterId, definition, choice);
+  await db.spells.add(reference);
+  await db.characters.update(characterId, { updatedAt: reference.updatedAt });
+  return reference;
+}
+
+export async function saveAndAddReferenceSpell(spell: Spell) {
+  if (!spell.referenceDefinitionId) throw new Error("This spell is not linked to an incomplete catalog reference");
+  const missing = missingReferenceCompletionFields(spell);
+  if (missing.length) throw new Error(`Complete: ${missing.join(", ")}`);
+  await getOrCreateSpellbook(spell.characterId);
+  const existing = await db.spells.where("characterId").equals(spell.characterId).toArray();
+  const duplicate = existing.find((candidate) => candidate.id !== spell.id && candidate.referenceDefinitionId === spell.referenceDefinitionId);
+  if (duplicate) throw new Error(`${spell.name} is already owned by this character`);
+  const completed = spellSchema.parse({ ...spell, homebrew: true, rulesComplete: true, updatedAt: now() });
+  if (existing.some((candidate) => candidate.id === spell.id)) await db.spells.put(completed);
+  else await db.spells.add(completed);
+  await db.characters.update(completed.characterId, { updatedAt: completed.updatedAt });
+  return completed;
 }
 
 function asCatalogDefinition(definition: CatalogSpellDefinition | SrdSpell) {
@@ -197,7 +299,7 @@ export async function addSpellFromCatalog(characterId: string, input: CatalogSpe
   if (definition.definitionStatus !== "complete") throw new Error(`${definition.name} is listed in the guide, but its complete rules are unavailable`);
   await getOrCreateSpellbook(characterId);
   const existing = await db.spells.where("characterId").equals(characterId).toArray();
-  if (existing.some((spell) => spell.definitionId === definition.id)) throw new Error(`${definition.name} is already owned by this character`);
+  if (existing.some((spell) => spell.definitionId === definition.id || spell.referenceDefinitionId === definition.id)) throw new Error(`${definition.name} is already owned by this character`);
   const spell = createSpellFromCatalogDefinition(characterId, definition, choice);
   await db.spells.add(spell);
   await db.characters.update(characterId, { updatedAt: spell.updatedAt });
@@ -238,7 +340,7 @@ export async function createSpell(characterId: string, name: string) {
 export async function saveSpell(spell: Spell) {
   const existing = await db.spells.get(spell.id);
   if (!existing || existing.characterId !== spell.characterId) throw new Error("Spell does not belong to this character");
-  const customRulesComplete = spell.definitionId ? spell.rulesComplete : Boolean(
+  const customRulesComplete = spell.referenceDefinitionId ? missingReferenceCompletionFields(spell).length === 0 : spell.definitionId ? spell.rulesComplete : Boolean(
     spell.name.trim()
       && spell.school.trim() && spell.school !== "Custom"
       && spell.castingTime.trim()

@@ -1704,6 +1704,32 @@ h1, h2, strong { color: var(--ink); }
   margin: 0.2rem 0 0;
 }
 
+.catalog-incomplete-actions,
+.reference-completion-review > .form-section-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.reference-completion-context,
+.reference-completion-review {
+  background: color-mix(in srgb, var(--panel) 82%, var(--accent) 8%);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  margin: 1rem 0;
+  padding: 0.9rem;
+}
+
+.reference-completion-context p,
+.reference-completion-review p {
+  margin: 0.4rem 0;
+}
+
+.reference-completion-review .touch-toggle {
+  margin: 0.8rem 0;
+}
+
 .catalog-source-class {
   width: min(100%, 360px);
 }

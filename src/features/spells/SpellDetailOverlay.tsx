@@ -4,7 +4,7 @@ import type { CharacterSheet, Spell } from "../../domain/models";
 import { formatModifier } from "../../domain/dndMath";
 import { addRollToHistory, rollFormula, type DiceRollResult } from "../../dice/dice";
 import {
-  canCastSpellWithSlot,
+  canCastSpell,
   consumeSpellSlot,
   isSpellPrepared,
   spellComponents,
@@ -28,11 +28,13 @@ type SpellDetailOverlayProps = {
     associationPage: number | null;
     owned: boolean;
     onAdd: () => void;
-    onCompleteDefinition?: () => void;
+    onCompleteAndAdd?: () => void;
+    onAddReferenceOnly?: () => void;
     onSourceClassChange: (sourceClass: string) => void;
     onViewOwned?: () => void;
   };
   editContent?: ReactNode;
+  editorOpen?: boolean;
   onActivity?: (message: string) => void;
   onClose: () => void;
   onSheetChange: (nextSheet: CharacterSheet) => Promise<void> | void;
@@ -74,7 +76,7 @@ function slotChoiceSummary(sheet: CharacterSheet, choice: SpellSlotChoice) {
   return { maximum, used, remaining: remainingSpellSlots(maximum, used) };
 }
 
-export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, onSheetChange, sheet, spell }: SpellDetailOverlayProps) {
+export function SpellDetailOverlay({ catalog, editContent, editorOpen = false, onActivity, onClose, onSheetChange, sheet, spell }: SpellDetailOverlayProps) {
   const dialogRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -100,7 +102,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
   const spellAttack = detailStatistics.spellAttack;
   const castingModifier = detailStatistics.abilityModifier;
   const needsCastingSetup = detailStatistics.setupWarning;
-  const canCast = spell.rulesComplete && (spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotChoice));
+  const canCast = canCastSpell(sheet, spell, selectedSlotChoice);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -207,11 +209,11 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
         <div className="spell-detail-body">
           {catalog ? <section className={`spell-cast-panel catalog-add-panel${catalog.complete ? "" : " incomplete-definition-panel"}`}>
             <div className="spell-cast-primary">
-              <div><span className="card-label">Add from Spell Catalog</span><strong>{!catalog.complete ? "Definition unavailable" : catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{!catalog.complete ? "The guide lists this spell by name but does not provide complete rules. It cannot be added or cast until you supply a custom definition." : catalog.owned ? "This character already has this stable catalog definition." : "The selected class determines the spellcasting ability and content-source association."}</small></div>
-              {!catalog.complete ? (catalog.onCompleteDefinition ? <button className="primary-button" onClick={catalog.onCompleteDefinition} type="button">Complete spell data</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
+              <div><span className="card-label">Add from Spell Catalog</span><strong>{!catalog.complete ? catalog.owned ? "Already owned as a local reference" : "Definition unavailable" : catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{!catalog.complete ? catalog.owned ? "This character owns a local reference or completed custom definition linked to this FFXIV catalog entry." : "The guide lists this spell by name and association, but not complete rules. Keep the reference local, or supply your own rules without changing the source pack." : catalog.owned ? "This character already has this stable catalog definition." : "The selected class determines the spellcasting ability and content-source association."}</small></div>
+              {!catalog.complete ? catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <div className="catalog-incomplete-actions"><button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onCompleteAndAdd} type="button">Complete &amp; Add</button><button className="secondary-button" disabled={!catalog.sourceClass} onClick={catalog.onAddReferenceOnly} type="button">Add as reference only</button><button className="text-button" onClick={onClose} type="button">Close</button></div> : catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
             </div>
-            {catalog.complete && !catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>}
-          </section> : !spell.rulesComplete ? <section className="spell-cast-panel incomplete-definition-panel"><div><span className="card-label">Incomplete custom definition</span><strong>Complete the required spell data before casting</strong><small>Add a school, casting time, range, duration, and full description in the editor below.</small></div></section> : <section className="spell-cast-panel">
+            {!catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>}
+          </section> : !spell.rulesComplete ? <section className="spell-cast-panel incomplete-definition-panel"><div><span className="card-label">Rules incomplete</span><strong>Complete the required spell data before casting</strong><small>{spell.referenceDefinitionId ? "This is a local reference-only spell linked to the FFXIV catalog. Its name, level, source, pages, and chosen class are preserved below." : "Add a school, casting time, range, duration, and full description in the editor below."}</small></div></section> : <section className="spell-cast-panel">
             <div className="spell-cast-primary">
               <div>
                 <span className="card-label">Cast spell</span>
@@ -231,7 +233,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
             {message && <p className="inline-message" role="status">{message}</p>}
           </section>}
 
-          {(!catalog || catalog.complete) && <section className="spell-detail-grid" aria-label="Spell details">
+          {(!catalog || catalog.complete) && spell.rulesComplete && <section className="spell-detail-grid" aria-label="Spell details">
             <div><span>Casting time</span><strong>{spell.castingTime}</strong></div>
             <div><span>Action type</span><strong>{actionTypeLabel(spell.actionType)}</strong></div>
             <div><span>Range</span><strong>{spell.range}</strong></div>
@@ -253,6 +255,8 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
 
           {catalog && <section className="spell-text-panel"><span className="card-label">Available classes and subclasses</span><p>{catalog.classes.join(", ") || "No verified class association."}</p></section>}
 
+          {!catalog && spell.referenceDefinitionId && <section className="spell-text-panel"><span className="card-label">FFXIV catalog reference</span><p><SourceBadge source={spell.contentSourceId || spell.rulesSourceId} /> Reference ID: {spell.referenceDefinitionId}. {spell.referenceSourcePages.length ? `Source pages: ${spell.referenceSourcePages.join(", ")}.` : ""} {spell.referenceClasses.length ? `Available classes: ${spell.referenceClasses.join(", ")}.` : ""}</p></section>}
+
           {!catalog && rollOptions.length > 0 && <section className="spell-roll-panel">
             <div className="form-section-heading"><div><span className="card-label">Built-in rolls</span><h3>Spell dice</h3></div></div>
             <div className="spell-roll-grid">
@@ -271,7 +275,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
           {spell.notes && <section className="spell-text-panel"><span className="card-label">Character notes</span><p>{spell.notes}</p></section>}
 
           {history.length > 0 && <details className="dice-history spell-cast-history"><summary>Roll / cast history</summary><ol>{history.map((roll) => <li key={roll.id}><strong>{roll.formula}</strong> {roll.breakdown}</li>)}</ol></details>}
-          {editContent && <details className="spell-edit-details"><summary>Edit spell data</summary>{editContent}</details>}
+          {editContent && <details className="spell-edit-details" open={editorOpen}><summary>{editorOpen ? "Complete FFXIV spell rules" : "Edit spell data"}</summary>{editContent}</details>}
         </div>
       </section>
     </div>

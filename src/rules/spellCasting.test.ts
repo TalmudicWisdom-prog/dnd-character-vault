@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyCharacterSheet } from "../storage/characterSheets";
-import { createEmptySpell } from "../storage/spellbooks";
+import { createEmptySpell, createReferenceSpellDraft } from "../storage/spellbooks";
+import { characterSourceClassChoices, findCatalogSpellByName } from "./spellCatalog";
 import {
   canCastSpellWithSlot,
+  canCastSpell,
   consumeSpellSlot,
   extractDiceFormulas,
   isSpellPrepared,
@@ -133,5 +135,16 @@ describe("spell casting helpers", () => {
     expect(consumeSpellSlot(sheet, cantrip, null).spellSlotsUsed).toEqual(sheet.spellSlotsUsed);
     expect(canCastSpellWithSlot(sheet, leveled, 1)).toBe(false);
     expect(() => consumeSpellSlot(sheet, leveled, 1)).toThrow("No valid spell slot");
+  });
+
+  it("blocks reference-only FFXIV spells until their local rules are completed", () => {
+    const sheet = createEmptyCharacterSheet(crypto.randomUUID());
+    sheet.spellSlots = { "1": 1 };
+    const arms = findCatalogSpellByName("Arms of Hadar")!;
+    const choice = characterSourceClassChoices("Void Mage", arms).find((candidate) => candidate.sourceClass === "Void Mage")!;
+    const reference = createReferenceSpellDraft(sheet.characterId, arms, choice);
+
+    expect(canCastSpell(sheet, reference, 1)).toBe(false);
+    expect(canCastSpell(sheet, { ...reference, school: "Conjuration", castingTime: "1 action", range: "10 feet", duration: "Instantaneous", description: "Completed locally.", completionReviewed: true, rulesComplete: true }, 1)).toBe(true);
   });
 });
