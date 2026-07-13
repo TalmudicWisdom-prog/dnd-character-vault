@@ -61,7 +61,12 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      caches.match(indexUrl).then((cached) => cached ?? fetch(request)),
+      // Prefer the latest deployed document while online; retain the app shell
+      // as a fallback for an offline reload.
+      fetch(request).then((response) => {
+        if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(indexUrl, response.clone()));
+        return response;
+      }).catch(() => caches.match(indexUrl)),
     );
     return;
   }

@@ -21,7 +21,11 @@ export function hasWaitingUpdate() {
 export function registerVaultServiceWorker() {
   if (!("serviceWorker" in navigator) || !import.meta.env.PROD) return Promise.resolve(null);
   if (registrationPromise) return registrationPromise;
-  registrationPromise = navigator.serviceWorker.register(new URL("sw.js", document.baseURI), { scope: import.meta.env.BASE_URL })
+  registrationPromise = navigator.serviceWorker.register(new URL("sw.js", document.baseURI), {
+    scope: import.meta.env.BASE_URL,
+    // Do not let an HTTP cache hide a newly deployed service worker.
+    updateViaCache: "none",
+  })
     .then((registration) => {
       if (registration.waiting) notifyUpdateAvailable(registration.waiting);
       registration.addEventListener("updatefound", () => {

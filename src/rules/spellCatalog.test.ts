@@ -11,6 +11,7 @@ import {
   suggestSrdSpells,
   SRD_SPELL_CATALOG_VERSION,
 } from "./spellCatalog";
+import { FFXIV_CONTENT_SOURCE_ID, SRD_CONTENT_SOURCE_ID } from "./contentSources";
 
 describe("embedded SRD spell catalog", () => {
   it("contains the complete offline SRD 5.2.1 spell set", () => {
@@ -66,5 +67,27 @@ describe("optional FFXIV companion spell source", () => {
 
   it("keeps name-only non-SRD spells explicitly unavailable", () => {
     expect(findCatalogSpellByName("Hunger of Hadar")).toMatchObject({ definitionStatus: "unavailable", description: "", rulesSourceId: "ffxiv-companion-dawntrail" });
+  });
+
+  it("includes FFXIV-only unavailable entries only while the source is enabled", () => {
+    const enabled = [SRD_CONTENT_SOURCE_ID, FFXIV_CONTENT_SOURCE_ID];
+    const disabled = [SRD_CONTENT_SOURCE_ID];
+
+    expect(searchCatalogSpells({ query: "Arms of Hadar" }, enabled)).toEqual([
+      expect.objectContaining({ name: "Arms of Hadar", definitionStatus: "unavailable", rulesSourceId: FFXIV_CONTENT_SOURCE_ID }),
+    ]);
+    expect(searchCatalogSpells({ query: "Arms of Hadar" }, disabled)).toEqual([]);
+    expect(searchCatalogSpells({ query: "Hunger of Hadar" }, enabled)).toEqual([
+      expect.objectContaining({ definitionStatus: "unavailable" }),
+    ]);
+  });
+
+  it("keeps canonical SRD search available whether or not FFXIV is enabled", () => {
+    const disabled = [SRD_CONTENT_SOURCE_ID];
+
+    expect(searchCatalogSpells({ query: "Dispel Magic" }, disabled)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "dispel-magic", rulesSourceId: SRD_CONTENT_SOURCE_ID }),
+    ]));
+    expect(searchCatalogSpells({ query: "FFXIV" }, [SRD_CONTENT_SOURCE_ID, FFXIV_CONTENT_SOURCE_ID]).length).toBeGreaterThan(300);
   });
 });

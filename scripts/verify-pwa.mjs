@@ -15,6 +15,7 @@ async function listFiles(directory) {
 
 const manifest = JSON.parse(await readFile(join(distDirectory, "manifest.webmanifest"), "utf8"));
 const serviceWorker = await readFile(join(distDirectory, "sw.js"), "utf8");
+const indexDocument = await readFile(join(distDirectory, "index.html"), "utf8");
 const shellMatch = serviceWorker.match(/const APP_SHELL = (\[[\s\S]*?\]);/);
 if (!shellMatch) throw new Error("Could not read the generated service-worker app shell");
 
@@ -38,4 +39,14 @@ if (!manifest.icons?.some((icon) => icon.sizes === "192x192") || !manifest.icons
   throw new Error("Manifest requires 192x192 and 512x512 icons");
 }
 
-console.log(`PWA verified: relative manifest and ${shellFiles.length} cached offline files.`);
+const appEntry = indexDocument.match(/src="\.\/(assets\/app-[^"]+\.js)"/)?.[1];
+if (!appEntry) throw new Error("Production entry must use a content-addressed application bundle");
+const appBundle = await readFile(join(distDirectory, appEntry), "utf8");
+for (const marker of ["ffxiv-companion-dawntrail", "Final Fantasy Companion Guide", "arms-of-hadar", "1.0.0-ffxiv-"]) {
+  if (!appBundle.includes(marker)) throw new Error(`Production application bundle is missing ${marker}`);
+}
+if (!serviceWorker.includes("fetch(request).then") || !serviceWorker.includes(".catch(() => caches.match(indexUrl))")) {
+  throw new Error("Service worker must use network-first navigation with an offline shell fallback");
+}
+
+console.log(`PWA verified: relative manifest, FFXIV-enabled ${appEntry}, and ${shellFiles.length} cached offline files.`);

@@ -1691,6 +1691,19 @@ h1, h2, strong { color: var(--ink); }
   max-width: 62ch;
 }
 
+.content-source-setting {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 1rem;
+}
+
+.content-source-setting p {
+  margin: 0.2rem 0 0;
+}
+
 .catalog-source-class {
   width: min(100%, 360px);
 }

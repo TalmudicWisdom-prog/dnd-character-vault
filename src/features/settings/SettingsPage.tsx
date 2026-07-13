@@ -74,23 +74,26 @@ export function SettingsPage() {
           <div>
             <h2>Optional content sources</h2>
             <p>Enable or hide locally bundled homebrew packs. Canonical SRD content is always available.</p>
-            {optionalContentSources.map((source) => <p key={source.id}><strong>{source.displayName}</strong> · {source.sourceType} · Version {source.version}</p>)}
           </div>
           {optionalContentSources.map((source) => {
             const enabled = settings?.enabledContentSourceIds.includes(source.id) ?? source.enabledByDefault;
-            return <label className="toggle" key={source.id}>
-              <input
-                checked={enabled}
-                onChange={(event) => {
-                  const current = settings?.enabledContentSourceIds ?? [];
-                  const enabledContentSourceIds = event.target.checked ? [...new Set([...current, source.id])] : current.filter((id) => id !== source.id);
-                  void save({ enabledContentSourceIds });
-                }}
-                type="checkbox"
-              />
-              <span aria-hidden="true" />
-              <strong>{enabled ? "On" : "Off"}</strong>
-            </label>;
+            return <div className="content-source-setting" key={source.id}>
+              <div><strong>{source.displayName}</strong><p>{source.sourceType} · Optional · Version {source.version}</p></div>
+              <label className="toggle">
+                <input
+                  aria-label={`Enable ${source.displayName}`}
+                  checked={enabled}
+                  onChange={(event) => {
+                    const current = settings?.enabledContentSourceIds ?? [];
+                    const enabledContentSourceIds = event.target.checked ? [...new Set([...current, source.id])] : current.filter((id) => id !== source.id);
+                    void save({ enabledContentSourceIds });
+                  }}
+                  type="checkbox"
+                />
+                <span aria-hidden="true" />
+                <strong>{enabled ? "On" : "Off"}</strong>
+              </label>
+            </div>;
           })}
         </article>
 
