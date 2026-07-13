@@ -301,6 +301,8 @@ h1, h2, strong { color: var(--ink); }
 .source-manual { color: var(--muted); background: var(--paper-strong); border-color: var(--line); }
 .source-imported-pdf { color: #7b4c13; background: #fff1d7; border-color: #e2bd80; }
 .source-homebrew { color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); border-color: color-mix(in srgb, var(--good) 35%, var(--line)); }
+.source-ffxiv-companion-dawntrail { color: #7450a8; background: color-mix(in srgb, #8a63c4 12%, var(--paper)); border-color: color-mix(in srgb, #8a63c4 48%, var(--line)); }
+.source-srd-5-2-1 { color: #2f6278; background: color-mix(in srgb, #4e8aa3 11%, var(--paper)); border-color: color-mix(in srgb, #4e8aa3 45%, var(--line)); }
 .source-badge-row, .item-source-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .compact-field { max-width: 120px; }
 .create-character-page { width: min(1320px, 100%); }
@@ -1673,6 +1675,20 @@ h1, h2, strong { color: var(--ink); }
 
 .catalog-add-panel {
   gap: 12px;
+}
+
+.incomplete-definition-panel {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  background: color-mix(in srgb, var(--danger) 7%, var(--paper));
+}
+
+.incomplete-label {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+.content-source-settings > div:first-child {
+  max-width: 62ch;
 }
 
 .catalog-source-class {

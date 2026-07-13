@@ -1,0 +1,601 @@
+{
+  "pdfPages": 219,
+  "spellNamesDetected": 686,
+  "completeCustomDefinitions": 95,
+  "srdMatches": 304,
+  "incompleteNamedOnlyEntries": 253,
+  "ambiguousEntries": 65,
+  "classListAssociations": 3309,
+  "classesAndSubclasses": [
+    "Ampdapori",
+    "Artificer",
+    "Astrologian",
+    "Bard",
+    "Black Mage",
+    "Blue Mage — Fell Guard",
+    "Blue Mage — Lore Keeper",
+    "Blue Mage — Whalaqee",
+    "Cleric",
+    "Dancer",
+    "Druid",
+    "Elementalist",
+    "Enchanter",
+    "Geomancy",
+    "Gridanian Bard",
+    "Mhachi",
+    "Paladin",
+    "Paladin (Sultansworn)",
+    "Pictomancer",
+    "Ranger",
+    "Reaper",
+    "Red Mage",
+    "Sage",
+    "Scholar",
+    "Sorcerer",
+    "Spirit Master",
+    "Summoner",
+    "Void Mage",
+    "Warlock",
+    "White Mage",
+    "Wizard"
+  ],
+  "parseUncertainties": [
+    {
+      "name": "Aeroja (Aero IV)",
+      "page": 184,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Asylum",
+      "page": 184,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Bioja (Bio IV)",
+      "page": 186,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Doomsday",
+      "page": 190,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Electron",
+      "page": 191,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Flare",
+      "page": 192,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Freeze",
+      "page": 193,
+      "missingOrAmbiguousFields": [
+        "savingThrowType",
+        "damageType"
+      ]
+    },
+    {
+      "name": "Foul",
+      "page": 193,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Holy",
+      "page": 193,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Quake",
+      "page": 194,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Tornado",
+      "page": 198,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Veraero",
+      "page": 198,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Veraeroga (Veraero III)",
+      "page": 198,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Verfire",
+      "page": 198,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Verflare",
+      "page": 199,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Verholy",
+      "page": 199,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Verthunder",
+      "page": 199,
+      "missingOrAmbiguousFields": [
+        "damageType"
+      ]
+    },
+    {
+      "name": "Waterga (Water III)",
+      "page": 200,
+      "missingOrAmbiguousFields": [
+        "savingThrowType"
+      ]
+    }
+  ],
+  "ambiguousOrCloseMatches": [
+    {
+      "name": "Mold Earth",
+      "page": 170,
+      "possibleMatch": "Move Earth",
+      "distance": 2
+    },
+    {
+      "name": "Create of Destroy Water",
+      "page": 170,
+      "possibleMatch": "Create or Destroy Water",
+      "distance": 1
+    },
+    {
+      "name": "Speak wth Dead",
+      "page": 170,
+      "possibleMatch": "Speak with Dead",
+      "distance": 1
+    },
+    {
+      "name": "Dawn",
+      "page": 171,
+      "possibleMatch": "Dark",
+      "distance": 2
+    },
+    {
+      "name": "Globe of Invulnerbility",
+      "page": 171,
+      "possibleMatch": "Globe of Invulnerability",
+      "distance": 1
+    },
+    {
+      "name": "Scatter",
+      "page": 171,
+      "possibleMatch": "Shatter",
+      "distance": 1
+    },
+    {
+      "name": "Conjure Celetial",
+      "page": 171,
+      "possibleMatch": "Conjure Celestial",
+      "distance": 1
+    },
+    {
+      "name": "Force Cage",
+      "page": 171,
+      "possibleMatch": "Forcecage",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Heal",
+      "page": 171,
+      "possibleMatch": "Power Word Heal",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Kill",
+      "page": 171,
+      "possibleMatch": "Power Word Kill",
+      "distance": 1
+    },
+    {
+      "name": "Hail of Thorns",
+      "page": 171,
+      "possibleMatch": "Wall of Thorns",
+      "distance": 2
+    },
+    {
+      "name": "Snare",
+      "page": 171,
+      "possibleMatch": "Flare",
+      "distance": 2
+    },
+    {
+      "name": "Vampire Touch",
+      "page": 172,
+      "possibleMatch": "Vampiric Touch",
+      "distance": 2
+    },
+    {
+      "name": "Scatter",
+      "page": 173,
+      "possibleMatch": "Shatter",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Stun",
+      "page": 173,
+      "possibleMatch": "Power Word Stun",
+      "distance": 1
+    },
+    {
+      "name": "Demi-Ultima",
+      "page": 173,
+      "possibleMatch": "Demi Ultima",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Kill",
+      "page": 173,
+      "possibleMatch": "Power Word Kill",
+      "distance": 1
+    },
+    {
+      "name": "Ehance Ability",
+      "page": 174,
+      "possibleMatch": "Enhance Ability",
+      "distance": 1
+    },
+    {
+      "name": "Scying",
+      "page": 174,
+      "possibleMatch": "Scrying",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Stun",
+      "page": 174,
+      "possibleMatch": "Power Word Stun",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Heal",
+      "page": 174,
+      "possibleMatch": "Power Word Heal",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Kill",
+      "page": 174,
+      "possibleMatch": "Power Word Kill",
+      "distance": 1
+    },
+    {
+      "name": "Warding Wind",
+      "page": 175,
+      "possibleMatch": "Warding Bond",
+      "distance": 2
+    },
+    {
+      "name": "Gaesous Form",
+      "page": 175,
+      "possibleMatch": "Gaseous Form",
+      "distance": 2
+    },
+    {
+      "name": "Dawn",
+      "page": 175,
+      "possibleMatch": "Dark",
+      "distance": 2
+    },
+    {
+      "name": "Enhanced Ability",
+      "page": 175,
+      "possibleMatch": "Enhance Ability",
+      "distance": 1
+    },
+    {
+      "name": "Mold Earth",
+      "page": 176,
+      "possibleMatch": "Move Earth",
+      "distance": 2
+    },
+    {
+      "name": "Create of Destroy Water",
+      "page": 176,
+      "possibleMatch": "Create or Destroy Water",
+      "distance": 1
+    },
+    {
+      "name": "Warding Wind",
+      "page": 176,
+      "possibleMatch": "Warding Bond",
+      "distance": 2
+    },
+    {
+      "name": "Great Invisibility",
+      "page": 176,
+      "possibleMatch": "Greater Invisibility",
+      "distance": 2
+    },
+    {
+      "name": "Dawn",
+      "page": 177,
+      "possibleMatch": "Dark",
+      "distance": 2
+    },
+    {
+      "name": "Teleporation Circle",
+      "page": 177,
+      "possibleMatch": "Teleportation Circle",
+      "distance": 1
+    },
+    {
+      "name": "Scatter",
+      "page": 177,
+      "possibleMatch": "Shatter",
+      "distance": 1
+    },
+    {
+      "name": "Meteor Storm",
+      "page": 177,
+      "possibleMatch": "Meteor Swarm",
+      "distance": 2
+    },
+    {
+      "name": "Confusions",
+      "page": 177,
+      "possibleMatch": "Confusion",
+      "distance": 1
+    },
+    {
+      "name": "Warding Wind",
+      "page": 178,
+      "possibleMatch": "Warding Bond",
+      "distance": 2
+    },
+    {
+      "name": "Stoneshape",
+      "page": 178,
+      "possibleMatch": "Stone Shape",
+      "distance": 1
+    },
+    {
+      "name": "Dawn",
+      "page": 178,
+      "possibleMatch": "Dark",
+      "distance": 2
+    },
+    {
+      "name": "Snare",
+      "page": 179,
+      "possibleMatch": "Flare",
+      "distance": 2
+    },
+    {
+      "name": "Globe of Invulnerbility",
+      "page": 179,
+      "possibleMatch": "Globe of Invulnerability",
+      "distance": 1
+    },
+    {
+      "name": "Scatter",
+      "page": 179,
+      "possibleMatch": "Shatter",
+      "distance": 1
+    },
+    {
+      "name": "Snare",
+      "page": 180,
+      "possibleMatch": "Flare",
+      "distance": 2
+    },
+    {
+      "name": "Globe of Invulnerbility",
+      "page": 181,
+      "possibleMatch": "Globe of Invulnerability",
+      "distance": 1
+    },
+    {
+      "name": "Scatter",
+      "page": 181,
+      "possibleMatch": "Shatter",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Stun",
+      "page": 181,
+      "possibleMatch": "Power Word Stun",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Heal",
+      "page": 181,
+      "possibleMatch": "Power Word Heal",
+      "distance": 1
+    },
+    {
+      "name": "Power Word: Kill",
+      "page": 181,
+      "possibleMatch": "Power Word Kill",
+      "distance": 1
+    },
+    {
+      "name": "Mold Earth",
+      "page": 181,
+      "possibleMatch": "Move Earth",
+      "distance": 2
+    },
+    {
+      "name": "Warding Wind",
+      "page": 181,
+      "possibleMatch": "Warding Bond",
+      "distance": 2
+    },
+    {
+      "name": "De-Elemental",
+      "page": 182,
+      "possibleMatch": "De-Element",
+      "distance": 2
+    },
+    {
+      "name": "Mold Earth",
+      "page": 183,
+      "possibleMatch": "Move Earth",
+      "distance": 2
+    },
+    {
+      "name": "Mage Armour",
+      "page": 183,
+      "possibleMatch": "Mage Armor",
+      "distance": 1
+    },
+    {
+      "name": "Snare",
+      "page": 183,
+      "possibleMatch": "Flare",
+      "distance": 2
+    },
+    {
+      "name": "Barksin",
+      "page": 183,
+      "possibleMatch": "Barkskin",
+      "distance": 1
+    },
+    {
+      "name": "Warding Wind",
+      "page": 183,
+      "possibleMatch": "Warding Bond",
+      "distance": 2
+    },
+    {
+      "name": "Glyph of Wardning",
+      "page": 183,
+      "possibleMatch": "Glyph of Warding",
+      "distance": 1
+    },
+    {
+      "name": "Mass Healing Ward",
+      "page": 183,
+      "possibleMatch": "Mass Healing Word",
+      "distance": 1
+    },
+    {
+      "name": "Guardians of Faith",
+      "page": 183,
+      "possibleMatch": "Guardian of Faith",
+      "distance": 1
+    },
+    {
+      "name": "Bar-element-ja",
+      "page": 183,
+      "possibleMatch": "Bar-Element-ra",
+      "distance": 1
+    },
+    {
+      "name": "Jolt",
+      "page": 201,
+      "possibleMatch": "Holy",
+      "distance": 2
+    },
+    {
+      "name": "Bar-Elementra",
+      "page": 201,
+      "possibleMatch": "Bar-Element-ra",
+      "distance": 1
+    },
+    {
+      "name": "Aerojaa",
+      "page": 201,
+      "possibleMatch": "Aeroja (Aero IV)",
+      "distance": 1
+    },
+    {
+      "name": "Aerojaa",
+      "page": 202,
+      "possibleMatch": "Aeroja (Aero IV)",
+      "distance": 1
+    },
+    {
+      "name": "Bar-Elementra",
+      "page": 202,
+      "possibleMatch": "Bar-Element-ra",
+      "distance": 1
+    },
+    {
+      "name": "Dawn",
+      "page": 169,
+      "possibleMatch": "Dark",
+      "distance": 2
+    }
+  ],
+  "levelConflicts": [
+    {
+      "name": "Find Steed",
+      "page": 172,
+      "listedLevel": 1,
+      "definitionLevel": 2
+    },
+    {
+      "name": "Charm Person",
+      "page": 175,
+      "listedLevel": 2,
+      "definitionLevel": 1
+    },
+    {
+      "name": "Find Steed",
+      "page": 177,
+      "listedLevel": 1,
+      "definitionLevel": 2
+    },
+    {
+      "name": "Gentle Repose",
+      "page": 177,
+      "listedLevel": 1,
+      "definitionLevel": 2
+    },
+    {
+      "name": "Holy",
+      "page": 178,
+      "listedLevel": 5,
+      "definitionLevel": 7
+    },
+    {
+      "name": "Sleep",
+      "page": 169,
+      "listedLevel": 2,
+      "definitionLevel": 1
+    }
+  ]
+}

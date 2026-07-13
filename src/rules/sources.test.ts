@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inventoryItemSchema, spellSchema } from "../domain/models";
 import { rulesSourceLabel } from "./sources";
+import { contentSource, defaultEnabledContentSourceIds, FFXIV_CONTENT_SOURCE_ID } from "./contentSources";
 
 const timestamp = new Date().toISOString();
 
@@ -62,5 +63,13 @@ describe("rules source labels", () => {
 
     expect(item.source).toBe("Manual");
     expect(spell.source).toBe("Manual");
+    expect(spell.rulesSourceId).toBe("");
+    expect(spell.contentSourceId).toBe("");
+    expect(spell.rulesComplete).toBe(true);
+  });
+
+  it("registers the optional FFXIV source independently from the SRD", () => {
+    expect(contentSource(FFXIV_CONTENT_SOURCE_ID)).toMatchObject({ displayName: "Final Fantasy Companion Guide", shortLabel: "FFXIV", sourceType: "Homebrew", optional: true });
+    expect(defaultEnabledContentSourceIds).toContain(FFXIV_CONTENT_SOURCE_ID);
   });
 });

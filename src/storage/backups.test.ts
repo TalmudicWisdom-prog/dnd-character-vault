@@ -4,7 +4,8 @@ import { db } from "./database";
 import { createCharacter } from "./characters";
 import { createInventoryItem, ensureDefaultContainers, saveInventoryItem } from "./inventory";
 import { createEmptyCharacterSheet, saveCharacterSheet } from "./characterSheets";
-import { createSpell, saveSpell, setSpellPinned } from "./spellbooks";
+import { addSpellFromCatalog, createSpell, saveSpell, setSpellPinned } from "./spellbooks";
+import { characterSourceClassChoices, findCatalogSpellByName } from "../rules/spellCatalog";
 
 describe("manual backup and restore", () => {
   beforeEach(async () => {
@@ -114,5 +115,27 @@ describe("manual backup and restore", () => {
     expect(restoredSheet?.sheetLayoutOrder).toEqual(["spells", "roll-helper", "health-combat"]);
     expect(restoredSpells).toEqual([expect.objectContaining({ name: "Call Lightning", level: 3, description: "Storm cloud follows Cloud." })]);
     expect(restoredItems).toEqual([expect.objectContaining({ name: "Storm Staff", category: "Arcane focus", effectsAndStats: "+1 spell attack", favorite: true })]);
+  });
+
+  it("preserves content-source and class associations in backup and restore", async () => {
+    const character = await createCharacter({ name: "FFXIV Caster", summary: "", playerName: "", campaign: "", ancestry: "", characterClass: "Astrologian", level: 3 });
+    const aero = findCatalogSpellByName("Aero")!;
+    const choice = characterSourceClassChoices("Astrologian", aero).find((candidate) => candidate.sourceClass === "Astrologian")!;
+    const spell = await addSpellFromCatalog(character.id, aero, choice);
+    const backup = await createCharacterBackup(character.id);
+
+    await db.delete();
+    await db.open();
+    await restoreVaultBackup(await validateVaultBackup(JSON.parse(JSON.stringify(backup)) as unknown), "new");
+
+    expect(await db.spells.get(spell.id)).toMatchObject({
+      definitionId: "ffxiv-companion-dawntrail:aero",
+      definitionVersion: "2025-02-18",
+      rulesSourceId: "ffxiv-companion-dawntrail",
+      contentSourceId: "ffxiv-companion-dawntrail",
+      sourceClass: "Astrologian",
+      castingAbilityOverride: "wis",
+      rulesComplete: true,
+    });
   });
 });

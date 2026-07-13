@@ -1,7 +1,15 @@
 import type { Spell, Spellbook } from "../domain/models";
 import { spellSchema, spellbookSchema } from "../domain/models";
 import type { SrdSpell } from "../rules/srd";
-import { actionTypeFromCastingTime, SRD_SPELL_CATALOG_VERSION } from "../rules/spellCatalog";
+import {
+  actionTypeFromCastingTime,
+  catalogSourceChoice,
+  catalogSpell,
+  type CatalogSourceChoice,
+  type CatalogSpellDefinition,
+  SRD_SPELL_CATALOG_VERSION,
+} from "../rules/spellCatalog";
+import { SRD_CONTENT_SOURCE_ID, contentSource } from "../rules/contentSources";
 import { db } from "./database";
 
 function now() {
@@ -49,8 +57,13 @@ export function createEmptySpell(characterId: string, name: string): Spell {
     homebrew: true,
     definitionId: "",
     definitionVersion: "",
+    rulesSourceId: "",
+    contentSourceId: "",
+    sourcePage: null,
     sourceClass: "",
+    sourceSubclass: "",
     castingAbilityOverride: null,
+    rulesComplete: false,
     notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -58,6 +71,15 @@ export function createEmptySpell(characterId: string, name: string): Spell {
 }
 
 export function createSpellFromSrd(characterId: string, spell: SrdSpell, sourceClass = ""): Spell {
+  const definition = catalogSpell(spell.id);
+  if (definition) {
+    const sourceChoice = definition.associations.find((association) => association.sourceClass === sourceClass && association.contentSourceId === SRD_CONTENT_SOURCE_ID);
+    return createSpellFromCatalogDefinition(characterId, definition, sourceChoice ? {
+      ...sourceChoice,
+      value: [sourceChoice.contentSourceId, sourceChoice.sourceClass].join("|"),
+      label: sourceChoice.sourceClass,
+    } : undefined);
+  }
   const timestamp = now();
   return spellSchema.parse({
     id: crypto.randomUUID(),
@@ -90,29 +112,110 @@ export function createSpellFromSrd(characterId: string, spell: SrdSpell, sourceC
     homebrew: false,
     definitionId: spell.id,
     definitionVersion: spell.sourceVersion ?? SRD_SPELL_CATALOG_VERSION,
+    rulesSourceId: SRD_CONTENT_SOURCE_ID,
+    contentSourceId: SRD_CONTENT_SOURCE_ID,
+    sourcePage: null,
     sourceClass,
+    sourceSubclass: "",
     castingAbilityOverride: null,
+    rulesComplete: true,
     notes: "",
     createdAt: timestamp,
     updatedAt: timestamp,
   });
 }
 
-export async function addSpellFromCatalog(characterId: string, definition: SrdSpell, sourceClass: string) {
-  if (!sourceClass.trim()) throw new Error("Choose the spell's source class");
+function sourceNotes(definition: CatalogSpellDefinition, choice?: CatalogSourceChoice) {
+  const rulesSource = contentSource(definition.rulesSourceId)?.displayName ?? definition.rulesSourceId;
+  const campaignSource = choice ? contentSource(choice.contentSourceId)?.displayName : undefined;
+  return [
+    `${definition.rulesSourceId === SRD_CONTENT_SOURCE_ID ? "Canonical rules" : "Rules source"}: ${rulesSource}`,
+    campaignSource && choice ? `Available through: ${campaignSource} — ${choice.sourceClass}` : "",
+    definition.sourcePage ? `Definition page: ${definition.sourcePage}` : "",
+    choice?.page && choice.page !== definition.sourcePage ? `Class-list page: ${choice.page}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+export function createSpellFromCatalogDefinition(characterId: string, definition: CatalogSpellDefinition, choice?: CatalogSourceChoice): Spell {
+  if (definition.definitionStatus !== "complete" || definition.level === null) throw new Error(`${definition.name} has no complete spell definition yet`);
+  const timestamp = now();
+  return spellSchema.parse({
+    id: crypto.randomUUID(),
+    characterId,
+    name: definition.name,
+    level: definition.level,
+    school: definition.school,
+    castingTime: definition.castingTime,
+    actionType: actionTypeFromCastingTime(definition.castingTime),
+    range: definition.range,
+    verbalComponent: definition.components.includes("V"),
+    somaticComponent: definition.components.includes("S"),
+    materialComponent: definition.components.includes("M"),
+    materialDetails: definition.materialDetails,
+    duration: definition.duration,
+    concentration: definition.concentration,
+    ritual: definition.ritual,
+    damageType: definition.damageType ?? "",
+    damageFormula: definition.damageFormula ?? "",
+    healingFormula: definition.healingFormula ?? "",
+    areaOfEffectType: definition.areaOfEffectType ?? "",
+    areaOfEffectSize: definition.areaOfEffectSize ?? "",
+    savingThrowType: definition.savingThrowType ?? "",
+    attackRollRequired: definition.attackRollRequired ?? false,
+    statusEffects: definition.statusEffects ?? "",
+    description: definition.description,
+    higherLevelScaling: definition.higherLevelScaling ?? "",
+    sourceNotes: sourceNotes(definition, choice),
+    source: definition.rulesSourceId === SRD_CONTENT_SOURCE_ID ? "SRD" : "Homebrew",
+    homebrew: definition.homebrew,
+    definitionId: definition.id,
+    definitionVersion: definition.sourceVersion,
+    rulesSourceId: definition.rulesSourceId,
+    contentSourceId: choice?.contentSourceId ?? definition.rulesSourceId,
+    sourcePage: choice?.page ?? definition.sourcePage,
+    sourceClass: choice?.sourceClass ?? "",
+    sourceSubclass: choice?.subclassName ?? "",
+    castingAbilityOverride: choice?.castingAbility ?? null,
+    rulesComplete: true,
+    notes: "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+}
+
+function asCatalogDefinition(definition: CatalogSpellDefinition | SrdSpell) {
+  return "rulesSourceId" in definition ? definition : catalogSpell(definition.id);
+}
+
+export async function addSpellFromCatalog(characterId: string, input: CatalogSpellDefinition | SrdSpell, source: string | CatalogSourceChoice) {
+  const definition = asCatalogDefinition(input);
+  if (!definition) throw new Error("Catalog definition not found");
+  const choice = typeof source === "string"
+    ? catalogSourceChoice(definition, source) ?? definition.associations.map((association) => ({ ...association, value: "", label: association.sourceClass })).find((association) => association.sourceClass === source)
+    : source;
+  if (!choice?.sourceClass.trim()) throw new Error("Choose the spell's source class");
+  if (definition.definitionStatus !== "complete") throw new Error(`${definition.name} is listed in the guide, but its complete rules are unavailable`);
   await getOrCreateSpellbook(characterId);
   const existing = await db.spells.where("characterId").equals(characterId).toArray();
   if (existing.some((spell) => spell.definitionId === definition.id)) throw new Error(`${definition.name} is already owned by this character`);
-  const spell = createSpellFromSrd(characterId, definition, sourceClass);
+  const spell = createSpellFromCatalogDefinition(characterId, definition, choice);
   await db.spells.add(spell);
   await db.characters.update(characterId, { updatedAt: spell.updatedAt });
   return spell;
 }
 
 export async function replaceCustomSpellWithSrd(spell: Spell, definition: SrdSpell, sourceClass: string) {
+  const catalogDefinition = catalogSpell(definition.id);
+  if (!catalogDefinition) throw new Error("Catalog definition not found");
+  const association = catalogDefinition.associations.find((candidate) => candidate.sourceClass === sourceClass && candidate.contentSourceId === SRD_CONTENT_SOURCE_ID);
+  const choice = association ? { ...association, value: [association.contentSourceId, association.sourceClass].join("|"), label: association.sourceClass } : undefined;
+  return replaceCustomSpellWithCatalogDefinition(spell, catalogDefinition, choice);
+}
+
+export async function replaceCustomSpellWithCatalogDefinition(spell: Spell, definition: CatalogSpellDefinition, choice?: CatalogSourceChoice) {
   if (!spell.homebrew) throw new Error("Only custom spells can be replaced with catalog data");
   const replacement = spellSchema.parse({
-    ...createSpellFromSrd(spell.characterId, definition, sourceClass),
+    ...createSpellFromCatalogDefinition(spell.characterId, definition, choice),
     id: spell.id,
     notes: spell.notes || spell.sourceNotes,
     createdAt: spell.createdAt,
@@ -135,7 +238,15 @@ export async function createSpell(characterId: string, name: string) {
 export async function saveSpell(spell: Spell) {
   const existing = await db.spells.get(spell.id);
   if (!existing || existing.characterId !== spell.characterId) throw new Error("Spell does not belong to this character");
-  const updated = spellSchema.parse({ ...spell, updatedAt: now() });
+  const customRulesComplete = spell.definitionId ? spell.rulesComplete : Boolean(
+    spell.name.trim()
+      && spell.school.trim() && spell.school !== "Custom"
+      && spell.castingTime.trim()
+      && spell.range.trim()
+      && spell.duration.trim()
+      && spell.description.trim(),
+  );
+  const updated = spellSchema.parse({ ...spell, rulesComplete: customRulesComplete, updatedAt: now() });
   await db.spells.put(updated);
   await db.characters.update(updated.characterId, { updatedAt: updated.updatedAt });
   return updated;
@@ -149,6 +260,14 @@ export async function duplicateSpell(characterId: string, spellId: string) {
     ...existing,
     id: crypto.randomUUID(),
     name: `${existing.name} Copy`,
+    source: existing.definitionId ? "Homebrew" : existing.source,
+    homebrew: existing.definitionId ? true : existing.homebrew,
+    definitionId: existing.definitionId ? "" : existing.definitionId,
+    definitionVersion: existing.definitionId ? "" : existing.definitionVersion,
+    rulesSourceId: existing.definitionId ? "" : existing.rulesSourceId,
+    contentSourceId: existing.definitionId ? "" : existing.contentSourceId,
+    sourcePage: existing.definitionId ? null : existing.sourcePage,
+    sourceNotes: existing.definitionId ? `${existing.sourceNotes}\nCopied as an independent custom definition.`.trim() : existing.sourceNotes,
     createdAt: timestamp,
     updatedAt: timestamp,
   });

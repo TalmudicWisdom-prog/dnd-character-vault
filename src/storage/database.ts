@@ -20,6 +20,7 @@ const defaultSettings: AppSettings = {
   id: "app",
   theme: "system",
   backupReminders: true,
+  enabledContentSourceIds: ["ffxiv-companion-dawntrail"],
   lastUpdateCheck: null,
   updatedAt: new Date().toISOString(),
 };
@@ -550,6 +551,36 @@ class CharacterVaultDatabase extends Dexie {
           spell.sourceClass ??= "";
           spell.castingAbilityOverride ??= null;
           spell.notes ??= "";
+        });
+      });
+
+    this.version(18)
+      .stores({
+        characters: "id, name, updatedAt, createdAt, archivedAt",
+        characterSheets: "characterId, updatedAt",
+        inventoryContainers: "id, characterId, [characterId+sortOrder], updatedAt",
+        inventoryItems: "id, characterId, containerId, [characterId+containerId], updatedAt",
+        spellbooks: "characterId, updatedAt",
+        spells: "id, characterId, definitionId, level, school, actionType, damageType, updatedAt, [characterId+level]",
+        importSessions: "id, status, updatedAt, createdAt",
+        importSessionFiles: "id, sessionId, [sessionId+lastModified]",
+        characterCreationDrafts: "id, updatedAt",
+        soulReaperProgressions: "characterId, level, path, updatedAt",
+        pdfDocuments: "id, name, gameSystem, updatedAt, *characterIds",
+        pdfFiles: "documentId",
+        pdfBookmarks: "id, documentId, [documentId+page], createdAt",
+        settings: "id",
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table("spells").toCollection().modify((spell) => {
+          spell.rulesSourceId ??= spell.source === "SRD" ? "srd-5.2.1" : "";
+          spell.contentSourceId ??= spell.rulesSourceId;
+          spell.sourcePage ??= null;
+          spell.sourceSubclass ??= "";
+          spell.rulesComplete ??= true;
+        });
+        await transaction.table("settings").toCollection().modify((settings) => {
+          settings.enabledContentSourceIds ??= ["ffxiv-companion-dawntrail"];
         });
       });
 

@@ -18,10 +18,17 @@ import { remainingSpellSlots } from "../../rules/spellSlots";
 type SpellDetailOverlayProps = {
   catalog?: {
     classes: string[];
-    sourceChoices: string[];
+    sourceChoices: Array<{ value: string; label: string }>;
     sourceClass: string;
+    complete: boolean;
+    displayLevel: string;
+    rulesSourceId: string;
+    contentSourceId: string;
+    definitionPage: number | null;
+    associationPage: number | null;
     owned: boolean;
     onAdd: () => void;
+    onCompleteDefinition?: () => void;
     onSourceClassChange: (sourceClass: string) => void;
     onViewOwned?: () => void;
   };
@@ -93,7 +100,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
   const spellAttack = detailStatistics.spellAttack;
   const castingModifier = detailStatistics.abilityModifier;
   const needsCastingSetup = detailStatistics.setupWarning;
-  const canCast = spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotChoice);
+  const canCast = spell.rulesComplete && (spell.level === 0 || canCastSpellWithSlot(sheet, spell, selectedSlotChoice));
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -184,10 +191,11 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
       >
         <header className="spell-detail-header">
           <div>
-            <span className="card-label">{levelLabel(spell.level)} · {spell.school}</span>
+            <span className="card-label">{catalog?.displayLevel ?? levelLabel(spell.level)} · {spell.school}</span>
             <h2 id="spell-detail-title">{spell.name}</h2>
             <div className="spell-detail-tags">
-              <SourceBadge source={spell.source} />
+              <SourceBadge source={catalog?.rulesSourceId || spell.rulesSourceId || spell.source} />
+              {(catalog?.contentSourceId || spell.contentSourceId) && (catalog?.contentSourceId || spell.contentSourceId) !== (catalog?.rulesSourceId || spell.rulesSourceId) && <SourceBadge source={catalog?.contentSourceId || spell.contentSourceId} />}
               <span>{catalog ? "Catalog spell" : prepared ? "Prepared" : spell.level === 0 ? "Known cantrip" : "Not marked prepared"}</span>
               {spell.concentration && <span title="The caster must maintain focus and normally can concentrate on only one spell at a time.">Concentration</span>}
               {spell.ritual && <span title="Eligible casters may cast it as a ritual when their rules allow.">Ritual</span>}
@@ -197,13 +205,13 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
         </header>
 
         <div className="spell-detail-body">
-          {catalog ? <section className="spell-cast-panel catalog-add-panel">
+          {catalog ? <section className={`spell-cast-panel catalog-add-panel${catalog.complete ? "" : " incomplete-definition-panel"}`}>
             <div className="spell-cast-primary">
-              <div><span className="card-label">Add from Spell Catalog</span><strong>{catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{catalog.owned ? "This character already has the canonical SRD definition." : "The selected class determines the spellcasting ability."}</small></div>
-              {catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
+              <div><span className="card-label">Add from Spell Catalog</span><strong>{!catalog.complete ? "Definition unavailable" : catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{!catalog.complete ? "The guide lists this spell by name but does not provide complete rules. It cannot be added or cast until you supply a custom definition." : catalog.owned ? "This character already has this stable catalog definition." : "The selected class determines the spellcasting ability and content-source association."}</small></div>
+              {!catalog.complete ? (catalog.onCompleteDefinition ? <button className="primary-button" onClick={catalog.onCompleteDefinition} type="button">Complete spell data</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
             </div>
-            {!catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}</select></label>}
-          </section> : <section className="spell-cast-panel">
+            {catalog.complete && !catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>}
+          </section> : !spell.rulesComplete ? <section className="spell-cast-panel incomplete-definition-panel"><div><span className="card-label">Incomplete custom definition</span><strong>Complete the required spell data before casting</strong><small>Add a school, casting time, range, duration, and full description in the editor below.</small></div></section> : <section className="spell-cast-panel">
             <div className="spell-cast-primary">
               <div>
                 <span className="card-label">Cast spell</span>
@@ -223,7 +231,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
             {message && <p className="inline-message" role="status">{message}</p>}
           </section>}
 
-          <section className="spell-detail-grid" aria-label="Spell details">
+          {(!catalog || catalog.complete) && <section className="spell-detail-grid" aria-label="Spell details">
             <div><span>Casting time</span><strong>{spell.castingTime}</strong></div>
             <div><span>Action type</span><strong>{actionTypeLabel(spell.actionType)}</strong></div>
             <div><span>Range</span><strong>{spell.range}</strong></div>
@@ -233,7 +241,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
             {spellSaveDc !== null && <div><span title="The target number a creature must meet on its saving throw.">Save DC</span><strong>{spellSaveDc} · {abilityNames[spell.savingThrowType.toLocaleLowerCase() as keyof typeof abilityNames] ?? spell.savingThrowType} save</strong></div>}
             {resolvedAbility && castingModifier !== null && <div><span>Spellcasting Ability</span><strong>{abilityLabel(resolvedAbility)} {formatModifier(castingModifier)}</strong></div>}
             {(spell.attackRollRequired || spell.savingThrowType) && resolvedAbility && <div><span>Proficiency</span><strong>{formatModifier(sheet.proficiencyBonus)}</strong></div>}
-          </section>
+          </section>}
 
           {needsCastingSetup && <p className="inline-message setup-warning" role="status">Choose the spell's source class or a casting ability override before using its spellcasting statistics.</p>}
 
@@ -241,7 +249,9 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
 
           {spell.materialDetails && <section className="spell-text-panel"><span className="card-label">Materials</span><p>{spell.materialDetails}</p></section>}
 
-          {catalog && <section className="spell-text-panel"><span className="card-label">Available classes</span><p>{catalog.classes.join(", ")}</p></section>}
+          {catalog && <section className="spell-text-panel"><span className="card-label">Content source</span><p><SourceBadge source={catalog.contentSourceId} />{catalog.definitionPage ? ` Rules page ${catalog.definitionPage}.` : ""}{catalog.associationPage && catalog.associationPage !== catalog.definitionPage ? ` Class-list page ${catalog.associationPage}.` : ""} {!catalog.complete && "Rules data: Custom definition required."}</p></section>}
+
+          {catalog && <section className="spell-text-panel"><span className="card-label">Available classes and subclasses</span><p>{catalog.classes.join(", ") || "No verified class association."}</p></section>}
 
           {!catalog && rollOptions.length > 0 && <section className="spell-roll-panel">
             <div className="form-section-heading"><div><span className="card-label">Built-in rolls</span><h3>Spell dice</h3></div></div>
@@ -254,7 +264,7 @@ export function SpellDetailOverlay({ catalog, editContent, onActivity, onClose, 
             </div>
           </section>}
 
-          <section className="spell-text-panel"><span className="card-label">Description</span><p>{spell.description || "No description saved yet."}</p></section>
+          <section className="spell-text-panel"><span className="card-label">Description</span><p>{catalog && !catalog.complete ? "Definition unavailable in the supplied guide. No rules text has been invented or fetched." : spell.description || "No description saved yet."}</p></section>
           {spell.higherLevelScaling && <section className="spell-text-panel"><span className="card-label">At higher levels</span><p>{spell.higherLevelScaling}</p></section>}
           {spell.statusEffects && <section className="spell-text-panel"><span className="card-label">Effects</span><p>{spell.statusEffects}</p></section>}
           {spell.sourceNotes && <section className="spell-text-panel"><span className="card-label">Source / class notes</span><p>{spell.sourceNotes}</p></section>}

@@ -4,6 +4,7 @@ import type { AppSettings, ThemePreference } from "../../domain/models";
 import { getSettings, updateSettings } from "../../storage/database";
 import { BUILD_ID, APP_VERSION } from "../../app/version";
 import { checkForAppUpdate, hasWaitingUpdate, installWaitingUpdate, onUpdateAvailable } from "../../pwa/updates";
+import { optionalContentSources } from "../../rules/contentSources";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -20,7 +21,7 @@ export function SettingsPage() {
     setUpdateStatus("Update Available");
   }), []);
 
-  const save = async (next: Partial<Pick<AppSettings, "theme" | "backupReminders" | "lastUpdateCheck">>) => {
+  const save = async (next: Partial<Pick<AppSettings, "theme" | "backupReminders" | "enabledContentSourceIds" | "lastUpdateCheck">>) => {
     const updated = await updateSettings(next);
     setSettings(updated);
     document.documentElement.dataset.theme = updated.theme;
@@ -67,6 +68,30 @@ export function SettingsPage() {
               <option value="dark">Dark</option>
             </select>
           </label>
+        </article>
+
+        <article className="panel setting-section content-source-settings">
+          <div>
+            <h2>Optional content sources</h2>
+            <p>Enable or hide locally bundled homebrew packs. Canonical SRD content is always available.</p>
+            {optionalContentSources.map((source) => <p key={source.id}><strong>{source.displayName}</strong> · {source.sourceType} · Version {source.version}</p>)}
+          </div>
+          {optionalContentSources.map((source) => {
+            const enabled = settings?.enabledContentSourceIds.includes(source.id) ?? source.enabledByDefault;
+            return <label className="toggle" key={source.id}>
+              <input
+                checked={enabled}
+                onChange={(event) => {
+                  const current = settings?.enabledContentSourceIds ?? [];
+                  const enabledContentSourceIds = event.target.checked ? [...new Set([...current, source.id])] : current.filter((id) => id !== source.id);
+                  void save({ enabledContentSourceIds });
+                }}
+                type="checkbox"
+              />
+              <span aria-hidden="true" />
+              <strong>{enabled ? "On" : "Off"}</strong>
+            </label>;
+          })}
         </article>
 
         <article className="panel setting-section">

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createCharacter, deleteCharacter, duplicateCharacter } from "./characters";
 import { db } from "./database";
 import { srdSpell } from "../rules/srd";
+import { catalogSpell, characterSourceClassChoices, findCatalogSpellByName } from "../rules/spellCatalog";
 import { addSpellFromCatalog, createSpell, createSpellFromSrd, deleteSpell, duplicateSpell, movePinnedSpell, replaceCustomSpellWithSrd, saveSpell, setSpellPinned } from "./spellbooks";
 
 const draft = (name: string) => ({
@@ -119,5 +120,40 @@ describe("character-scoped spellbooks", () => {
     const repaired = await replaceCustomSpellWithSrd(annotated, srdSpell("dispel-magic")!, "Druid");
     expect(repaired).toMatchObject({ id: custom.id, level: 3, source: "SRD", homebrew: false, notes: "Keep this note" });
     expect((await db.spellbooks.get(character.id))?.pinnedSpellIds).toContain(custom.id);
+  });
+
+  it("adds complete FFXIV rules and preserves FFXIV associations on canonical SRD spells", async () => {
+    const astrologian = await createCharacter({ ...draft("Astrologian"), characterClass: "Astrologian" });
+    const aero = findCatalogSpellByName("Aero")!;
+    const aeroChoice = characterSourceClassChoices("Astrologian", aero).find((choice) => choice.sourceClass === "Astrologian")!;
+    const addedAero = await addSpellFromCatalog(astrologian.id, aero, aeroChoice);
+
+    expect(addedAero).toMatchObject({
+      name: "Aero",
+      definitionId: "ffxiv-companion-dawntrail:aero",
+      rulesSourceId: "ffxiv-companion-dawntrail",
+      contentSourceId: "ffxiv-companion-dawntrail",
+      definitionVersion: "2025-02-18",
+      sourceClass: "Astrologian",
+      castingAbilityOverride: "wis",
+      sourcePage: 170,
+      rulesComplete: true,
+    });
+    expect(addedAero.description).toContain("burst of wind");
+
+    const whiteMage = await createCharacter({ ...draft("White Mage"), characterClass: "White Mage" });
+    const dispelMagic = catalogSpell("dispel-magic")!;
+    const whiteMageChoice = characterSourceClassChoices("White Mage", dispelMagic).find((choice) => choice.sourceClass === "White Mage")!;
+    const addedDispel = await addSpellFromCatalog(whiteMage.id, dispelMagic, whiteMageChoice);
+    expect(addedDispel).toMatchObject({ definitionId: "dispel-magic", rulesSourceId: "srd-5.2.1", contentSourceId: "ffxiv-companion-dawntrail", sourceClass: "White Mage", castingAbilityOverride: "wis" });
+  });
+
+  it("does not add a name-only FFXIV entry as a blank cantrip", async () => {
+    const character = await createCharacter({ ...draft("Void Mage"), characterClass: "Void Mage" });
+    const hunger = findCatalogSpellByName("Hunger of Hadar")!;
+    const choice = characterSourceClassChoices("Void Mage", hunger)[0];
+
+    await expect(addSpellFromCatalog(character.id, hunger, choice)).rejects.toThrow("complete rules are unavailable");
+    expect(await db.spells.where("characterId").equals(character.id).count()).toBe(0);
   });
 });
