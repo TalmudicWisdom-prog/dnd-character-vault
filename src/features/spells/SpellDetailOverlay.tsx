@@ -27,6 +27,8 @@ type SpellDetailOverlayProps = {
     definitionPage: number | null;
     associationPage: number | null;
     owned: boolean;
+    canAdd: boolean;
+    eligibilityReason: string;
     onAdd: () => void;
     onCompleteAndAdd?: () => void;
     onAddReferenceOnly?: () => void;
@@ -103,6 +105,18 @@ export function SpellDetailOverlay({ catalog, editContent, editorOpen = false, o
   const castingModifier = detailStatistics.abilityModifier;
   const needsCastingSetup = detailStatistics.setupWarning;
   const canCast = canCastSpell(sheet, spell, selectedSlotChoice);
+  const catalogStatusTitle = !catalog?.complete
+    ? catalog?.owned ? "Already owned as a local reference" : "Definition unavailable"
+    : catalog.owned ? "Already owned" : catalog.canAdd ? "Choose the class granting this spell" : catalog.eligibilityReason;
+  const catalogStatusDetail = !catalog?.complete
+    ? catalog?.owned
+      ? "This character owns a local reference or completed custom definition linked to this FFXIV catalog entry."
+      : "The guide lists this spell by name and association, but not complete rules. Keep the reference local, or supply your own rules without changing the source pack."
+    : catalog.owned
+      ? "This character already has this stable catalog definition."
+      : catalog.canAdd
+        ? "The selected class determines the spellcasting ability and content-source association."
+        : "You can still read the full spell. Add remains unavailable until this character becomes eligible.";
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -209,10 +223,11 @@ export function SpellDetailOverlay({ catalog, editContent, editorOpen = false, o
         <div className="spell-detail-body">
           {catalog ? <section className={`spell-cast-panel catalog-add-panel${catalog.complete ? "" : " incomplete-definition-panel"}`}>
             <div className="spell-cast-primary">
-              <div><span className="card-label">Add from Spell Catalog</span><strong>{!catalog.complete ? catalog.owned ? "Already owned as a local reference" : "Definition unavailable" : catalog.owned ? "Already owned" : "Choose the class granting this spell"}</strong><small>{!catalog.complete ? catalog.owned ? "This character owns a local reference or completed custom definition linked to this FFXIV catalog entry." : "The guide lists this spell by name and association, but not complete rules. Keep the reference local, or supply your own rules without changing the source pack." : catalog.owned ? "This character already has this stable catalog definition." : "The selected class determines the spellcasting ability and content-source association."}</small></div>
-              {!catalog.complete ? catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <div className="catalog-incomplete-actions"><button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onCompleteAndAdd} type="button">Complete &amp; Add</button><button className="secondary-button" disabled={!catalog.sourceClass} onClick={catalog.onAddReferenceOnly} type="button">Add as reference only</button><button className="text-button" onClick={onClose} type="button">Close</button></div> : catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
+              <div><span className="card-label">Add from Spell Catalog</span><strong>{catalogStatusTitle}</strong><small>{catalogStatusDetail}</small></div>
+              {!catalog.complete ? catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <div className="catalog-incomplete-actions"><button className="primary-button" disabled={!catalog.sourceClass} onClick={catalog.onCompleteAndAdd} type="button">Complete &amp; Add</button><button className="secondary-button" disabled={!catalog.sourceClass} onClick={catalog.onAddReferenceOnly} type="button">Add as reference only</button><button className="text-button" onClick={onClose} type="button">Close</button></div> : catalog.owned ? (catalog.onViewOwned ? <button className="secondary-button" onClick={catalog.onViewOwned} type="button">View owned spell</button> : <button className="secondary-button" onClick={onClose} type="button">Close</button>) : <button className="primary-button" disabled={!catalog.canAdd || !catalog.sourceClass} onClick={catalog.onAdd} type="button">Add Spell</button>}
             </div>
-            {!catalog.owned && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>}
+            {!catalog.owned && <p className={catalog.canAdd || !catalog.complete && catalog.sourceChoices.length ? "catalog-eligibility-message ready" : "catalog-eligibility-message"} role="status">{catalog.eligibilityReason}</p>}
+            {!catalog.owned && catalog.sourceChoices.length > 0 && <label className="form-field catalog-source-class"><span>Source class</span><select aria-label={`Source class for ${spell.name}`} onChange={(event) => catalog.onSourceClassChange(event.target.value)} value={catalog.sourceClass}><option value="">Choose class</option>{catalog.sourceChoices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>}
           </section> : !spell.rulesComplete ? <section className="spell-cast-panel incomplete-definition-panel"><div><span className="card-label">Rules incomplete</span><strong>Complete the required spell data before casting</strong><small>{spell.referenceDefinitionId ? "This is a local reference-only spell linked to the FFXIV catalog. Its name, level, source, pages, and chosen class are preserved below." : "Add a school, casting time, range, duration, and full description in the editor below."}</small></div></section> : <section className="spell-cast-panel">
             <div className="spell-cast-primary">
               <div>
@@ -245,9 +260,9 @@ export function SpellDetailOverlay({ catalog, editContent, editorOpen = false, o
             {(spell.attackRollRequired || spell.savingThrowType) && resolvedAbility && <div><span>Proficiency</span><strong>{formatModifier(sheet.proficiencyBonus)}</strong></div>}
           </section>}
 
-          {needsCastingSetup && <p className="inline-message setup-warning" role="status">Choose the spell's source class or a casting ability override before using its spellcasting statistics.</p>}
+          {needsCastingSetup && (!catalog || catalog.sourceChoices.length > 0) && <p className="inline-message setup-warning" role="status">Choose the spell's source class or a casting ability override before using its spellcasting statistics.</p>}
 
-          <details className="spell-rules-help"><summary>What do these spell terms mean?</summary><dl><dt>V - Verbal</dt><dd>The caster must speak magical words.</dd><dt>S - Somatic</dt><dd>The caster must perform gestures.</dd><dt>M - Material</dt><dd>The spell requires a material component or spellcasting focus, subject to its rules.</dd><dt>Concentration</dt><dd>The caster must maintain focus and normally can concentrate on only one spell at a time.</dd><dt>Ritual</dt><dd>Eligible casters may cast it as a ritual when their rules allow.</dd><dt>Save DC</dt><dd>The target number a creature must meet on its saving throw.</dd><dt>Spell Attack</dt><dd>The modifier added to the caster's spell-attack roll.</dd></dl></details>
+          <details className="spell-rules-help"><summary>What do these spell terms mean?</summary><dl><dt>V - Verbal</dt><dd>The caster must speak magical words.</dd><dt>S - Somatic</dt><dd>The caster must perform gestures.</dd><dt>M - Material</dt><dd>The spell requires a material component or spellcasting focus, subject to its rules.</dd><dt>Concentration</dt><dd>The caster must maintain focus and normally can concentrate on only one spell at a time.</dd><dt>Ritual</dt><dd>Eligible casters may cast it as a ritual when their rules allow.</dd><dt>Upcasting</dt><dd>Casting a spell with a higher-level slot when its rules provide an increased effect.</dd><dt>Save DC</dt><dd>The target number a creature must meet on its saving throw.</dd><dt>Spell Attack</dt><dd>The modifier added to the caster's spell-attack roll.</dd></dl></details>
 
           {spell.materialDetails && <section className="spell-text-panel"><span className="card-label">Materials</span><p>{spell.materialDetails}</p></section>}
 
