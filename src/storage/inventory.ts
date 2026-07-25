@@ -67,6 +67,8 @@ export async function createInventoryContainer(characterId: string, name: string
 }
 
 export async function createInventoryItem(characterId: string, containerId: string, name: string) {
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error("Enter an item name");
   const container = await db.inventoryContainers.get(containerId);
   if (!container || container.characterId !== characterId) throw new Error("Container does not belong to this character");
   const timestamp = now();
@@ -74,7 +76,7 @@ export async function createInventoryItem(characterId: string, containerId: stri
     id: crypto.randomUUID(),
     characterId,
     containerId,
-    name: name.trim(),
+    name: trimmedName,
     quantity: 1,
     category: "",
     description: "",
@@ -88,6 +90,21 @@ export async function createInventoryItem(characterId: string, containerId: stri
   });
   await db.inventoryItems.add(item);
   return item;
+}
+
+export async function duplicateInventoryItem(characterId: string, itemId: string) {
+  const source = await db.inventoryItems.get(itemId);
+  if (!source || source.characterId !== characterId) throw new Error("Item does not belong to this character");
+  const timestamp = now();
+  const duplicate = inventoryItemSchema.parse({
+    ...source,
+    id: crypto.randomUUID(),
+    name: `${source.name} copy`,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  await db.inventoryItems.add(duplicate);
+  return duplicate;
 }
 
 export async function saveInventoryItem(item: InventoryItem) {
