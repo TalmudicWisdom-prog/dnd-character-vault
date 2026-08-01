@@ -42,26 +42,28 @@ export function sheetNavigatorDomId(sectionId: SheetNavigatorSectionId) {
 export type SheetNavigatorSection = {
   id: SheetNavigatorSectionId;
   label: string;
+  shortLabel: string;
+  icon: string;
   targetId: string;
 };
 
 export const sheetNavigatorSections: SheetNavigatorSection[] = [
-  { id: "dashboard", label: "Dashboard", targetId: sheetNavigatorDomId("dashboard") },
-  { id: "health-combat", label: "HP / Combat", targetId: sheetNavigatorDomId("health-combat") },
-  { id: "abilities", label: "Abilities, Saves, Senses", targetId: sheetNavigatorDomId("abilities") },
-  { id: "skills", label: "Skills", targetId: sheetNavigatorDomId("skills") },
-  { id: "speed-defenses", label: "Speed & Defenses", targetId: sheetNavigatorDomId("speed-defenses") },
-  { id: "roll-helper", label: "Rolls", targetId: sheetNavigatorDomId("roll-helper") },
-  { id: "dice", label: "Dice", targetId: sheetNavigatorDomId("dice") },
-  { id: "attacks", label: "Actions", targetId: sheetNavigatorDomId("attacks") },
-  { id: "spells", label: "Spells", targetId: sheetNavigatorDomId("spells") },
-  { id: "inventory", label: "Inventory", targetId: sheetNavigatorDomId("inventory") },
-  { id: "features", label: "Features & Traits", targetId: sheetNavigatorDomId("features") },
-  { id: "training", label: "Proficiencies & Training", targetId: sheetNavigatorDomId("training") },
-  { id: "roleplay", label: "Background / Biography", targetId: sheetNavigatorDomId("roleplay") },
-  { id: "notes", label: "Notes", targetId: sheetNavigatorDomId("notes") },
-  { id: "book", label: "Book / PDF", targetId: sheetNavigatorDomId("book") },
-  { id: "layout", label: "Layout", targetId: sheetNavigatorDomId("layout") },
+  { id: "dashboard", label: "Dashboard", shortLabel: "Dashboard", icon: "D", targetId: sheetNavigatorDomId("dashboard") },
+  { id: "health-combat", label: "HP / Combat", shortLabel: "Combat", icon: "HP", targetId: sheetNavigatorDomId("health-combat") },
+  { id: "abilities", label: "Abilities, Saves, Senses", shortLabel: "Abilities", icon: "A", targetId: sheetNavigatorDomId("abilities") },
+  { id: "skills", label: "Skills", shortLabel: "Skills", icon: "S", targetId: sheetNavigatorDomId("skills") },
+  { id: "speed-defenses", label: "Speed & Defenses", shortLabel: "Defenses", icon: "AC", targetId: sheetNavigatorDomId("speed-defenses") },
+  { id: "roll-helper", label: "Rolls", shortLabel: "Rolls", icon: "R", targetId: sheetNavigatorDomId("roll-helper") },
+  { id: "dice", label: "Dice", shortLabel: "Dice", icon: "D20", targetId: sheetNavigatorDomId("dice") },
+  { id: "attacks", label: "Actions", shortLabel: "Actions", icon: "A", targetId: sheetNavigatorDomId("attacks") },
+  { id: "spells", label: "Spells", shortLabel: "Spells", icon: "S", targetId: sheetNavigatorDomId("spells") },
+  { id: "inventory", label: "Inventory", shortLabel: "Inventory", icon: "I", targetId: sheetNavigatorDomId("inventory") },
+  { id: "features", label: "Features & Traits", shortLabel: "Features", icon: "F", targetId: sheetNavigatorDomId("features") },
+  { id: "training", label: "Proficiencies & Training", shortLabel: "Training", icon: "T", targetId: sheetNavigatorDomId("training") },
+  { id: "roleplay", label: "Background / Biography", shortLabel: "Biography", icon: "B", targetId: sheetNavigatorDomId("roleplay") },
+  { id: "notes", label: "Notes", shortLabel: "Notes", icon: "N", targetId: sheetNavigatorDomId("notes") },
+  { id: "book", label: "Book / PDF", shortLabel: "Book", icon: "P", targetId: sheetNavigatorDomId("book") },
+  { id: "layout", label: "Layout", shortLabel: "Layout", icon: "L", targetId: sheetNavigatorDomId("layout") },
 ];
 
 export function sheetNavigatorSectionForTarget(targetId: string) {
@@ -72,6 +74,10 @@ export function selectSheetNavigatorSection(sectionId: SheetNavigatorSectionId, 
   const section = sheetNavigatorSections.find((candidate) => candidate.id === sectionId);
   if (!section) throw new Error(`Unknown sheet navigator section: ${sectionId}`);
   return { targetId: section.targetId, routeHash: currentRouteHash };
+}
+
+export function sheetSectionScrollBehavior(reducedMotion: boolean): ScrollBehavior {
+  return reducedMotion ? "auto" : "smooth";
 }
 
 export type SheetNavigatorModalState = {

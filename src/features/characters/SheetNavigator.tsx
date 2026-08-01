@@ -1,52 +1,46 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import dashboardNavigatorIcon from "../../assets/navigator-dashboard.jpeg";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SheetNavigatorSection } from "./sheetLayout";
-import type { SheetNavigatorSectionId } from "./sheetLayout";
 import { sheetNavigatorSectionForTarget } from "./sheetLayout";
 
-const focusableSelector = [
-  "button:not([disabled])",
-  "a[href]",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
 type SheetNavigatorProps = {
+  defaultOpen?: boolean;
+  initialActiveTargetId?: string;
   onNavigate: (section: SheetNavigatorSection) => void;
   sections: SheetNavigatorSection[];
 };
 
-const compactNavigatorLabels: Record<SheetNavigatorSectionId, { icon: string; label: string; imageSrc?: string }> = {
-  dashboard: { icon: "D", imageSrc: dashboardNavigatorIcon, label: "Dashboard" },
-  "health-combat": { icon: "H", label: "HP" },
-  abilities: { icon: "A", label: "Abilities" },
-  skills: { icon: "S", label: "Skills" },
-  "speed-defenses": { icon: "M", label: "Speed" },
-  "roll-helper": { icon: "R", label: "Rolls" },
-  dice: { icon: "D20", label: "Dice" },
-  attacks: { icon: "A", label: "Actions" },
-  spells: { icon: "S", label: "Spells" },
-  inventory: { icon: "I", label: "Inventory" },
-  features: { icon: "F", label: "Features" },
-  training: { icon: "T", label: "Training" },
-  roleplay: { icon: "B", label: "Bio" },
-  notes: { icon: "N", label: "Notes" },
-  book: { icon: "P", label: "Book" },
-  layout: { icon: "L", label: "Layout" },
-  identity: { icon: "I", label: "Identity" },
-  "level-preview": { icon: "L", label: "Level" },
-  "soul-reaper": { icon: "S", label: "Soul" },
+export type SheetSectionViewportEntry = {
+  isIntersecting: boolean;
+  targetId: string;
+  top: number;
 };
 
-export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
-  const [open, setOpen] = useState(false);
-  const [activeTargetId, setActiveTargetId] = useState(sections[0]?.targetId ?? "");
-  const [stuck, setStuck] = useState(false);
-  const barRef = useRef<HTMLDivElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const openerRef = useRef<HTMLButtonElement | null>(null);
+export function nearestVisibleSheetSection(entries: SheetSectionViewportEntry[], anchorTop = 104) {
+  const visible = entries.filter((entry) => entry.isIntersecting);
+  if (!visible.length) return "";
+  return visible.reduce((nearest, entry) => (
+    Math.abs(entry.top - anchorTop) < Math.abs(nearest.top - anchorTop) ? entry : nearest
+  )).targetId;
+}
+
+function focusSheetSectionTrigger() {
+  document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus();
+}
+
+export function SheetNavigator({
+  defaultOpen = false,
+  initialActiveTargetId,
+  onNavigate,
+  sections,
+}: SheetNavigatorProps) {
+  const firstTargetId = initialActiveTargetId ?? sections[0]?.targetId ?? "";
+  const [open, setOpen] = useState(defaultOpen);
+  const [activeTargetId, setActiveTargetId] = useState(firstTargetId);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef(true);
+  const wasOpenRef = useRef(false);
+  const scrollStopTimerRef = useRef<number | null>(null);
 
   const activeSection = useMemo(
     () => sections.find((section) => section.targetId === activeTargetId) ?? sheetNavigatorSectionForTarget(activeTargetId),
@@ -54,146 +48,179 @@ export function SheetNavigator({ onNavigate, sections }: SheetNavigatorProps) {
   );
 
   useEffect(() => {
+    if (sections.some((section) => section.targetId === activeTargetId)) return;
+    setActiveTargetId(sections[0]?.targetId ?? "");
+  }, [activeTargetId, sections]);
+
+  useEffect(() => {
+    const observed = sections
+      .map((section) => ({ element: document.getElementById(section.targetId), section }))
+      .filter((entry): entry is { element: HTMLElement; section: SheetNavigatorSection } => entry.element instanceof HTMLElement);
+    if (!observed.length) return;
+
     let frame = 0;
     const updateActiveSection = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        const bar = barRef.current;
-        const barTop = bar?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
-        const stickyTop = bar ? Number.parseFloat(window.getComputedStyle(bar).top) || 0 : 0;
-        setStuck(barTop <= stickyTop + 1);
-
-        const candidates = sections
-          .map((section) => {
-            const element = document.getElementById(section.targetId);
-            if (!element) return null;
-            return { section, top: element.getBoundingClientRect().top };
-          })
-          .filter((candidate): candidate is { section: SheetNavigatorSection; top: number } => Boolean(candidate));
-        if (!candidates.length) return;
-
-        const headerOffset = 96;
-        const nearest = candidates.reduce((best, candidate) => {
-          const distance = Math.abs(candidate.top - headerOffset);
-          const bestDistance = Math.abs(best.top - headerOffset);
-          return distance < bestDistance ? candidate : best;
+        const anchorTop = 104;
+        const trackingBandBottom = Math.max(220, window.innerHeight * 0.46);
+        const candidates = observed.map(({ element, section }) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            isIntersecting: rect.bottom > 72 && rect.top < trackingBandBottom,
+            targetId: section.targetId,
+            top: rect.top,
+          };
         });
-        setActiveTargetId(nearest.section.targetId);
+        const nextTargetId = nearestVisibleSheetSection(candidates, anchorTop);
+        if (nextTargetId) setActiveTargetId(nextTargetId);
       });
     };
+    const observer = new IntersectionObserver(() => {
+      updateActiveSection();
+    }, {
+      rootMargin: "-72px 0px -54% 0px",
+      threshold: [0, 0.05, 0.25, 0.6],
+    });
 
+    observed.forEach(({ element }) => observer.observe(element));
     updateActiveSection();
     window.addEventListener("scroll", updateActiveSection, { passive: true });
     window.addEventListener("resize", updateActiveSection);
     return () => {
       window.cancelAnimationFrame(frame);
+      observer.disconnect();
       window.removeEventListener("scroll", updateActiveSection);
       window.removeEventListener("resize", updateActiveSection);
     };
   }, [sections]);
 
   useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const firstButton = dialogRef.current?.querySelector<HTMLElement>(focusableSelector);
-    firstButton?.focus();
+    const markScrolling = () => {
+      setIsScrolling(true);
+      if (scrollStopTimerRef.current !== null) window.clearTimeout(scrollStopTimerRef.current);
+      scrollStopTimerRef.current = window.setTimeout(() => {
+        setIsScrolling(false);
+        scrollStopTimerRef.current = null;
+      }, 180);
+    };
+    window.addEventListener("scroll", markScrolling, { passive: true });
     return () => {
-      document.body.style.overflow = previousOverflow;
-      openerRef.current?.focus();
+      window.removeEventListener("scroll", markScrolling);
+      if (scrollStopTimerRef.current !== null) window.clearTimeout(scrollStopTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      if (wasOpenRef.current && returnFocusRef.current) {
+        window.setTimeout(focusSheetSectionTrigger, 0);
+      }
+      wasOpenRef.current = false;
+      return;
+    }
+
+    wasOpenRef.current = true;
+    returnFocusRef.current = true;
+    const focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      returnFocusRef.current = true;
+      setOpen(false);
+      window.setTimeout(focusSheetSectionTrigger, 0);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
 
-  const close = () => setOpen(false);
-
-  const trapFocus = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
-    if (event.key !== "Tab") return;
-
-    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-      return;
-    }
-    if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
+  const restoreVisibility = () => {
+    setIsScrolling(false);
+    if (scrollStopTimerRef.current !== null) {
+      window.clearTimeout(scrollStopTimerRef.current);
+      scrollStopTimerRef.current = null;
     }
   };
 
+  const closeAndReturnFocus = () => {
+    returnFocusRef.current = true;
+    setOpen(false);
+    window.setTimeout(focusSheetSectionTrigger, 0);
+  };
+
   const selectSection = (section: SheetNavigatorSection) => {
+    returnFocusRef.current = false;
     setActiveTargetId(section.targetId);
-    close();
-    onNavigate(section);
+    setOpen(false);
+    window.requestAnimationFrame(() => onNavigate(section));
   };
 
   return (
     <>
-      <div className={stuck ? "sheet-navigator-bar stuck" : "sheet-navigator-bar"} aria-label="Current character sheet section" ref={barRef}>
-        <div>
-          <span className="card-label">Current section</span>
-          <strong>{activeSection.label}</strong>
-        </div>
+      <div className={`sheet-section-fab${open ? " open" : ""}${isScrolling && !open ? " is-scrolling" : ""}`}>
+        <span className="sr-only" id="sheet-section-current-label">Current section: {activeSection.label}.</span>
         <button
+          aria-controls="sheet-section-navigator-panel"
+          aria-describedby="sheet-section-current-label"
           aria-expanded={open}
-          aria-haspopup="dialog"
-          className="sheet-navigator-trigger"
-          onClick={() => setOpen(true)}
-          ref={openerRef}
+          aria-label="Open character sections"
+          className="sheet-section-trigger"
+          onClick={() => {
+            restoreVisibility();
+            setOpen((current) => !current);
+          }}
+          onFocus={restoreVisibility}
+          onPointerEnter={restoreVisibility}
           type="button"
         >
-          <span aria-hidden="true">Grid</span>
-          <span className="sr-only">Open sheet navigator</span>
+          <svg aria-hidden="true" className="sheet-section-trigger-icon" viewBox="0 0 24 24">
+            <path d="M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11" />
+          </svg>
+          <span className="sheet-section-trigger-label">{activeSection.shortLabel}</span>
         </button>
       </div>
 
       {open && (
-        <div className="sheet-navigator-overlay" onMouseDown={close} role="presentation">
+        <>
           <div
-            aria-modal="true"
-            aria-labelledby="sheet-navigator-title"
-            className="sheet-navigator-modal"
-            onKeyDown={trapFocus}
-            onMouseDown={(event) => event.stopPropagation()}
-            ref={dialogRef}
-            role="dialog"
-          >
-            <div className="module-header">
+            aria-hidden="true"
+            className="sheet-section-dismiss-layer"
+            onClick={closeAndReturnFocus}
+            onPointerDown={(event) => event.preventDefault()}
+          />
+          <nav aria-label="Character sections" className="sheet-section-popover" id="sheet-section-navigator-panel">
+            <header className="sheet-section-popover-header">
               <div>
-                <span className="card-label">Jump to</span>
-                <h2 id="sheet-navigator-title">Sheet Navigator</h2>
+                <span className="card-label">Navigate this sheet</span>
+                <h2>Character Sections</h2>
               </div>
-              <button className="secondary-button compact" onClick={close} type="button">Close</button>
-            </div>
-            <div className="sheet-navigator-options">
+              <button aria-label="Close character sections" className="sheet-section-close" onClick={closeAndReturnFocus} ref={closeButtonRef} type="button">×</button>
+            </header>
+            <div className="sheet-section-options">
               {sections.map((section) => {
-                const compact = compactNavigatorLabels[section.id];
+                const current = section.targetId === activeTargetId;
                 return (
                   <button
-                    aria-label={`Open ${section.label}`}
-                    className={section.targetId === activeTargetId ? "sheet-navigator-option active" : "sheet-navigator-option"}
+                    aria-current={current ? "page" : undefined}
+                    aria-label={current ? `${section.label}, current section` : `Go to ${section.label}`}
+                    className={current ? "sheet-section-option active" : "sheet-section-option"}
                     data-section-id={section.id}
                     key={section.id}
                     onClick={() => selectSection(section)}
                     type="button"
                   >
-                    {compact.imageSrc && <img alt="" aria-hidden="true" className="sheet-navigator-option-background" src={compact.imageSrc} />}
-                    {!compact.imageSrc && <span aria-hidden="true" className="sheet-navigator-option-icon">{compact.icon}</span>}
-                    <span className="sheet-navigator-option-label">{compact.label}</span>
+                    <span aria-hidden="true" className="sheet-section-option-icon">{section.icon}</span>
+                    <span className="sheet-section-option-label">{section.label}</span>
+                    {current && <span className="sheet-section-current-marker"><span aria-hidden="true">✓</span><span className="sr-only">Current section</span></span>}
                   </button>
                 );
               })}
             </div>
-          </div>
-        </div>
+          </nav>
+        </>
       )}
     </>
   );

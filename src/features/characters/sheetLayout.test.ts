@@ -11,6 +11,7 @@ import {
   normalizeSheetLayoutOrder,
   openSheetNavigator,
   selectSheetNavigatorSection,
+  sheetSectionScrollBehavior,
   sheetNavigatorSections,
   sheetSectionDomId,
 } from "./sheetLayout";
@@ -45,6 +46,9 @@ describe("character sheet layout customization", () => {
       "Layout",
     ]);
     expect(sheetNavigatorSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
+    expect(sheetNavigatorSections.every((section) => section.shortLabel && section.icon)).toBe(true);
+    expect(new Set(sheetNavigatorSections.map((section) => section.id)).size).toBe(sheetNavigatorSections.length);
+    expect(new Set(sheetNavigatorSections.map((section) => section.targetId)).size).toBe(sheetNavigatorSections.length);
   });
 
   it("uses the grid navigator as the only live play shortcut surface", () => {
@@ -71,6 +75,11 @@ describe("character sheet layout customization", () => {
       targetId: sheetSectionDomId("inventory"),
       routeHash: currentRoute,
     });
+  });
+
+  it("uses immediate section navigation when reduced motion is requested", () => {
+    expect(sheetSectionScrollBehavior(false)).toBe("smooth");
+    expect(sheetSectionScrollBehavior(true)).toBe("auto");
   });
 
   it("closes the navigator and returns the intended scroll target when a section is chosen", () => {

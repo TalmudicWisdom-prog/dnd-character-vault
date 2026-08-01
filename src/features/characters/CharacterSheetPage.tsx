@@ -24,6 +24,7 @@ import {
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
   selectSheetNavigatorSection,
+  sheetSectionScrollBehavior,
   sheetNavigatorSections,
   sheetSectionDomId,
   type SheetLayoutPlacement,
@@ -389,20 +390,24 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     if (!target) return;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start", inline: "nearest" });
-    if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+    target.classList.remove("sheet-section-arrival");
+    target.scrollIntoView({ behavior: sheetSectionScrollBehavior(reducedMotion), block: "start", inline: "nearest" });
+    if (target instanceof HTMLElement) {
+      target.focus({ preventScroll: true });
+      if (!reducedMotion) {
+        window.requestAnimationFrame(() => target.classList.add("sheet-section-arrival"));
+        window.setTimeout(() => target.classList.remove("sheet-section-arrival"), 1100);
+      }
+    }
   };
 
   const navigateSheet = (section: SheetNavigatorSection) => {
     const { targetId } = selectSheetNavigatorSection(section.id, window.location.hash);
-    if (isSheetLayoutSectionId(section.id)) {
+    if (!document.getElementById(targetId)) {
       setActiveModuleId(section.id);
       return;
     }
-    if (section.id !== "dashboard") {
-      setActiveModuleId(section.id);
-      return;
-    }
+    setActiveModuleId(null);
     scrollToSheetTargetId(targetId);
   };
 
