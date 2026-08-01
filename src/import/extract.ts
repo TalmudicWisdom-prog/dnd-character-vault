@@ -1,5 +1,5 @@
 import type { AbilityId, SkillId } from "../domain/models";
-import type { CharacterImportDraft, ImportField } from "../domain/import";
+import type { CharacterImportDraft, ImportField, ParsedImportedSpells } from "../domain/import";
 import { abilityIds, skillIds } from "../storage/characterSheets";
 
 const skillLabels: Record<SkillId, string> = {
@@ -30,7 +30,11 @@ function matchNumber(text: string, labels: string[], fallback: number, sourceNam
 
 function extractSection(text: string, labels: string[], limit = 20) {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const start = lines.findIndex((line) => labels.some((label) => line.toLowerCase().includes(label)));
+  const start = lines.findIndex((line) => labels.some((label) => {
+    const normalizedLine = line.toLocaleLowerCase();
+    const normalizedLabel = label.toLocaleLowerCase();
+    return normalizedLine === normalizedLabel || normalizedLine.startsWith(`${normalizedLabel}:`);
+  }));
   if (start < 0) return [];
   const sectionHeading = /^(features(?:\s*&\s*traits)?|traits|spells|notes|additional features|equipment|inventory|treasure|biography|backstory|personality traits|ideals|bonds|flaws)(?:\s*:.*)?$/i;
   const values: string[] = [];
@@ -43,7 +47,7 @@ function extractSection(text: string, labels: string[], limit = 20) {
   return values;
 }
 
-export function extractCharacterText(rawText: string, sourceName: string): CharacterImportDraft {
+export function extractCharacterText(rawText: string, sourceName: string, spellData?: ParsedImportedSpells): CharacterImportDraft {
   const text = rawText.replace(/\u0000/g, " ").replace(/[ \t]+/g, " ");
   const nameValue = matchText(text, ["character name", "name"]);
   const classAndLevelValue = matchText(text, ["class & level", "class and level", "class level", "class"]);
@@ -98,6 +102,12 @@ export function extractCharacterText(rawText: string, sourceName: string): Chara
     inventory: field(inventory, inventory.length === 0, inventory.length > 0, inventory.length ? sourceName : "", inventory.length ? 0.65 : null),
     features: field(features, features.length === 0, features.length > 0, features.length ? sourceName : "", features.length ? 0.65 : null),
     spellsAndNotes: field(notes, !notes, Boolean(notes), notes ? sourceName : "", notes ? 0.65 : null),
+    rawSpellCount: spellData?.rawCount ?? 0,
+    importedSpells: field(spellData?.spells ?? [], !spellData?.spells.length, Boolean(spellData?.spells.length), spellData?.spells.length ? sourceName : "", spellData?.spells.length ? 0.98 : null),
+    spellcastingAbility: field(spellData?.spellcasting.ability ?? null, !spellData?.spellcasting.ability, Boolean(spellData?.spellcasting.ability), spellData?.spellcasting.ability ? sourceName : "", spellData?.spellcasting.ability ? 0.98 : null),
+    spellSaveDc: field(spellData?.spellcasting.saveDc ?? 0, spellData?.spellcasting.saveDc == null, spellData?.spellcasting.saveDc != null, spellData?.spellcasting.saveDc != null ? sourceName : "", spellData?.spellcasting.saveDc != null ? 0.98 : null),
+    spellAttackBonus: field(spellData?.spellcasting.attackBonus ?? 0, spellData?.spellcasting.attackBonus == null, spellData?.spellcasting.attackBonus != null, spellData?.spellcasting.attackBonus != null ? sourceName : "", spellData?.spellcasting.attackBonus != null ? 0.98 : null),
+    spellcastingClass: field(spellData?.spellcasting.sourceClass ?? "", !spellData?.spellcasting.sourceClass, Boolean(spellData?.spellcasting.sourceClass), spellData?.spellcasting.sourceClass ? sourceName : "", spellData?.spellcasting.sourceClass ? 0.98 : null),
   };
 }
 
@@ -127,5 +137,10 @@ export function applyProviderConfidence(draft: CharacterImportDraft, confidence:
     inventory: apply(draft.inventory),
     features: apply(draft.features),
     spellsAndNotes: apply(draft.spellsAndNotes),
+    importedSpells: apply(draft.importedSpells),
+    spellcastingAbility: apply(draft.spellcastingAbility),
+    spellSaveDc: apply(draft.spellSaveDc),
+    spellAttackBonus: apply(draft.spellAttackBonus),
+    spellcastingClass: apply(draft.spellcastingClass),
   };
 }

@@ -2,6 +2,8 @@ import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from "pdfjs-d
 import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import { asImportParserError, type ImportParserStage } from "./importErrors";
 import { extractPdfFormFields, pdfFormFieldsToText } from "./pdfFields";
+import { extractDndBeyondSpellData } from "./pdfSpells";
+import type { ParsedImportedSpells } from "../domain/import";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -83,6 +85,7 @@ export type ExtractedPdfDocument = {
   formFieldCount: number;
   formCharacterCount: number;
   embeddedCharacterCount: number;
+  spellData: ParsedImportedSpells;
 };
 
 export async function extractPdfDocumentText(pdf: PdfDocumentReader, onStage?: StageCallback): Promise<ExtractedPdfDocument> {
@@ -125,6 +128,7 @@ export async function extractPdfDocumentText(pdf: PdfDocumentReader, onStage?: S
   onStage?.("extracting-text", "Organizing extracted PDF details locally...");
   const formFields = extractPdfFormFields(fieldObjects, pageAnnotations);
   const formText = pdfFormFieldsToText(formFields);
+  const spellData = extractDndBeyondSpellData(formFields);
   const embeddedText = pageText.filter(Boolean).join("\n");
   return {
     rawText: [formText, embeddedText].filter(Boolean).join("\n\n"),
@@ -132,10 +136,11 @@ export async function extractPdfDocumentText(pdf: PdfDocumentReader, onStage?: S
     formFieldCount: formFields.length,
     formCharacterCount: formText.replace(/\s/g, "").length,
     embeddedCharacterCount: embeddedText.replace(/\s/g, "").length,
+    spellData,
   };
 }
 
-export type ReadSourceResult = { rawText: string; pageCount: number; confidence: number | null };
+export type ReadSourceResult = { rawText: string; pageCount: number; confidence: number | null; spellData?: ParsedImportedSpells };
 
 export async function readCharacterSheetSource(file: Blob & { name?: string }, onStatus?: StatusCallback): Promise<ReadSourceResult> {
   const fileName = file.name ?? "Imported file";
@@ -163,7 +168,7 @@ export async function readCharacterSheetSource(file: Blob & { name?: string }, o
       report(onStatus, message);
     });
     if (extracted.formFieldCount >= 3 || extracted.formCharacterCount >= 80 || extracted.embeddedCharacterCount >= 120) {
-      return { rawText: extracted.rawText, pageCount: extracted.pageCount, confidence: extracted.formFieldCount > 0 ? 0.98 : 0.95 };
+      return { rawText: extracted.rawText, pageCount: extracted.pageCount, confidence: extracted.formFieldCount > 0 ? 0.98 : 0.95, spellData: extracted.spellData };
     }
 
     stage = "extracting-text";
@@ -176,6 +181,7 @@ export async function readCharacterSheetSource(file: Blob & { name?: string }, o
       rawText: [extracted.rawText, ocrPages.join("\n")].filter(Boolean).join("\n\n"),
       pageCount: pdf.numPages,
       confidence: null,
+      spellData: extracted.spellData,
     };
   } catch (error) {
     throw asImportParserError(error, { stage, fileName, pageCount });

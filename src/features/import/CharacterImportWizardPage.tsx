@@ -14,6 +14,7 @@ import { addImportFiles, createImportSession, discardImportSession, removeImport
 import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
 import { BUILD_ID } from "../../app/version";
 import { asImportParserError, describeImportFailure, type ImportFailure } from "../../import/importErrors";
+import { reviewImportedSpells } from "../../import/spellPersistence";
 
 const abilityLabels: Record<AbilityId, string> = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
 const confidenceLabel = (value: number | null) => value == null ? "" : `${Math.round(value * 100)}% confidence`;
@@ -50,6 +51,7 @@ export function CharacterImportWizardPage() {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [parsing, setParsing] = useState(false);
   const [failure, setFailure] = useState<ImportFailure | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<{ characterId: string; characterName: string; spellCount: number; customCount: number } | null>(null);
   const parseInFlight = useRef(false);
 
   useEffect(() => {
@@ -66,6 +68,8 @@ export function CharacterImportWizardPage() {
   const draft = session?.mergedDraft ?? null;
   const proficiencyBonus = draft?.proficiencyBonus ?? { value: 2, include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
   const biography = draft?.biography ?? { value: "", include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
+  const importedSpells = draft?.importedSpells ?? { value: [], include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
+  const spellReview = useMemo(() => reviewImportedSpells(draft?.rawSpellCount ?? 0, importedSpells.value), [draft?.rawSpellCount, importedSpells.value]);
   const onlineProvider = getOnlineImportProvider();
 
   const chooseFiles = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +129,7 @@ export function CharacterImportWizardPage() {
       const parseResults: ImportParseResult[] = providerResults.map((result) => {
         const sourceName = orderedFiles.find((file) => file.id === result.fileId)?.name ?? "Imported file";
         try {
-          return { fileId: result.fileId, sourceName, rawText: result.rawText, confidence: result.confidence, draft: applyProviderConfidence(extractCharacterText(result.rawText, sourceName), result.confidence) };
+          return { fileId: result.fileId, sourceName, rawText: result.rawText, confidence: result.confidence, draft: applyProviderConfidence(extractCharacterText(result.rawText, sourceName, result.spellData), result.confidence) };
         } catch (error) {
           throw asImportParserError(error, { stage: "normalizing-character", fileName: sourceName, fileId: result.fileId, pageCount: result.pageCount ?? undefined });
         }
@@ -180,11 +184,15 @@ export function CharacterImportWizardPage() {
     if (mode === "merge" && !window.confirm("Merge the selected reviewed fields into this character? Existing values are changed only for checked fields.")) return;
     setStatus("Saving reviewed fields locally...");
     try {
-      const characterId = await saveCharacterImport(draft, mode, targetId);
-      await activateCharacter(characterId);
-      queueCharacterAnnouncement("Character imported.");
+      const result = await saveCharacterImport(draft, mode, targetId, orderedFiles);
+      await activateCharacter(result.characterId);
+      const characterName = draft.name.value.trim() || "Imported character";
+      queueCharacterAnnouncement(`${characterName} imported with ${result.spells.imported + result.spells.skippedExisting} spells.`);
       await discardImportSession(session.id);
-      window.location.hash = `sheet/${characterId}`;
+      setSaveSuccess({ characterId: result.characterId, characterName, spellCount: result.spells.imported + result.spells.skippedExisting, customCount: result.spells.custom });
+      setStatus(result.spells.detected
+        ? `${characterName} imported with ${result.spells.imported + result.spells.skippedExisting} spells.`
+        : `${characterName} imported, but no structured spells were detected in the selected files.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save import");
     }
@@ -201,6 +209,13 @@ export function CharacterImportWizardPage() {
 
   return <section className="page import-page">
     <PageHeader eyebrow="Character tools" title="Import one character from several sources" description="Combine PDFs, scans, photos, and screenshots into one reviewable character draft. Your in-progress session stays on this device." actions={<button className="secondary-button" onClick={() => void startFresh()} type="button">New import session</button>} />
+
+    {saveSuccess && <article className="panel import-success-panel" role="status">
+      <span className="card-label">Import complete</span>
+      <h2>{saveSuccess.characterName} imported with {saveSuccess.spellCount} spells.</h2>
+      <p>{saveSuccess.customCount ? `${saveSuccess.customCount} unmatched spells were retained as local imported drafts.` : "All imported spells matched existing catalog definitions."}</p>
+      <div className="header-action-group"><a className="primary-button button-link" href={`#sheet/${saveSuccess.characterId}`}>Open Character</a><a className="secondary-button button-link" href={`#spellbook/${saveSuccess.characterId}`} onClick={() => window.localStorage.setItem(`vault:spellbook:${saveSuccess.characterId}`, JSON.stringify({ page: "owned", classKey: "", level: 0 }))}>Open Spellbook</a><a className="secondary-button button-link" href={`#spellbook/${saveSuccess.characterId}`} onClick={() => window.localStorage.setItem(`vault:spellbook:${saveSuccess.characterId}`, JSON.stringify({ page: "owned", classKey: "", level: 0 }))}>Review Imported Spells</a></div>
+    </article>}
 
     <article className="panel import-files-panel">
       <div className="form-section-heading">
@@ -241,6 +256,14 @@ export function CharacterImportWizardPage() {
     </article>
 
     {draft && <>
+      <article className="panel import-spell-summary">
+        <div className="form-section-heading"><div><span className="card-label">Spell import</span><h2>{spellReview.uniqueCount ? `${spellReview.uniqueCount} unique spells ready` : "No structured spells detected"}</h2><p>{spellReview.uniqueCount ? "Spells will be written directly to this character’s My Spells collection when you save." : "The character can still be saved, but its spellbook will be empty unless spell fields are present."}</p></div>{spellReview.uniqueCount > 0 && <label className="touch-toggle"><input checked={importedSpells.include} onChange={(event) => void update("importedSpells", { ...importedSpells, include: event.target.checked })} type="checkbox" /><span>Import detected spells</span></label>}</div>
+        <div className="import-spell-metrics"><span><strong>{spellReview.rawCount}</strong>Raw entries</span><span><strong>{spellReview.uniqueCount}</strong>After deduplication</span><span><strong>{spellReview.preparedCount}</strong>Prepared</span><span><strong>{spellReview.alwaysPreparedCount}</strong>Always prepared</span><span><strong>{spellReview.customCount}</strong>Custom / unmatched</span></div>
+        {spellReview.variantCount > 0 && <p className="inline-message">{spellReview.variantCount} mechanically distinct duplicate {spellReview.variantCount === 1 ? "variant was" : "variants were"} kept separately. Equivalent duplicates were merged.</p>}
+        {spellReview.unknownLevelCount > 0 && <p className="inline-message error-message">{spellReview.unknownLevelCount} {spellReview.unknownLevelCount === 1 ? "spell has" : "spells have"} no recognized level header and need review.</p>}
+        {spellReview.uniqueCount > 0 && <details><summary>Review detected spells</summary><div className="imported-spell-list">{importedSpells.value.map((spell) => <span key={`${spell.index}-${spell.variantKey}`}><strong>{spell.name}</strong><small>{spell.level === null ? "Level unknown" : spell.level === 0 ? "Cantrip" : `Level ${spell.level}`}{spell.alwaysPrepared ? " · Always prepared" : spell.prepared ? " · Prepared" : ""}{spell.ritual ? " · Ritual" : ""}{spell.source ? ` · ${spell.source}` : ""}</small></span>)}</div></details>}
+        {spellReview.uniqueCount > 0 && <p>Spellcasting: {draft.spellcastingAbility?.value?.toUpperCase() || "ability unavailable"} · Save DC {draft.spellSaveDc?.include ? draft.spellSaveDc.value : "unavailable"} · Attack {draft.spellAttackBonus?.include ? `${draft.spellAttackBonus.value >= 0 ? "+" : ""}${draft.spellAttackBonus.value}` : "unavailable"} · {draft.spellcastingClass?.value || "class unavailable"}</p>}
+      </article>
       <article className="panel import-destination">
         <div><span className="card-label">Step 2</span><h2>Choose destination</h2><p>Merge never changes an unchecked field.</p></div>
         <div className="destination-controls"><label className="touch-toggle"><input checked={mode === "create"} onChange={() => setMode("create")} type="radio" /><span>Create new character</span></label><label className="touch-toggle"><input checked={mode === "merge"} onChange={() => setMode("merge")} type="radio" /><span>Merge into existing character</span></label>{mode === "merge" && <select onChange={(event) => setTargetId(event.target.value)} value={targetId}><option value="">Choose character...</option>{characters.map((character) => <option key={character.id} value={character.id}>{character.name}</option>)}</select>}</div>

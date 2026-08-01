@@ -207,7 +207,7 @@ export function SpellDetailOverlay({ catalog, editContent, editorOpen = false, o
       >
         <header className="spell-detail-header">
           <div>
-            <span className="card-label">{catalog?.displayLevel ?? levelLabel(spell.level)} · {spell.school}</span>
+            <span className="card-label">{catalog?.displayLevel ?? (spell.levelKnown ? levelLabel(spell.level) : "Level unknown")} · {spell.school}</span>
             <h2 id="spell-detail-title">{spell.name}</h2>
             <div className="spell-detail-tags">
               <SourceBadge source={catalog?.rulesSourceId || spell.rulesSourceId || spell.source} />

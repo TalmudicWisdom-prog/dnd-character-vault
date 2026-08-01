@@ -1,6 +1,7 @@
 import type { AbilityId, SkillId } from "../domain/models";
 import type { CharacterImportDraft, ImportConflict, ImportField, ImportParseResult } from "../domain/import";
 import { abilityIds, skillIds } from "../storage/characterSheets";
+import { deduplicateImportedSpells } from "./pdfSpells";
 
 function sameValue(left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -75,6 +76,12 @@ export function mergeImportResults(results: ImportParseResult[]) {
   const savingThrows = Object.fromEntries(abilityIds.map((ability) =>
     [ability, take((draft) => draft.savingThrows[ability], `savingThrows.${ability}`, `${ability.toUpperCase()} save`)],
   )) as Record<AbilityId, ImportField<boolean>>;
+  const importedSpellCandidates = results.filter((result) => result.draft.importedSpells?.include).flatMap((result) => result.draft.importedSpells?.value ?? []);
+  const importedSpells = deduplicateImportedSpells(importedSpellCandidates);
+  const importedSpellSources = [...new Set(results.filter((result) => result.draft.importedSpells?.include).map((result) => result.sourceName))];
+  const emptyAbility: ImportField<CharacterImportDraft["spellcastingAbility"]["value"]> = { value: null, include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
+  const emptyNumber: ImportField<number> = { value: 0, include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
+  const emptyText: ImportField<string> = { value: "", include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
 
   const mergedDraft: CharacterImportDraft = {
     sourceName: results.map((result) => result.sourceName).join(", "),
@@ -98,6 +105,19 @@ export function mergeImportResults(results: ImportParseResult[]) {
     inventory: mergeLists(results, (draft) => draft.inventory),
     features: mergeLists(results, (draft) => draft.features),
     spellsAndNotes: mergeText(results, (draft) => draft.spellsAndNotes),
+    rawSpellCount: results.reduce((total, result) => total + (result.draft.rawSpellCount ?? 0), 0),
+    importedSpells: {
+      value: importedSpells,
+      include: importedSpells.length > 0,
+      needsReview: importedSpells.some((spell) => spell.level === null),
+      confidence: importedSpells.length ? 0.98 : null,
+      sourceNames: importedSpellSources,
+      conflicts: [],
+    },
+    spellcastingAbility: take((draft) => draft.spellcastingAbility ?? emptyAbility, "spellcastingAbility", "Spellcasting ability"),
+    spellSaveDc: take((draft) => draft.spellSaveDc ?? emptyNumber, "spellSaveDc", "Spell save DC"),
+    spellAttackBonus: take((draft) => draft.spellAttackBonus ?? emptyNumber, "spellAttackBonus", "Spell attack bonus"),
+    spellcastingClass: take((draft) => draft.spellcastingClass ?? emptyText, "spellcastingClass", "Spellcasting class"),
   };
   return { mergedDraft, conflicts };
 }

@@ -102,6 +102,8 @@ function spellTags(spell: Spell) {
   return [
     spell.concentration && "Concentration",
     spell.ritual && "Ritual",
+    spell.alwaysPrepared ? "Always prepared" : spell.prepared && "Prepared",
+    spell.imported && "Imported",
     actionLabels[spell.actionType],
     spell.damageType,
     spell.savingThrowType && `${spell.savingThrowType} save`,
@@ -128,10 +130,10 @@ function SpellCard({
   return (
     <article className={compact ? "spell-card compact-spell-card" : "spell-card"}>
       <button className="spell-card-main" onClick={onOpen} type="button">
-        <span className="spell-level-mark">{spell.level === 0 ? "C" : spell.level}</span>
+        <span className="spell-level-mark">{spell.levelKnown ? spell.level === 0 ? "C" : spell.level : "?"}</span>
         <span className="spell-card-copy">
           <span className="spell-title-row"><strong>{spell.name}</strong><SourceBadge source={spell.rulesSourceId || spell.source} />{spell.contentSourceId && spell.contentSourceId !== spell.rulesSourceId && <SourceBadge source={spell.contentSourceId} />}{spell.homebrew && !spell.contentSourceId && <small>Homebrew</small>}</span>
-          <span>{levelLabel(spell.level)} · {spell.school}</span>
+          <span>{spell.levelKnown ? levelLabel(spell.level) : "Level unknown"} · {spell.school}</span>
           <span className="spell-tags">{spellTags(spell).map((tag) => <small key={tag}>{tag}</small>)}</span>
         </span>
       </button>
@@ -466,7 +468,7 @@ export function SpellbookPage({ characterId }: { characterId: string }) {
         : a.level - b.level || a.name.localeCompare(b.name));
   }, [filters, pinnedIds, spells]);
   const gameplaySpells = visibleSpells.filter((spell) =>
-    (filters.prepared === "all" || (sheet ? (spell.level === 0 ? sheet.cantrips : sheet.preparedSpells).toLocaleLowerCase().includes(spell.name.toLocaleLowerCase()) : false) === (filters.prepared === "yes"))
+    (filters.prepared === "all" || (spell.prepared || spell.alwaysPrepared || (sheet ? (spell.level === 0 ? sheet.cantrips : sheet.preparedSpells).toLocaleLowerCase().includes(spell.name.toLocaleLowerCase()) : false)) === (filters.prepared === "yes"))
     && (filters.available === "all" || (spell.rulesComplete && (spell.level === 0 || sheet && Object.entries(sheet.spellSlots).some(([level, maximum]) => Number(level) >= spell.level && maximum - (sheet.spellSlotsUsed[level] ?? 0) > 0))) === (filters.available === "yes"))
     && (filters.completeness === "all" || spell.rulesComplete === (filters.completeness === "complete"))
   );

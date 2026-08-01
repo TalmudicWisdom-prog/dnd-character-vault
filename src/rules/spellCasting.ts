@@ -71,6 +71,7 @@ function spellNameLines(value: string) {
 }
 
 export function isSpellPrepared(sheet: CharacterSheet, spell: Spell) {
+  if (spell.prepared || spell.alwaysPrepared) return true;
   const name = spell.name.trim().toLocaleLowerCase();
   const cantrips = spellNameLines(sheet.cantrips);
   const prepared = spellNameLines(sheet.preparedSpells);

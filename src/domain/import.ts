@@ -1,5 +1,38 @@
 import type { AbilityId, SkillId } from "./models";
 
+export type ImportedSpellRecord = {
+  index: number;
+  rawName: string;
+  name: string;
+  canonicalName: string;
+  level: number | null;
+  prepared: boolean;
+  alwaysPrepared: boolean;
+  ritual: boolean;
+  source: string;
+  saveHit: string;
+  castingTime: string;
+  range: string;
+  components: string;
+  duration: string;
+  page: string;
+  notes: string;
+  variantKey: string;
+};
+
+export type ImportedSpellcastingData = {
+  ability: AbilityId | null;
+  saveDc: number | null;
+  attackBonus: number | null;
+  sourceClass: string;
+};
+
+export type ParsedImportedSpells = {
+  rawCount: number;
+  spells: ImportedSpellRecord[];
+  spellcasting: ImportedSpellcastingData;
+};
+
 export type ImportField<T> = {
   value: T;
   include: boolean;
@@ -31,6 +64,12 @@ export type CharacterImportDraft = {
   inventory: ImportField<string[]>;
   features: ImportField<string[]>;
   spellsAndNotes: ImportField<string>;
+  rawSpellCount: number;
+  importedSpells: ImportField<ImportedSpellRecord[]>;
+  spellcastingAbility: ImportField<AbilityId | null>;
+  spellSaveDc: ImportField<number>;
+  spellAttackBonus: ImportField<number>;
+  spellcastingClass: ImportField<string>;
 };
 
 export type ImportSaveMode = "create" | "merge";

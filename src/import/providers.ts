@@ -1,4 +1,5 @@
 import type { ImportMode, ImportSessionFile } from "../domain/import";
+import type { ParsedImportedSpells } from "../domain/import";
 import { readCharacterSheetSource } from "./readSource";
 import { asImportParserError } from "./importErrors";
 
@@ -7,6 +8,7 @@ export type ProviderResult = {
   rawText: string;
   pageCount: number | null;
   confidence: number | null;
+  spellData?: ParsedImportedSpells;
 };
 
 export type ImportProvider = {

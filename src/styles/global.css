@@ -1461,6 +1461,16 @@ h1, h2, strong { color: var(--ink); }
 .import-error-panel details { border-top: 1px solid var(--line); }
 .import-error-panel summary { min-height: 44px; padding-top: 12px; color: var(--accent); font-weight: 800; cursor: pointer; }
 .import-error-panel pre { max-height: 230px; margin: 0; padding: 12px; overflow: auto; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.import-success-panel, .import-spell-summary { display: grid; gap: 14px; margin-bottom: 16px; }
+.import-success-panel h2, .import-success-panel p, .import-spell-summary > p { margin: 0; }
+.import-spell-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.import-spell-metrics span { display: grid; gap: 3px; padding: 12px; color: var(--muted); background: var(--paper-strong); border: 1px solid var(--line); border-radius: 10px; font-size: 0.75rem; }
+.import-spell-metrics strong { color: var(--ink); font-size: 1.35rem; }
+.import-spell-summary details { border-top: 1px solid var(--line); }
+.import-spell-summary summary { min-height: 48px; padding-top: 14px; color: var(--accent); font-weight: 800; cursor: pointer; }
+.imported-spell-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 7px; max-height: 420px; overflow: auto; }
+.imported-spell-list > span { display: grid; gap: 3px; padding: 10px; background: var(--paper-strong); border: 1px solid var(--line); border-radius: 9px; }
+.imported-spell-list small { color: var(--muted); line-height: 1.4; }
 .import-source-info { display: flex; flex-wrap: wrap; gap: 5px; }
 .import-source-info small { padding: 3px 6px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 0.64rem; font-weight: 700; }
 .import-source-info .conflict-label { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
@@ -1658,6 +1668,7 @@ h1, h2, strong { color: var(--ink); }
   .spell-slot-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .import-file-row { grid-template-columns: 36px minmax(0, 1fr); }
   .import-file-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .import-spell-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .import-conflicts > div { grid-template-columns: 1fr; }
   .module-overlay { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
   .module-overlay-dialog { width: 100%; max-height: calc(100dvh - 20px); border-radius: var(--radius-md); }

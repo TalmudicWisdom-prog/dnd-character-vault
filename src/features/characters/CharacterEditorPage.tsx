@@ -12,6 +12,7 @@ import {
 import { db } from "../../storage/database";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
+import { reimportSpellsFromLinkedPdf } from "../../import/spellPersistence";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -35,7 +36,10 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
   const [draft, setDraft] = useState<CharacterDraft>(emptyDraft);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [initializedId, setInitializedId] = useState<string | null>(null);
+  const [spellRepairStatus, setSpellRepairStatus] = useState("");
+  const [repairingDocumentId, setRepairingDocumentId] = useState("");
   const editVersion = useRef(0);
+  const linkedPdfs = useLiveQuery(() => isNew ? [] : db.pdfDocuments.filter((document) => document.characterIds.includes(characterId)).toArray(), [characterId, isNew]) ?? [];
 
   useEffect(() => {
     if (isNew) {
@@ -121,6 +125,21 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
     if (!character || !window.confirm(`Permanently delete ${character.name}? This cannot be undone.`)) return;
     const fallback = await deleteCharacter(character.id);
     window.location.hash = fallback ? `sheet/${fallback.id}` : "characters";
+  };
+
+  const repairSpells = async (documentId: string) => {
+    setRepairingDocumentId(documentId);
+    setSpellRepairStatus("Reading structured spell fields from the linked PDF...");
+    try {
+      const result = await reimportSpellsFromLinkedPdf(characterId, documentId, setSpellRepairStatus);
+      setSpellRepairStatus(result.detected
+        ? `${result.imported} missing ${result.imported === 1 ? "spell was" : "spells were"} added; ${result.skippedExisting} existing ${result.skippedExisting === 1 ? "spell was" : "spells were"} left unchanged.`
+        : "No structured spell fields were detected in this linked PDF. No character data was changed.");
+    } catch (error) {
+      setSpellRepairStatus(error instanceof Error ? error.message : "Could not re-import spells from this PDF");
+    } finally {
+      setRepairingDocumentId("");
+    }
   };
 
   if (!isNew && character === undefined) {
@@ -243,6 +262,15 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
               <p>Open HP controls, abilities, proficiencies, and notes.</p>
               <a className="primary-button button-link" href={`#sheet/${characterId}`}>Open character sheet</a>
               <a className="secondary-button button-link" href={`#spellbook/${characterId}`}>Open spellbook</a>
+            </article>
+          )}
+          {!isNew && (
+            <article className="panel action-panel">
+              <span className="card-label">Import tools</span>
+              <h2>Recover spells from a linked PDF</h2>
+              <p>Parse only spell fields and attach missing spells to this character. Profile, inventory, and other edits remain unchanged.</p>
+              {linkedPdfs.length ? linkedPdfs.map((document) => <button className="secondary-button" disabled={Boolean(repairingDocumentId)} key={document.id} onClick={() => void repairSpells(document.id)} type="button">{repairingDocumentId === document.id ? `Reading ${document.name}...` : `Re-import Spells from ${document.name}`}</button>) : <p className="inline-message">No linked PDF is stored for this character.</p>}
+              {spellRepairStatus && <p className="inline-message" role="status">{spellRepairStatus}</p>}
             </article>
           )}
           {!isNew && (
