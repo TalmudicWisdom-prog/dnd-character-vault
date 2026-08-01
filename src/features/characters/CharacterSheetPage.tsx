@@ -8,7 +8,8 @@ import { db } from "../../storage/database";
 import { InventorySection } from "./InventorySection";
 import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
-import { SheetNavigator } from "./SheetNavigator";
+import { CharacterHud } from "./CharacterHud";
+import { takeCharacterAnnouncement, takePendingSheetSection } from "../../app/activeCharacter";
 import { SpellDetailOverlay } from "../spells/SpellDetailOverlay";
 import { SpellSlotTracker } from "../spells/SpellSlotTracker";
 import { levelUpPreview } from "../../rules/levelUp";
@@ -200,6 +201,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
   const [activeModuleId, setActiveModuleId] = useState<SheetNavigatorSectionId | null>(null);
+  const [switchAnnouncement, setSwitchAnnouncement] = useState("");
   const [selectedSpellId, setSelectedSpellId] = useState("");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
@@ -209,8 +211,11 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
 
   useEffect(() => {
     let active = true;
+    setSheet(null);
+    setStatus("Opening character...");
+    setActiveModuleId(null);
     void getOrCreateCharacterSheet(characterId)
-      .then((loaded) => { if (active) setSheet(loaded); })
+      .then((loaded) => { if (active) { setSheet(loaded); setStatus("Saved locally"); } })
       .catch((error: unknown) => { if (active) setLoadError(error instanceof Error ? `${error.name}: ${error.message}` : String(error)); });
     return () => { active = false; };
   }, [characterId]);
@@ -236,16 +241,39 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   }, [sheet, status]);
 
   useEffect(() => {
-    const flush = () => {
+    const flush = (event: Event) => {
       if (!sheet || status !== "Unsaved changes") return;
-      void saveCharacterSheet(sheet).then((saved) => {
+      const saving = saveCharacterSheet(sheet).then((saved) => {
         setSheet(saved);
         setStatus("Saved locally");
       });
+      (event as CustomEvent<{ waitUntil?: (promise: Promise<unknown>) => void }>).detail?.waitUntil?.(saving);
+      void saving;
     };
     window.addEventListener("vault:flush", flush);
     return () => window.removeEventListener("vault:flush", flush);
   }, [sheet, status]);
+
+  useEffect(() => {
+    if (!sheet || sheet.characterId !== characterId) return;
+    const announcement = takeCharacterAnnouncement();
+    setSwitchAnnouncement(announcement);
+    const targetId = takePendingSheetSection();
+    if (targetId) {
+      window.setTimeout(() => {
+        const target = document.getElementById(targetId);
+        if (target) target.scrollIntoView({ behavior: "auto", block: "start" });
+        else {
+          const section = sheetNavigatorSections.find((candidate) => candidate.targetId === targetId);
+          if (section) setActiveModuleId(section.id);
+        }
+      }, 80);
+    }
+    if (announcement) {
+      const timer = window.setTimeout(() => setSwitchAnnouncement(""), 2200);
+      return () => window.clearTimeout(timer);
+    }
+  }, [characterId, sheet]);
 
   useEffect(() => {
     if (!activeModuleId) return;
@@ -795,7 +823,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </section>
 
-      <SheetNavigator onNavigate={navigateSheet} sections={sheetNavigatorSections} />
+      <CharacterHud character={character} onNavigate={navigateSheet} sections={sheetNavigatorSections} />
+
+      {switchAnnouncement && <p aria-live="polite" className="character-switch-toast" role="status">{switchAnnouncement}</p>}
 
       <section className="abilities-panel abilities-senses-region" id="sheet-section-abilities" aria-labelledby="abilities-senses-title" tabIndex={-1}>
         <div className="sheet-region-heading">

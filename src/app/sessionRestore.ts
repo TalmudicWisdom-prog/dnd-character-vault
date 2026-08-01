@@ -28,3 +28,15 @@ export function flushBeforeBackgrounding() {
   rememberRoute();
   rememberScroll();
 }
+
+export async function flushPendingCharacterEdits() {
+  const pending: Promise<unknown>[] = [];
+  window.dispatchEvent(new CustomEvent("vault:flush", {
+    detail: {
+      waitUntil(promise: Promise<unknown>) {
+        pending.push(promise);
+      },
+    },
+  }));
+  await Promise.allSettled(pending);
+}

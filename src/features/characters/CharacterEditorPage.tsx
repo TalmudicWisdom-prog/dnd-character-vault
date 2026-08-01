@@ -11,6 +11,7 @@ import {
 } from "../../storage/characters";
 import { db } from "../../storage/database";
 import { CharacterPortraitField } from "./CharacterPortraitField";
+import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -93,7 +94,9 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
     setStatus("saving");
     try {
       const created = await createCharacter({ ...draft, name: draft.name.trim() });
-      window.location.hash = `character/${created.id}`;
+      await activateCharacter(created.id);
+      queueCharacterAnnouncement("Character created.");
+      window.location.hash = `sheet/${created.id}`;
     } catch {
       setStatus("error");
     }
@@ -101,19 +104,23 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
 
   const archive = async () => {
     if (!character) return;
-    await setCharacterArchived(character.id, !character.archivedAt);
+    const archiving = !character.archivedAt;
+    const fallback = await setCharacterArchived(character.id, archiving);
+    if (archiving) window.location.hash = fallback ? `sheet/${fallback.id}` : "characters";
   };
 
   const duplicate = async () => {
     if (!character) return;
     const copy = await duplicateCharacter(character.id);
-    window.location.hash = `character/${copy.id}`;
+    await activateCharacter(copy.id);
+    queueCharacterAnnouncement(`${copy.name} created.`);
+    window.location.hash = `sheet/${copy.id}`;
   };
 
   const remove = async () => {
     if (!character || !window.confirm(`Permanently delete ${character.name}? This cannot be undone.`)) return;
-    await deleteCharacter(character.id);
-    window.location.hash = "characters";
+    const fallback = await deleteCharacter(character.id);
+    window.location.hash = fallback ? `sheet/${fallback.id}` : "characters";
   };
 
   if (!isNew && character === undefined) {

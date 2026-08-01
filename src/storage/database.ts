@@ -610,6 +610,30 @@ class CharacterVaultDatabase extends Dexie {
         });
       });
 
+    this.version(20)
+      .stores({
+        characters: "id, name, updatedAt, createdAt, archivedAt, favorite, lastOpenedAt",
+        characterSheets: "characterId, updatedAt",
+        inventoryContainers: "id, characterId, [characterId+sortOrder], updatedAt",
+        inventoryItems: "id, characterId, containerId, [characterId+containerId], updatedAt",
+        spellbooks: "characterId, updatedAt",
+        spells: "id, characterId, definitionId, referenceDefinitionId, level, school, actionType, damageType, updatedAt, [characterId+level]",
+        importSessions: "id, status, updatedAt, createdAt",
+        importSessionFiles: "id, sessionId, [sessionId+lastModified]",
+        characterCreationDrafts: "id, updatedAt",
+        soulReaperProgressions: "characterId, level, path, updatedAt",
+        pdfDocuments: "id, name, gameSystem, updatedAt, *characterIds",
+        pdfFiles: "documentId",
+        pdfBookmarks: "id, documentId, [documentId+page], createdAt",
+        settings: "id",
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table("characters").toCollection().modify((character) => {
+          character.favorite ??= false;
+          character.lastOpenedAt ??= null;
+        });
+      });
+
     this.on("populate", () => {
       void this.settings.add(defaultSettings);
     });

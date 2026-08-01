@@ -5,7 +5,10 @@ import { sheetNavigatorSectionForTarget } from "./sheetLayout";
 type SheetNavigatorProps = {
   defaultOpen?: boolean;
   initialActiveTargetId?: string;
+  onActiveSectionChange?: (section: SheetNavigatorSection) => void;
+  onOpenChange?: (open: boolean) => void;
   onNavigate: (section: SheetNavigatorSection) => void;
+  open?: boolean;
   sections: SheetNavigatorSection[];
 };
 
@@ -30,11 +33,20 @@ function focusSheetSectionTrigger() {
 export function SheetNavigator({
   defaultOpen = false,
   initialActiveTargetId,
+  onActiveSectionChange,
+  onOpenChange,
   onNavigate,
+  open: controlledOpen,
   sections,
 }: SheetNavigatorProps) {
   const firstTargetId = initialActiveTargetId ?? sections[0]?.targetId ?? "";
-  const [open, setOpen] = useState(defaultOpen);
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean | ((current: boolean) => boolean)) => {
+    const resolved = typeof next === "function" ? next(open) : next;
+    if (controlledOpen === undefined) setInternalOpen(resolved);
+    onOpenChange?.(resolved);
+  };
   const [activeTargetId, setActiveTargetId] = useState(firstTargetId);
   const [isScrolling, setIsScrolling] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -46,6 +58,10 @@ export function SheetNavigator({
     () => sections.find((section) => section.targetId === activeTargetId) ?? sheetNavigatorSectionForTarget(activeTargetId),
     [activeTargetId, sections],
   );
+
+  useEffect(() => {
+    onActiveSectionChange?.(activeSection);
+  }, [activeSection, onActiveSectionChange]);
 
   useEffect(() => {
     if (sections.some((section) => section.targetId === activeTargetId)) return;

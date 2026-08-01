@@ -20,6 +20,7 @@ import {
   standardArrayScores,
 } from "./abilityScoreSetup";
 import { clampCreationStep, creationSteps, nextCreationStep, previousCreationStep } from "./createCharacterWizard";
+import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
 import {
   canChooseSkill,
   guidedReviewWarnings,
@@ -357,6 +358,8 @@ export function CreateCharacterWizardPage() {
     setCreating(true);
     try {
       const character = await createCharacterFromCreationDraft(draft);
+      await activateCharacter(character.id);
+      queueCharacterAnnouncement("Character created.");
       window.location.hash = `sheet/${character.id}`;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not create character");

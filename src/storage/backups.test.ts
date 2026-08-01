@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createCharacterBackup, createVaultBackup, restoreVaultBackup, validateVaultBackup } from "./backups";
+import { cloneCharacterBackupForImport, createCharacterBackup, createVaultBackup, restoreVaultBackup, validateVaultBackup } from "./backups";
 import { db } from "./database";
 import { createCharacter } from "./characters";
 import { createInventoryItem, ensureDefaultContainers, saveInventoryItem } from "./inventory";
@@ -66,6 +66,23 @@ describe("manual backup and restore", () => {
     expect(backup.payload.characters.map((character) => character.name)).toEqual(["Solo Backup"]);
     expect(backup.payload.spells.map((spell) => spell.id)).toEqual([firstSpell.id]);
     expect(backup.includesPdfs).toBe(false);
+  });
+
+  it("imports a character backup as a separate character with remapped child records", async () => {
+    const original = await createCharacter({ name: "Twin", characterClass: "Wizard", ancestry: "Elf", level: 4 });
+    const spell = await createSpell(original.id, "Mirror Image");
+    const backup = await createCharacterBackup(original.id);
+    const cloned = await cloneCharacterBackupForImport(backup);
+    await restoreVaultBackup(cloned, "merge-skip");
+
+    const imported = cloned.payload.characters[0];
+    const importedSpell = cloned.payload.spells[0];
+    expect(imported.id).not.toBe(original.id);
+    expect(importedSpell.id).not.toBe(spell.id);
+    expect(importedSpell.characterId).toBe(imported.id);
+    expect(await db.characters.count()).toBe(2);
+    expect(await db.spells.get(spell.id)).toMatchObject({ characterId: original.id });
+    expect(await db.spells.get(importedSpell.id)).toMatchObject({ characterId: imported.id });
   });
 
   it("imports an exported character backup into an empty vault with sheet, spells, layout, notes, and inventory", async () => {

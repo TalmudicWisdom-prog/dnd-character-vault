@@ -5,7 +5,7 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   define: {
-    __BUILD_ID__: JSON.stringify(`1.0.0-ffxiv-${Date.now().toString(36)}`),
+    __BUILD_ID__: JSON.stringify(`1.1.0-multichar-${Date.now().toString(36)}`),
   },
   build: {
     rollupOptions: {

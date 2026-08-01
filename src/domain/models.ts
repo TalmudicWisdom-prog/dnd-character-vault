@@ -17,6 +17,8 @@ export const characterSchema = z.object({
   importantRelationships: z.string().max(10000).default(""),
   roleplayNotes: z.string().max(10000).default(""),
   level: z.number().int().min(1).max(20),
+  favorite: z.boolean().default(false),
+  lastOpenedAt: z.string().datetime().nullable().default(null),
   archivedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

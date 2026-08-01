@@ -16,7 +16,7 @@ import {
 import { db } from "./database";
 
 export const BACKUP_FORMAT_VERSION = 3;
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
 export type RestoreMode = "new" | "merge-skip" | "merge-replace";
 
 const backupPayloadSchema = z.object({
@@ -202,6 +202,48 @@ export async function validateVaultBackup(value: unknown) {
   if (backup.payload.pdfBookmarks.some((record) => !documentIds.has(record.documentId))) throw new Error("Backup contains an orphaned PDF bookmark");
   if (backup.payload.pdfFiles.some((record) => !documentIds.has(record.documentId))) throw new Error("Backup contains an orphaned PDF file");
   return backup;
+}
+
+export async function cloneCharacterBackupForImport(backup: VaultBackup): Promise<VaultBackup> {
+  const validated = await validateVaultBackup(backup);
+  if (validated.payload.characters.length !== 1) throw new Error("Choose a backup containing exactly one character");
+
+  const timestamp = new Date().toISOString();
+  const sourceCharacterId = validated.payload.characters[0].id;
+  const characterId = crypto.randomUUID();
+  const containerIds = new Map(validated.payload.inventoryContainers.map((container) => [container.id, crypto.randomUUID()]));
+  const spellIds = new Map(validated.payload.spells.map((spell) => [spell.id, crypto.randomUUID()]));
+  const documentIds = new Map(validated.payload.pdfDocuments.map((document) => [document.id, crypto.randomUUID()]));
+
+  const payload = backupPayloadSchema.parse({
+    characters: validated.payload.characters.map((character) => ({
+      ...character,
+      id: characterId,
+      archivedAt: null,
+      favorite: false,
+      lastOpenedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })),
+    characterSheets: validated.payload.characterSheets.map((sheet) => ({ ...sheet, characterId, updatedAt: timestamp })),
+    characterCreationDrafts: [],
+    inventoryContainers: validated.payload.inventoryContainers.map((container) => ({ ...container, id: containerIds.get(container.id), characterId, createdAt: timestamp, updatedAt: timestamp })),
+    inventoryItems: validated.payload.inventoryItems.map((item) => ({ ...item, id: crypto.randomUUID(), characterId, containerId: containerIds.get(item.containerId), createdAt: timestamp, updatedAt: timestamp })),
+    spellbooks: validated.payload.spellbooks.map((spellbook) => ({ ...spellbook, characterId, pinnedSpellIds: spellbook.pinnedSpellIds.map((id) => spellIds.get(id)).filter(Boolean), updatedAt: timestamp })),
+    spells: validated.payload.spells.map((spell) => ({ ...spell, id: spellIds.get(spell.id), characterId, createdAt: timestamp, updatedAt: timestamp })),
+    soulReaperProgressions: validated.payload.soulReaperProgressions.map((progression) => ({ ...progression, characterId, sourcePdfId: progression.sourcePdfId ? documentIds.get(progression.sourcePdfId) ?? null : null, updatedAt: timestamp })),
+    pdfDocuments: validated.payload.pdfDocuments.map((document) => ({ ...document, id: documentIds.get(document.id), characterIds: [characterId], createdAt: timestamp, updatedAt: timestamp })),
+    pdfBookmarks: validated.payload.pdfBookmarks.map((bookmark) => ({ ...bookmark, id: crypto.randomUUID(), documentId: documentIds.get(bookmark.documentId), createdAt: timestamp })),
+    settings: [],
+    pdfFiles: validated.payload.pdfFiles.map((file) => ({ ...file, documentId: documentIds.get(file.documentId) })),
+  });
+
+  return vaultBackupSchema.parse({
+    ...validated,
+    createdAt: timestamp,
+    checksum: await checksumPayload(payload),
+    payload,
+  });
 }
 
 async function putByMode<T>(table: { get(key: string): Promise<unknown>; put(value: T): Promise<unknown> }, records: T[], keyOf: (record: T) => string, replace: boolean) {

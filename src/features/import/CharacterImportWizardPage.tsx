@@ -7,10 +7,11 @@ import { applyProviderConfidence, extractCharacterText } from "../../import/extr
 import { mergeImportResults } from "../../import/merge";
 import { getImportProvider, getOnlineImportProvider } from "../../import/providers";
 import { saveCharacterImport } from "../../import/saveImport";
-import { restoreVaultBackup, validateVaultBackup } from "../../storage/backups";
+import { cloneCharacterBackupForImport, restoreVaultBackup, validateVaultBackup } from "../../storage/backups";
 import { abilityIds, skillIds } from "../../storage/characterSheets";
 import { db } from "../../storage/database";
 import { addImportFiles, createImportSession, discardImportSession, removeImportFile, reorderImportFile, updateImportSession } from "../../storage/importSessions";
+import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
 
 const abilityLabels: Record<AbilityId, string> = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
 const confidenceLabel = (value: number | null) => value == null ? "" : `${Math.round(value * 100)}% confidence`;
@@ -81,11 +82,15 @@ export function CharacterImportWizardPage() {
       const parsed = JSON.parse(await file.text()) as unknown;
       const backup = await validateVaultBackup(parsed);
       if (backup.payload.characters.length !== 1) throw new Error("This backup contains more than one character. Use Vault Tools to restore full-vault backups.");
-      const characterName = backup.payload.characters[0].name;
-      await restoreVaultBackup(backup, "merge-skip");
+      const importedBackup = await cloneCharacterBackupForImport(backup);
+      const importedCharacter = importedBackup.payload.characters[0];
+      const characterName = importedCharacter.name;
+      await restoreVaultBackup(importedBackup, "merge-skip");
+      await activateCharacter(importedCharacter.id);
+      queueCharacterAnnouncement(`${characterName} imported.`);
       setStatus(`Imported ${characterName} from ${file.name}. Character sheet, spells, notes, layout, and inventory were restored locally.`);
       event.target.value = "";
-      window.location.hash = `sheet/${backup.payload.characters[0].id}`;
+      window.location.hash = `sheet/${importedCharacter.id}`;
     } catch (error) {
       setStatus(error instanceof SyntaxError ? "That file is not valid JSON. Choose a Character Vault .json export." : error instanceof Error ? error.message : "Could not import character backup");
     }
@@ -133,6 +138,8 @@ export function CharacterImportWizardPage() {
     setStatus("Saving reviewed fields locally...");
     try {
       const characterId = await saveCharacterImport(draft, mode, targetId);
+      await activateCharacter(characterId);
+      queueCharacterAnnouncement("Character imported.");
       await discardImportSession(session.id);
       window.location.hash = `sheet/${characterId}`;
     } catch (error) {

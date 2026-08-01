@@ -16,6 +16,7 @@ import { SpellbookPage } from "../features/spells/SpellbookPage";
 import { getSettings } from "../storage/database";
 import type { PageId } from "./navigation";
 import { flushBeforeBackgrounding, rememberRoute, rememberScroll, restoreScroll, savedRouteHash } from "./sessionRestore";
+import { activateCharacter, resolveActiveCharacter } from "./activeCharacter";
 
 type AppRoute =
   | { page: PageId; characterId?: never }
@@ -69,7 +70,23 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    void resolveActiveCharacter();
+  }, []);
+
+  useEffect(() => {
     restoreScroll();
+  }, [route]);
+
+  useEffect(() => {
+    if ((route.page !== "character" && route.page !== "sheet" && route.page !== "spellbook") || route.characterId === "new") return;
+    let current = true;
+    void activateCharacter(route.characterId).then(async (character) => {
+      if (character || !current) return;
+      const fallback = await resolveActiveCharacter(route.characterId);
+      if (!current) return;
+      window.location.hash = fallback ? `sheet/${fallback.id}` : "characters";
+    });
+    return () => { current = false; };
   }, [route]);
 
   useEffect(() => {
