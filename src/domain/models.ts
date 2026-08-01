@@ -1,5 +1,19 @@
 import { z } from "zod";
 
+export const portraitTransformSchema = z.object({
+  zoom: z.number().min(1).max(8).default(1),
+  offsetX: z.number().min(-4).max(4).default(0),
+  offsetY: z.number().min(-4).max(4).default(0),
+  version: z.number().int().min(1).default(1),
+  updatedAt: z.string().datetime().nullable().default(null),
+});
+
+export type PortraitTransform = z.infer<typeof portraitTransformSchema>;
+
+export function centeredPortraitTransform(): PortraitTransform {
+  return { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null };
+}
+
 export const characterSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100),
@@ -11,6 +25,8 @@ export const characterSchema = z.object({
   background: z.string().max(100).default(""),
   concept: z.string().max(500).default(""),
   portraitDataUrl: z.string().max(1500000).default(""),
+  portraitImageId: z.string().max(100).default(""),
+  portraitTransform: portraitTransformSchema.default(centeredPortraitTransform),
   personalityNotes: z.string().max(10000).default(""),
   backstory: z.string().max(20000).default(""),
   goals: z.string().max(10000).default(""),
@@ -36,6 +52,8 @@ export const characterDraftSchema = z.object({
   background: z.string().max(100).default(""),
   concept: z.string().max(500).default(""),
   portraitDataUrl: z.string().max(1500000).default(""),
+  portraitImageId: z.string().max(100).default(""),
+  portraitTransform: portraitTransformSchema.default(centeredPortraitTransform),
   personalityNotes: z.string().max(10000).default(""),
   backstory: z.string().max(20000).default(""),
   goals: z.string().max(10000).default(""),

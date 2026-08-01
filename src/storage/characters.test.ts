@@ -94,7 +94,14 @@ describe("multi-character lifecycle", () => {
     legacy.close();
 
     await db.open();
-    expect(await db.characters.get(characterId)).toMatchObject({ name: "Legacy Hero", summary: "Preserved", favorite: false, lastOpenedAt: null });
+    expect(await db.characters.get(characterId)).toMatchObject({
+      name: "Legacy Hero",
+      summary: "Preserved",
+      favorite: false,
+      lastOpenedAt: null,
+      portraitImageId: "",
+      portraitTransform: { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null },
+    });
     expect((await db.characterSheets.get(characterId))?.characterId).toBe(characterId);
   });
 

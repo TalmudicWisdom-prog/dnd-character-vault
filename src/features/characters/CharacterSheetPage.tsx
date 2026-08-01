@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { AbilityId, CharacterSheet, SkillId } from "../../domain/models";
+import type { AbilityId, Character, CharacterSheet, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
 import { DiceRoller } from "../../components/DiceRoller";
 import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } from "../../storage/characterSheets";
@@ -358,7 +358,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     }
   };
 
-  const updateCharacterField = async (changes: Record<string, string | number>) => {
+  const updateCharacterField = async (changes: Partial<Character>) => {
     await db.characters.update(characterId, { ...changes, updatedAt: new Date().toISOString() });
   };
 
@@ -782,8 +782,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
       case "portrait":
         return <CharacterPortraitField
           characterName={character.name}
+          imageId={character.portraitImageId}
           label="Portrait"
-          onChange={(portraitDataUrl) => updateCharacterField({ portraitDataUrl })}
+          onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
+          transform={character.portraitTransform}
           value={character.portraitDataUrl ?? ""}
         />;
       case "dashboard":
@@ -816,8 +818,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         <CharacterPortraitField
           characterName={character.name}
           compact
+          imageId={character.portraitImageId}
           label="Portrait"
-          onChange={(portraitDataUrl) => updateCharacterField({ portraitDataUrl })}
+          onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
+          transform={character.portraitTransform}
           value={character.portraitDataUrl ?? ""}
         />
 

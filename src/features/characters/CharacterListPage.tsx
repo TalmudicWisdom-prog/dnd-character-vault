@@ -59,7 +59,7 @@ function CharacterCard({ active, character, onStatus }: { active: boolean; chara
   return (
     <article className={`character-card${active ? " active-character" : ""}${character.archivedAt ? " archived-character" : ""}`}>
       <div className="character-card-main">
-        <CharacterAvatar name={character.name} portraitDataUrl={character.portraitDataUrl} size="large" />
+        <CharacterAvatar name={character.name} portraitDataUrl={character.portraitDataUrl} portraitTransform={character.portraitTransform} size="large" />
         <div className="character-card-copy">
           <span className="character-title-row">
             <strong>{character.name}</strong>

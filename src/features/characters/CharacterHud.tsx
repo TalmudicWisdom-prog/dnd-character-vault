@@ -104,7 +104,7 @@ export function CharacterHud({ character, items, onSelectMenuItem }: CharacterHu
           onClick={() => void switchTo(directTarget)}
           type="button"
         >
-          <CharacterAvatar name={directTarget.name} portraitDataUrl={directTarget.portraitDataUrl} size="small" />
+          <CharacterAvatar name={directTarget.name} portraitDataUrl={directTarget.portraitDataUrl} portraitTransform={directTarget.portraitTransform} size="small" />
           <span>{directTarget.name}</span>
         </button>
       )}
@@ -119,7 +119,7 @@ export function CharacterHud({ character, items, onSelectMenuItem }: CharacterHu
           ref={characterTriggerRef}
           type="button"
         >
-          <CharacterAvatar name={character.name} portraitDataUrl={character.portraitDataUrl} size="small" />
+          <CharacterAvatar name={character.name} portraitDataUrl={character.portraitDataUrl} portraitTransform={character.portraitTransform} size="small" />
           <span>{character.name}</span>
           <span aria-hidden="true">⌄</span>
         </button>
@@ -147,7 +147,7 @@ export function CharacterHud({ character, items, onSelectMenuItem }: CharacterHu
                 const current = candidate.id === character.id;
                 return (
                   <button aria-current={current ? "true" : undefined} className={current ? "character-switch-option active" : "character-switch-option"} disabled={current || Boolean(switchingId)} key={candidate.id} onClick={() => void switchTo(candidate)} type="button">
-                    <CharacterAvatar name={candidate.name} portraitDataUrl={candidate.portraitDataUrl} size="small" />
+                    <CharacterAvatar name={candidate.name} portraitDataUrl={candidate.portraitDataUrl} portraitTransform={candidate.portraitTransform} size="small" />
                     <span><strong>{candidate.name}</strong><small>{candidate.characterClass ? `Level ${candidate.level} ${candidate.characterClass}` : `Level ${candidate.level}`}{candidate.campaign ? ` · ${candidate.campaign}` : ""}</small></span>
                     {candidate.favorite && <span aria-label="Favorite" className="character-favorite-marker">★</span>}
                     {current && <span className="status-badge">Active</span>}

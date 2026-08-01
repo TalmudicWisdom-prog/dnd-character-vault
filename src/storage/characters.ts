@@ -54,6 +54,8 @@ export async function duplicateCharacter(id: string): Promise<Character> {
     background: current.background,
     concept: current.concept,
     portraitDataUrl: current.portraitDataUrl,
+    portraitImageId: current.portraitImageId,
+    portraitTransform: current.portraitTransform,
     personalityNotes: current.personalityNotes,
     backstory: current.backstory,
     goals: current.goals,

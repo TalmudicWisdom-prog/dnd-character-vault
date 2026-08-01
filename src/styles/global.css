@@ -241,8 +241,7 @@ h1, h2, strong { color: var(--ink); }
 .character-title-row { display: flex; align-items: center; gap: 9px; }
 .character-title-row strong { overflow: hidden; font-family: Georgia, serif; font-size: 1.35rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; transition: color 150ms ease; }
 .character-card-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.character-avatar { flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--paper-strong)); border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line)); border-radius: 14px; font-family: Georgia, serif; font-weight: 700; }
-.character-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.character-avatar { position: relative; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--paper-strong)); border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line)); border-radius: 14px; font-family: Georgia, serif; font-weight: 700; }
 .character-avatar.small { width: 34px; height: 34px; border-radius: 10px; font-size: 0.72rem; }
 .character-avatar.medium { width: 46px; height: 46px; }
 .character-avatar.large { width: 62px; height: 62px; font-size: 1.15rem; }
@@ -734,6 +733,8 @@ h1, h2, strong { color: var(--ink); }
   min-width: 0;
 }
 .portrait-frame {
+  --portrait-frame-aspect: 4 / 5;
+  position: relative;
   min-height: 260px;
   display: grid;
   place-items: center;
@@ -746,8 +747,10 @@ h1, h2, strong { color: var(--ink); }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 255 255 / 0.03);
 }
-.portrait-frame span { font-family: Georgia, serif; font-size: clamp(4rem, 11vw, 8rem); font-weight: 500; }
-.portrait-preview img { width: 100%; height: 100%; object-fit: cover; }
+.portrait-frame > span:not(.portrait-image) { font-family: Georgia, serif; font-size: clamp(4rem, 11vw, 8rem); font-weight: 500; }
+.portrait-image { position: absolute; inset: 0; display: block; overflow: hidden; }
+.portrait-image-pan { position: absolute; inset: 0; display: block; will-change: transform; }
+.portrait-image img { width: 100%; height: 100%; display: block; object-fit: cover; transform-origin: center; user-select: none; -webkit-user-drag: none; will-change: transform; }
 .portrait-picker {
   min-width: 0;
   display: grid;
@@ -759,7 +762,7 @@ h1, h2, strong { color: var(--ink); }
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
-.portrait-picker .portrait-frame { min-height: 132px; aspect-ratio: 1; }
+.portrait-picker .portrait-frame { min-height: 132px; aspect-ratio: var(--portrait-frame-aspect); }
 .portrait-picker-controls { min-width: 0; display: grid; gap: var(--space-2); }
 .portrait-picker-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .portrait-picker-controls small { color: var(--muted); font-size: 0.76rem; line-height: 1.35; }
@@ -772,7 +775,7 @@ h1, h2, strong { color: var(--ink); }
   border: 0;
   border-radius: 0;
 }
-.portrait-picker.compact .portrait-frame { min-height: 100%; width: 100%; aspect-ratio: 4 / 5; border-radius: var(--radius-md); }
+.portrait-picker.compact .portrait-frame { min-height: 100%; width: 100%; aspect-ratio: var(--portrait-frame-aspect); border-radius: var(--radius-md); }
 .portrait-management { position: absolute; right: 8px; bottom: 8px; left: 8px; z-index: 2; }
 .portrait-management summary {
   min-height: 34px;
@@ -795,6 +798,61 @@ h1, h2, strong { color: var(--ink); }
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-panel);
 }
+.portrait-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+  background: rgb(3 2 2 / 0.82);
+  backdrop-filter: blur(12px);
+}
+.portrait-editor-dialog {
+  width: min(680px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: clamp(16px, 3vw, 26px);
+  color: var(--sheet-text);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sheet-panel-strong) 94%, #000), var(--sheet-panel));
+  border: 1px solid color-mix(in srgb, var(--fantasy-gold) 55%, var(--sheet-border));
+  border-radius: var(--radius-lg);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 0.62), inset 0 0 0 1px rgb(255 255 255 / 0.035);
+}
+.portrait-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.portrait-editor-header h2 { margin: 3px 0 0; font-family: var(--font-display); font-size: clamp(1.7rem, 5vw, 2.35rem); font-weight: 500; }
+.portrait-editor-dialog > p { margin: 0; color: var(--muted); line-height: 1.45; }
+.portrait-editor-frame {
+  --portrait-frame-aspect: 4 / 5;
+  position: relative;
+  width: min(360px, 74vw);
+  aspect-ratio: var(--portrait-frame-aspect);
+  justify-self: center;
+  overflow: hidden;
+  background: #080706;
+  border: 2px solid color-mix(in srgb, var(--fantasy-gold) 72%, #fff);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.46), inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.portrait-editor-frame:active { cursor: grabbing; }
+.portrait-editor-frame:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sheet-accent) 32%, transparent), 0 16px 48px rgb(0 0 0 / 0.46); }
+.portrait-editor-frame.resetting .portrait-image-pan,
+.portrait-editor-frame.resetting .portrait-image img { transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.portrait-editor-guide { position: absolute; inset: 8%; pointer-events: none; border: 1px solid rgb(255 255 255 / 0.24); border-radius: calc(var(--radius-lg) - 4px); box-shadow: 0 0 0 999px rgb(0 0 0 / 0.08); }
+.portrait-editor-zoom { display: grid; gap: 7px; }
+.portrait-editor-zoom > label { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.78rem; font-weight: 850; text-transform: uppercase; letter-spacing: 0.08em; }
+.portrait-editor-zoom output { color: var(--sheet-text); }
+.portrait-editor-zoom > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; align-items: center; }
+.portrait-editor-zoom input { width: 100%; accent-color: var(--sheet-accent); }
+.portrait-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.portrait-editor-action-spacer { flex: 1 1 16px; }
+.portrait-editor-keyboard-help { color: var(--muted); font-size: 0.72rem; text-align: center; }
 .dashboard .sheet-character-header {
   min-width: 0;
   display: grid;
@@ -1538,7 +1596,8 @@ h1, h2, strong { color: var(--ink); }
   .page-header { margin-bottom: 30px; }
   .dashboard { grid-template-columns: minmax(82px, 96px) minmax(0, 1fr); gap: 9px; margin-bottom: 10px; padding: 10px; }
   .dashboard .portrait-picker.compact { grid-column: 1; min-height: 132px; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 132px; aspect-ratio: 3 / 4; border-radius: var(--radius-md); }
+  .portrait-frame, .portrait-editor-frame { --portrait-frame-aspect: 3 / 4; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 132px; aspect-ratio: var(--portrait-frame-aspect); border-radius: var(--radius-md); }
   .portrait-management { right: 6px; bottom: 6px; left: 6px; }
   .portrait-management summary { min-height: 28px; font-size: 0.66rem; }
   .portrait-management .portrait-picker-controls { padding: 7px; }
@@ -1553,7 +1612,11 @@ h1, h2, strong { color: var(--ink); }
   }
   .portrait-management .portrait-picker-controls small { font-size: 0.62rem; line-height: 1.25; }
   .portrait-frame { min-height: 132px; }
-  .portrait-frame span { font-size: 3rem; }
+  .portrait-frame > span:not(.portrait-image) { font-size: 3rem; }
+  .portrait-editor-backdrop { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+  .portrait-editor-dialog { max-height: calc(100dvh - 20px); padding: 14px; gap: 11px; border-radius: var(--radius-md); }
+  .portrait-editor-frame { width: min(310px, 72vw); }
+  .portrait-editor-keyboard-help { display: none; }
   .dashboard .sheet-character-header { grid-column: 2; min-height: 132px; padding: 10px; }
   .dashboard .sheet-character-header h1 { font-size: clamp(1.65rem, 9vw, 2rem); overflow-wrap: anywhere; }
   .dashboard .combat-summary, .dashboard .sheet-header-meta { grid-column: 1 / -1; }
@@ -1709,6 +1772,8 @@ h1, h2, strong { color: var(--ink); }
     animation: none;
   }
   .sheet-section-fab, .character-hud { transition: none; }
+  .portrait-editor-frame.resetting .portrait-image-pan,
+  .portrait-editor-frame.resetting .portrait-image img { transition: none; }
 }
 
 @media (max-width: 430px) {
@@ -1725,7 +1790,13 @@ h1, h2, strong { color: var(--ink); }
   .dashboard .combat-summary,
   .dashboard .sheet-header-meta { grid-column: 1; }
   .dashboard .portrait-picker.compact { min-height: 152px; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 152px; aspect-ratio: 16 / 9; }
+  .portrait-frame, .portrait-editor-frame { --portrait-frame-aspect: 16 / 9; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 152px; aspect-ratio: var(--portrait-frame-aspect); }
+  .portrait-editor-frame { width: min(100%, 390px); }
+  .portrait-editor-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portrait-editor-actions .portrait-editor-action-spacer { display: none; }
+  .portrait-editor-actions > label,
+  .portrait-editor-actions > button { width: 100%; }
   .dashboard .sheet-character-header { min-height: 0; padding: 10px; }
   .dashboard-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .spell-detail-tags { gap: 5px; }

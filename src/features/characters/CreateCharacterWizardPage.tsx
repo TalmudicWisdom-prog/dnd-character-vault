@@ -475,7 +475,17 @@ export function CreateCharacterWizardPage() {
             <div className="full-width">
               <CharacterPortraitField
                 characterName={character.name || "New character"}
-                onChange={(portraitDataUrl) => updateCharacter("portraitDataUrl", portraitDataUrl)}
+                imageId={character.portraitImageId}
+                onChange={(portrait) => update((current) => ({
+                  ...current,
+                  character: {
+                    ...current.character,
+                    portraitDataUrl: portrait.imageDataUrl,
+                    portraitImageId: portrait.imageId,
+                    portraitTransform: portrait.transform,
+                  },
+                }))}
+                transform={character.portraitTransform}
                 value={character.portraitDataUrl ?? ""}
               />
             </div>

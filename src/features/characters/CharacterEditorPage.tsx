@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PageHeader } from "../../components/PageHeader";
-import type { CharacterDraft } from "../../domain/models";
+import { portraitTransformSchema, type CharacterDraft } from "../../domain/models";
 import {
   createCharacter,
   deleteCharacter,
@@ -22,6 +22,8 @@ const emptyDraft: CharacterDraft = {
   ancestry: "",
   characterClass: "",
   portraitDataUrl: "",
+  portraitImageId: "",
+  portraitTransform: { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null },
   level: 1,
 };
 
@@ -59,6 +61,8 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
         ancestry: character.ancestry,
         characterClass: character.characterClass,
         portraitDataUrl: character.portraitDataUrl,
+        portraitImageId: character.portraitImageId,
+        portraitTransform: character.portraitTransform,
         level: character.level,
       });
       setInitializedId(character.id);
@@ -185,7 +189,15 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
               <div className="full-width">
                 <CharacterPortraitField
                   characterName={draft.name || "New character"}
-                  onChange={(portraitDataUrl) => updateDraft("portraitDataUrl", portraitDataUrl)}
+                  imageId={draft.portraitImageId}
+                  onChange={(portrait) => {
+                    setDraft((current) => ({ ...current, portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform }));
+                    if (!isNew) {
+                      editVersion.current += 1;
+                      setStatus("unsaved");
+                    }
+                  }}
+                  transform={portraitTransformSchema.parse(draft.portraitTransform)}
                   value={draft.portraitDataUrl ?? ""}
                 />
               </div>

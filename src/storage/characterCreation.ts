@@ -31,6 +31,8 @@ export function createEmptyCreationDraft(): CharacterCreationDraft {
       summary: "",
       concept: "",
       portraitDataUrl: "",
+      portraitImageId: "",
+      portraitTransform: { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null },
       personalityNotes: "",
       backstory: "",
       goals: "",

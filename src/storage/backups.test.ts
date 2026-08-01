@@ -86,7 +86,18 @@ describe("manual backup and restore", () => {
   });
 
   it("imports an exported character backup into an empty vault with sheet, spells, layout, notes, and inventory", async () => {
-    const cloud = await createCharacter({ name: "Cloud", summary: "Storm druid", playerName: "Yitzak", campaign: "Sunday", ancestry: "Human", characterClass: "Druid", portraitDataUrl: "data:image/jpeg;base64,cloud", level: 4 });
+    const cloud = await createCharacter({
+      name: "Cloud",
+      summary: "Storm druid",
+      playerName: "Yitzak",
+      campaign: "Sunday",
+      ancestry: "Human",
+      characterClass: "Druid",
+      portraitDataUrl: "data:image/jpeg;base64,cloud",
+      portraitImageId: "portrait-cloud",
+      portraitTransform: { zoom: 2.2, offsetX: -0.24, offsetY: 0.08, version: 1, updatedAt: "2026-07-12T12:00:00.000Z" },
+      level: 4,
+    });
     await saveCharacterSheet({
       ...createEmptyCharacterSheet(cloud.id),
       abilityScores: { str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 },
@@ -123,6 +134,8 @@ describe("manual backup and restore", () => {
 
     expect(restoredCharacter?.name).toBe("Cloud");
     expect(restoredCharacter?.portraitDataUrl).toBe("data:image/jpeg;base64,cloud");
+    expect(restoredCharacter?.portraitImageId).toBe("portrait-cloud");
+    expect(restoredCharacter?.portraitTransform).toMatchObject({ zoom: 2.2, offsetX: -0.24, offsetY: 0.08, version: 1 });
     expect(restoredSheet?.abilityScores).toMatchObject({ str: 10, dex: 14, con: 12, int: 15, wis: 20, cha: 10 });
     expect(restoredSheet).toMatchObject({ currentHp: 17, maxHp: 31, temporaryHp: 4, notes: "Concentrating on Call Lightning." });
     expect(restoredSheet?.spellSlotsUsed).toMatchObject({ "1": 1, "3": 2 });
