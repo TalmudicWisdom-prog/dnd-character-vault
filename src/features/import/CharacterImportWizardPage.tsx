@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PageHeader } from "../../components/PageHeader";
 import type { CharacterImportDraft, ImportField, ImportMode, ImportParseResult, ImportSaveMode, ImportSession } from "../../domain/import";
@@ -12,6 +12,8 @@ import { abilityIds, skillIds } from "../../storage/characterSheets";
 import { db } from "../../storage/database";
 import { addImportFiles, createImportSession, discardImportSession, removeImportFile, reorderImportFile, updateImportSession } from "../../storage/importSessions";
 import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
+import { BUILD_ID } from "../../app/version";
+import { asImportParserError, describeImportFailure, type ImportFailure } from "../../import/importErrors";
 
 const abilityLabels: Record<AbilityId, string> = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
 const confidenceLabel = (value: number | null) => value == null ? "" : `${Math.round(value * 100)}% confidence`;
@@ -46,6 +48,9 @@ export function CharacterImportWizardPage() {
   const [mode, setMode] = useState<ImportSaveMode>("create");
   const [targetId, setTargetId] = useState("");
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [parsing, setParsing] = useState(false);
+  const [failure, setFailure] = useState<ImportFailure | null>(null);
+  const parseInFlight = useRef(false);
 
   useEffect(() => {
     if (!session) void createImportSession();
@@ -59,6 +64,8 @@ export function CharacterImportWizardPage() {
 
   const orderedFiles = useMemo(() => session ? session.fileOrder.map((id) => files.find((file) => file.id === id)).filter((file): file is NonNullable<typeof file> => Boolean(file)) : [], [files, session]);
   const draft = session?.mergedDraft ?? null;
+  const proficiencyBonus = draft?.proficiencyBonus ?? { value: 2, include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
+  const biography = draft?.biography ?? { value: "", include: false, needsReview: true, confidence: null, sourceNames: [], conflicts: [] };
   const onlineProvider = getOnlineImportProvider();
 
   const chooseFiles = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +74,7 @@ export function CharacterImportWizardPage() {
     if (!selected.length) return;
     try {
       await addImportFiles(session.id, selected);
+      setFailure(null);
       setStatus(`${selected.length} ${selected.length === 1 ? "file" : "files"} added to this character import.`);
       event.target.value = "";
     } catch (error) {
@@ -99,31 +107,66 @@ export function CharacterImportWizardPage() {
   const setImportMode = async (nextMode: ImportMode) => {
     if (!session) return;
     await updateImportSession({ ...session, mode: nextMode });
+    setFailure(null);
   };
 
   const parseBatch = async () => {
-    if (!session || !orderedFiles.length) return;
+    if (!session || !orderedFiles.length || parseInFlight.current) return;
     const provider = getImportProvider(session.mode);
     if (!provider.available) return setStatus(provider.unavailableReason);
     if (session.mode === "online" && !window.confirm("Online AI import will send every selected file to the configured external OCR service. This is optional; Local import keeps files on this device. Send these files now?")) return;
+    parseInFlight.current = true;
+    setParsing(true);
+    setFailure(null);
     setStatus(`Starting ${provider.label}...`);
-    await updateImportSession({ ...session, status: "parsing", parseResults: [], mergedDraft: null, conflicts: [] });
     try {
+      await updateImportSession({ ...session, status: "parsing" });
       const providerResults = await provider.parse(orderedFiles, setStatus);
       const parseResults: ImportParseResult[] = providerResults.map((result) => {
         const sourceName = orderedFiles.find((file) => file.id === result.fileId)?.name ?? "Imported file";
-        return { fileId: result.fileId, sourceName, rawText: result.rawText, confidence: result.confidence, draft: applyProviderConfidence(extractCharacterText(result.rawText, sourceName), result.confidence) };
+        try {
+          return { fileId: result.fileId, sourceName, rawText: result.rawText, confidence: result.confidence, draft: applyProviderConfidence(extractCharacterText(result.rawText, sourceName), result.confidence) };
+        } catch (error) {
+          throw asImportParserError(error, { stage: "normalizing-character", fileName: sourceName, fileId: result.fileId, pageCount: result.pageCount ?? undefined });
+        }
       });
-      const merged = mergeImportResults(parseResults);
+      let merged: ReturnType<typeof mergeImportResults>;
+      try {
+        merged = mergeImportResults(parseResults);
+      } catch (error) {
+        throw asImportParserError(error, { stage: "creating-preview", fileName: orderedFiles[0]?.name ?? "Selected files" });
+      }
       await db.transaction("rw", db.importSessions, db.importSessionFiles, async () => {
         for (const result of providerResults) await db.importSessionFiles.update(result.fileId, { pageCount: result.pageCount });
         await updateImportSession({ ...session, status: "review", parseResults, ...merged });
       });
       setStatus(merged.conflicts.length ? `Parsing complete with ${merged.conflicts.length} conflicts needing review.` : "Parsing complete. Review every selected field before saving.");
     } catch (error) {
-      await updateImportSession({ ...session, status: "selecting" });
-      setStatus(`${error instanceof Error ? error.message : "Import failed"} Selected files are still saved; retry or switch to Local import.`);
+      await updateImportSession({ ...session, status: session.mergedDraft ? "review" : "selecting" });
+      setFailure(describeImportFailure(error, {
+        fileName: orderedFiles[0]?.name,
+        buildId: BUILD_ID,
+        browser: typeof navigator === "undefined" ? "Unknown browser" : navigator.userAgent,
+      }));
+      setStatus("Import stopped safely. Your selected files and any previous review are still available.");
+    } finally {
+      parseInFlight.current = false;
+      setParsing(false);
     }
+  };
+
+  const useLocalFallback = async () => {
+    await setImportMode("local");
+    setStatus("Local import selected. Your files are ready to retry without uploading.");
+  };
+
+  const removeFailedFile = async () => {
+    if (!session || !failure) return;
+    const fileId = failure.fileId ?? orderedFiles.find((file) => file.name === failure.fileName)?.id;
+    if (!fileId) return;
+    await removeImportFile(session.id, fileId);
+    setFailure(null);
+    setStatus(`${failure.fileName} removed. Other selected files remain in this import.`);
   };
 
   const update = async <Key extends keyof CharacterImportDraft>(key: Key, value: CharacterImportDraft[Key]) => {
@@ -180,10 +223,21 @@ export function CharacterImportWizardPage() {
         {orderedFiles.length ? orderedFiles.map((file, index) => <article className="import-file-row" key={file.id}>
           <span className="import-file-order">{index + 1}</span>
           <span className="import-file-copy"><strong>{file.name}</strong><small>{fileTypeLabel(file.type, file.name)} · {file.pageCount ? `${file.pageCount} ${file.pageCount === 1 ? "page/image" : "pages"}` : "page count available after parsing"} · {(file.size / 1024 / 1024).toFixed(1)} MB</small></span>
-          <span className="import-file-actions"><button aria-label={`Move ${file.name} up`} className="secondary-button compact" disabled={index === 0 || session.status === "parsing"} onClick={() => void reorderImportFile(session.id, file.id, -1)} type="button">↑</button><button aria-label={`Move ${file.name} down`} className="secondary-button compact" disabled={index === orderedFiles.length - 1 || session.status === "parsing"} onClick={() => void reorderImportFile(session.id, file.id, 1)} type="button">↓</button><button className="text-button danger" disabled={session.status === "parsing"} onClick={() => void removeImportFile(session.id, file.id)} type="button">Remove</button></span>
+          <span className="import-file-actions"><button aria-label={`Move ${file.name} up`} className="secondary-button compact" disabled={index === 0 || parsing} onClick={() => void reorderImportFile(session.id, file.id, -1)} type="button">↑</button><button aria-label={`Move ${file.name} down`} className="secondary-button compact" disabled={index === orderedFiles.length - 1 || parsing} onClick={() => void reorderImportFile(session.id, file.id, 1)} type="button">↓</button><button className="text-button danger" disabled={parsing} onClick={() => void removeImportFile(session.id, file.id)} type="button">Remove</button></span>
         </article>) : <div className="spell-empty compact-empty"><strong>No source files selected</strong><span>Add one or several PDFs, photos, scans, or screenshots.</span></div>}
       </div>
-      <button className="primary-button import-parse-button" disabled={!orderedFiles.length || session.status === "parsing"} onClick={() => void parseBatch()} type="button">{session.status === "parsing" ? "Parsing files..." : session.status === "review" ? "Re-parse selected files" : `Parse ${orderedFiles.length || ""} ${orderedFiles.length === 1 ? "file" : "files"}`}</button>
+      {failure && <section className="import-error-panel" role="alert">
+        <span className="card-label">Import stopped safely</span>
+        <h3>{failure.primaryMessage}</h3>
+        <p>The problem occurred while <strong>{failure.stageLabel.toLowerCase()}</strong>. The file remains selected, and no character was created or partly saved.</p>
+        <div className="import-error-actions">
+          <button className="primary-button" disabled={parsing} onClick={() => void parseBatch()} type="button">Retry import</button>
+          {session.mode !== "local" && <button className="secondary-button" onClick={() => void useLocalFallback()} type="button">Use Local Import fallback</button>}
+          <button className="text-button danger" onClick={() => void removeFailedFile()} type="button">Remove this file</button>
+        </div>
+        <details><summary>View technical details</summary><pre>{failure.technicalDetails}</pre></details>
+      </section>}
+      <button className="primary-button import-parse-button" disabled={!orderedFiles.length || parsing} onClick={() => void parseBatch()} type="button">{parsing ? "Parsing files..." : session.status === "review" ? "Re-parse selected files" : `Parse ${orderedFiles.length || ""} ${orderedFiles.length === 1 ? "file" : "files"}`}</button>
     </article>
 
     {draft && <>
@@ -202,11 +256,13 @@ export function CharacterImportWizardPage() {
           <ReviewField field={draft.characterClass} label="Class / classes" onChange={(value) => void update("characterClass", value as ImportField<string>)} />
           <ReviewField field={draft.ancestry} label="Species / ancestry" onChange={(value) => void update("ancestry", value as ImportField<string>)} />
           <ReviewField field={draft.background} label="Background" onChange={(value) => void update("background", value as ImportField<string>)} />
+          <ReviewField field={biography} label="Biography" onChange={(value) => void update("biography", value as ImportField<string>)} />
           <ReviewField field={draft.currentHp} label="Current HP" onChange={(value) => void update("currentHp", value as ImportField<number>)} type="number" />
           <ReviewField field={draft.maxHp} label="Max HP" onChange={(value) => void update("maxHp", value as ImportField<number>)} type="number" />
           <ReviewField field={draft.armorClass} label="Armor Class" onChange={(value) => void update("armorClass", value as ImportField<number>)} type="number" />
           <ReviewField field={draft.initiative} label="Initiative" onChange={(value) => void update("initiative", value as ImportField<number>)} type="number" />
           <ReviewField field={draft.speed} label="Speed" onChange={(value) => void update("speed", value as ImportField<number>)} type="number" />
+          <ReviewField field={proficiencyBonus} label="Proficiency Bonus" onChange={(value) => void update("proficiencyBonus", value as ImportField<number>)} type="number" />
         </div>
         <h3 className="review-subheading">Ability Scores</h3>
         <div className="ability-grid">{abilityIds.map((ability) => <ReviewField field={draft.abilityScores[ability]} key={ability} label={abilityLabels[ability]} onChange={(value) => void update("abilityScores", { ...draft.abilityScores, [ability]: value as ImportField<number> })} type="number" />)}</div>

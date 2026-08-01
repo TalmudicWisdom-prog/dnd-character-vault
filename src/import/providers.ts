@@ -1,5 +1,6 @@
 import type { ImportMode, ImportSessionFile } from "../domain/import";
 import { readCharacterSheetSource } from "./readSource";
+import { asImportParserError } from "./importErrors";
 
 export type ProviderResult = {
   fileId: string;
@@ -31,8 +32,12 @@ export function getLocalImportProvider(): ImportProvider {
       for (let index = 0; index < files.length; index += 1) {
         const file = files[index];
         onStatus(`Reading ${index + 1} of ${files.length}: ${file.name}`);
-        const parsed = await readCharacterSheetSource(fileLike(file), onStatus);
-        results.push({ fileId: file.id, ...parsed });
+        try {
+          const parsed = await readCharacterSheetSource(fileLike(file), onStatus);
+          results.push({ fileId: file.id, ...parsed });
+        } catch (error) {
+          throw asImportParserError(error, { stage: "reading-file", fileName: file.name, fileId: file.id, pageCount: file.pageCount ?? undefined });
+        }
       }
       return results;
     },

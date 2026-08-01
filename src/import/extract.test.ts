@@ -28,4 +28,21 @@ Second Wind
     expect(draft.currentHp.needsReview).toBe(true);
     expect(draft.currentHp.include).toBe(false);
   });
+
+  it("preserves fillable-sheet names while separating class and level", () => {
+    const draft = extractCharacterText(`
+Character Name: Akiva
+Class & Level: Druid 14
+Race: Wood Elf
+Current HP: 86
+Max HP: 94
+Armor Class: 17
+Speed: 35
+Proficiency Bonus: +5
+`, "Akiva Character D&D.pdf");
+
+    expect(draft.characterClass.value).toBe("Druid");
+    expect(draft.level.value).toBe(14);
+    expect(draft.proficiencyBonus.value).toBe(5);
+  });
 });

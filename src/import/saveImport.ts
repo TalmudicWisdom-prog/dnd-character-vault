@@ -56,7 +56,9 @@ export async function saveCharacterImport(draft: CharacterImportDraft, mode: Imp
   if (draft.armorClass.include) sheet.armorClass = Math.max(0, Math.round(draft.armorClass.value));
   if (draft.initiative.include) sheet.initiative = Math.round(draft.initiative.value);
   if (draft.speed.include) sheet.speed = Math.max(0, Math.round(draft.speed.value));
+  if (draft.proficiencyBonus?.include) sheet.proficiencyBonus = clamp(draft.proficiencyBonus.value, 2, 6);
   if (draft.features.include) sheet.notes = appendNotes(sheet.notes, "Features / Traits", draft.features.value.join("\n"));
+  if (draft.biography?.include) sheet.notes = appendNotes(sheet.notes, "Biography", draft.biography.value);
   if (draft.spellsAndNotes.include) sheet.notes = appendNotes(sheet.notes, "Spells / Imported Notes", draft.spellsAndNotes.value);
   sheet.notes = sheet.notes.slice(0, 50000);
   sheet.updatedAt = new Date().toISOString();

@@ -42,11 +42,17 @@ if (!manifest.icons?.some((icon) => icon.sizes === "192x192") || !manifest.icons
 const appEntry = indexDocument.match(/src="\.\/(assets\/app-[^"]+\.js)"/)?.[1];
 if (!appEntry) throw new Error("Production entry must use a content-addressed application bundle");
 const appBundle = await readFile(join(distDirectory, appEntry), "utf8");
-for (const marker of ["ffxiv-companion-dawntrail", "Final Fantasy Companion Guide", "arms-of-hadar", "1.1.0-multichar-"]) {
+for (const marker of ["ffxiv-companion-dawntrail", "Final Fantasy Companion Guide", "arms-of-hadar", "1.1.0-pdf-import-"]) {
   if (!appBundle.includes(marker)) throw new Error(`Production application bundle is missing ${marker}`);
+}
+if (!shellFiles.some((path) => /^assets\/pdf\.worker\.min-[^.]+\.mjs$/.test(path))) {
+  throw new Error("Offline shell is missing the Safari-compatible PDF worker");
+}
+if (!/withResolvers:function\(\)\{/.test(appBundle)) {
+  throw new Error("Production application bundle is missing the Promise.withResolvers compatibility implementation");
 }
 if (!serviceWorker.includes("fetch(request).then") || !serviceWorker.includes(".catch(() => caches.match(indexUrl))")) {
   throw new Error("Service worker must use network-first navigation with an offline shell fallback");
 }
 
-console.log(`PWA verified: relative manifest, FFXIV and multi-character ${appEntry}, and ${shellFiles.length} cached offline files.`);
+console.log(`PWA verified: relative manifest, FFXIV, multi-character, Safari-compatible PDF import in ${appEntry}, and ${shellFiles.length} cached offline files.`);

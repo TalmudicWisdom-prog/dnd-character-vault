@@ -1453,6 +1453,14 @@ h1, h2, strong { color: var(--ink); }
 .import-file-copy small { color: var(--muted); }
 .import-file-actions { display: flex; gap: 5px; align-items: center; }
 .import-parse-button { width: 100%; min-height: 54px; margin-top: 16px; }
+.import-error-panel { display: grid; gap: 10px; margin-top: 16px; padding: 16px; background: color-mix(in srgb, var(--danger) 7%, var(--paper-strong)); border: 1px solid color-mix(in srgb, var(--danger) 48%, var(--line)); border-radius: 12px; }
+.import-error-panel h3, .import-error-panel p { margin: 0; }
+.import-error-panel h3 { color: var(--ink); font-family: Georgia, serif; font-weight: 500; }
+.import-error-panel p { color: var(--muted); line-height: 1.55; }
+.import-error-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.import-error-panel details { border-top: 1px solid var(--line); }
+.import-error-panel summary { min-height: 44px; padding-top: 12px; color: var(--accent); font-weight: 800; cursor: pointer; }
+.import-error-panel pre { max-height: 230px; margin: 0; padding: 12px; overflow: auto; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .import-source-info { display: flex; flex-wrap: wrap; gap: 5px; }
 .import-source-info small { padding: 3px 6px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 0.64rem; font-weight: 700; }
 .import-source-info .conflict-label { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }

@@ -18,12 +18,14 @@ export type CharacterImportDraft = {
   characterClass: ImportField<string>;
   ancestry: ImportField<string>;
   background: ImportField<string>;
+  biography: ImportField<string>;
   abilityScores: Record<AbilityId, ImportField<number>>;
   currentHp: ImportField<number>;
   maxHp: ImportField<number>;
   armorClass: ImportField<number>;
   initiative: ImportField<number>;
   speed: ImportField<number>;
+  proficiencyBonus: ImportField<number>;
   skills: Record<SkillId, ImportField<boolean>>;
   savingThrows: Record<AbilityId, ImportField<boolean>>;
   inventory: ImportField<string[]>;
