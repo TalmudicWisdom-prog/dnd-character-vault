@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SheetNavigatorSection } from "./sheetLayout";
+import type { CharacterMenuItem, SheetNavigatorSection } from "./sheetLayout";
 import { sheetNavigatorSectionForTarget } from "./sheetLayout";
 
 type SheetNavigatorProps = {
@@ -7,9 +7,9 @@ type SheetNavigatorProps = {
   initialActiveTargetId?: string;
   onActiveSectionChange?: (section: SheetNavigatorSection) => void;
   onOpenChange?: (open: boolean) => void;
-  onNavigate: (section: SheetNavigatorSection) => void;
+  onSelect: (item: CharacterMenuItem) => void;
   open?: boolean;
-  sections: SheetNavigatorSection[];
+  items: CharacterMenuItem[];
 };
 
 export type SheetSectionViewportEntry = {
@@ -35,10 +35,11 @@ export function SheetNavigator({
   initialActiveTargetId,
   onActiveSectionChange,
   onOpenChange,
-  onNavigate,
+  onSelect,
   open: controlledOpen,
-  sections,
+  items,
 }: SheetNavigatorProps) {
+  const sections = useMemo(() => items.filter((item): item is SheetNavigatorSection => item.kind === "section"), [items]);
   const firstTargetId = initialActiveTargetId ?? sections[0]?.targetId ?? "";
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const open = controlledOpen ?? internalOpen;
@@ -167,11 +168,11 @@ export function SheetNavigator({
     window.setTimeout(focusSheetSectionTrigger, 0);
   };
 
-  const selectSection = (section: SheetNavigatorSection) => {
+  const selectItem = (item: CharacterMenuItem) => {
     returnFocusRef.current = false;
-    setActiveTargetId(section.targetId);
+    if (item.kind === "section") setActiveTargetId(item.targetId);
     setOpen(false);
-    window.requestAnimationFrame(() => onNavigate(section));
+    window.requestAnimationFrame(() => onSelect(item));
   };
 
   return (
@@ -182,7 +183,7 @@ export function SheetNavigator({
           aria-controls="sheet-section-navigator-panel"
           aria-describedby="sheet-section-current-label"
           aria-expanded={open}
-          aria-label="Open character sections"
+          aria-label="Open character command menu"
           className="sheet-section-trigger"
           onClick={() => {
             restoreVisibility();
@@ -207,29 +208,32 @@ export function SheetNavigator({
             onClick={closeAndReturnFocus}
             onPointerDown={(event) => event.preventDefault()}
           />
-          <nav aria-label="Character sections" className="sheet-section-popover" id="sheet-section-navigator-panel">
+          <nav aria-label="Character command menu" className="sheet-section-popover" id="sheet-section-navigator-panel">
             <header className="sheet-section-popover-header">
               <div>
-                <span className="card-label">Navigate this sheet</span>
-                <h2>Character Sections</h2>
+                <span className="card-label">Live-play commands</span>
+                <h2>Character Menu</h2>
               </div>
               <button aria-label="Close character sections" className="sheet-section-close" onClick={closeAndReturnFocus} ref={closeButtonRef} type="button">×</button>
             </header>
             <div className="sheet-section-options">
-              {sections.map((section) => {
-                const current = section.targetId === activeTargetId;
+              {items.map((item) => {
+                const current = item.kind === "section" && item.targetId === activeTargetId;
+                const ariaLabel = current ? `${item.label}, current section` : item.kind === "section" ? `Go to ${item.label}` : `Open ${item.label}`;
                 return (
                   <button
                     aria-current={current ? "page" : undefined}
-                    aria-label={current ? `${section.label}, current section` : `Go to ${section.label}`}
+                    aria-label={ariaLabel}
                     className={current ? "sheet-section-option active" : "sheet-section-option"}
-                    data-section-id={section.id}
-                    key={section.id}
-                    onClick={() => selectSection(section)}
+                    data-menu-kind={item.kind}
+                    data-section-id={item.id}
+                    key={item.id}
+                    onClick={() => selectItem(item)}
                     type="button"
                   >
-                    <span aria-hidden="true" className="sheet-section-option-icon">{section.icon}</span>
-                    <span className="sheet-section-option-label">{section.label}</span>
+                    <span aria-hidden="true" className="sheet-section-option-icon">{item.icon}</span>
+                    <span className="sheet-section-option-label">{item.label}</span>
+                    {!current && item.kind !== "section" && <span aria-hidden="true" className="sheet-section-action-marker">↗</span>}
                     {current && <span className="sheet-section-current-marker"><span aria-hidden="true">✓</span><span className="sr-only">Current section</span></span>}
                   </button>
                 );

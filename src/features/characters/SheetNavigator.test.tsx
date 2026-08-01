@@ -1,14 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { nearestVisibleSheetSection, SheetNavigator } from "./SheetNavigator";
-import { sheetNavigatorSections } from "./sheetLayout";
+import { characterMenuItems, sheetNavigatorSections } from "./sheetLayout";
 
 describe("floating character section navigator", () => {
   it("renders a floating accessible trigger without the old Current Section card or GRID control", () => {
-    const markup = renderToStaticMarkup(<SheetNavigator onNavigate={vi.fn()} sections={sheetNavigatorSections} />);
+    const markup = renderToStaticMarkup(<SheetNavigator items={characterMenuItems} onSelect={vi.fn()} />);
 
     expect(markup).toContain("sheet-section-fab");
-    expect(markup).toContain('aria-label="Open character sections"');
+    expect(markup).toContain('aria-label="Open character command menu"');
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("Current section: Dashboard.");
     expect(markup).not.toContain("sheet-navigator-bar");
@@ -16,22 +16,37 @@ describe("floating character section navigator", () => {
   });
 
   it("lists the shared section definitions and marks the current section accessibly", () => {
-    const inventory = sheetNavigatorSections.find((section) => section.id === "inventory")!;
+    const abilities = sheetNavigatorSections.find((section) => section.id === "abilities")!;
     const markup = renderToStaticMarkup(
       <SheetNavigator
         defaultOpen
-        initialActiveTargetId={inventory.targetId}
-        onNavigate={vi.fn()}
-        sections={sheetNavigatorSections}
+        initialActiveTargetId={abilities.targetId}
+        items={characterMenuItems}
+        onSelect={vi.fn()}
       />,
     );
 
-    expect(markup).toContain('aria-label="Character sections"');
-    expect(markup).toContain("Character Sections");
-    expect(markup.match(/class="sheet-section-option(?: active)?"/g)).toHaveLength(sheetNavigatorSections.length);
+    expect(markup).toContain('aria-label="Character command menu"');
+    expect(markup).toContain("Character Menu");
+    expect(markup.match(/class="sheet-section-option(?: active)?"/g)).toHaveLength(characterMenuItems.length);
     expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain("Inventory, current section");
-    expect(sheetNavigatorSections.every((section) => markup.includes(`data-section-id="${section.id}"`))).toBe(true);
+    expect(markup).toContain("Abilities, Saves, Senses, current section");
+    expect(characterMenuItems.every((item) => markup.includes(`data-section-id="${item.id}"`))).toBe(true);
+  });
+
+  it("renders direct destinations as buttons with explicit action or route semantics", () => {
+    const markup = renderToStaticMarkup(<SheetNavigator defaultOpen items={characterMenuItems} onSelect={vi.fn()} />);
+
+    expect(markup).toContain('aria-label="Open Dice Roller"');
+    expect(markup).toContain('aria-label="Open Spellbook"');
+    expect(markup).toContain('aria-label="Open Inventory"');
+    expect(markup).toContain('aria-label="Open Profile"');
+    expect(markup).toContain('aria-label="Open Export Character"');
+    expect(markup).toContain('aria-label="Open Edit Portrait"');
+    expect(markup).toContain('aria-label="Go to Abilities, Saves, Senses"');
+    expect(markup).toContain('data-menu-kind="action"');
+    expect(markup).toContain('data-menu-kind="route"');
+    expect(markup).toContain('data-menu-kind="section"');
   });
 
   it("chooses the visible section nearest the stable top anchor without boundary flicker", () => {

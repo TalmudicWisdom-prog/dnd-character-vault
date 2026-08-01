@@ -3,6 +3,8 @@ import { db } from "../../storage/database";
 import { createCharacter } from "../../storage/characters";
 import { createEmptyCharacterSheet, getOrCreateCharacterSheet, saveCharacterSheet } from "../../storage/characterSheets";
 import {
+  characterMenuIntent,
+  characterMenuItems,
   chooseSheetNavigatorSection,
   closeSheetNavigator,
   defaultSheetLayoutOrder,
@@ -13,7 +15,6 @@ import {
   selectSheetNavigatorSection,
   sheetSectionScrollBehavior,
   sheetNavigatorSections,
-  sheetSectionDomId,
 } from "./sheetLayout";
 
 describe("character sheet layout customization", () => {
@@ -29,21 +30,9 @@ describe("character sheet layout customization", () => {
   it("defines navigator options for every major live sheet area", () => {
     expect(sheetNavigatorSections.map((section) => section.label)).toEqual([
       "Dashboard",
-      "HP / Combat",
       "Abilities, Saves, Senses",
       "Skills",
       "Speed & Defenses",
-      "Rolls",
-      "Dice",
-      "Actions",
-      "Spells",
-      "Inventory",
-      "Features & Traits",
-      "Proficiencies & Training",
-      "Background / Biography",
-      "Notes",
-      "Book / PDF",
-      "Layout",
     ]);
     expect(sheetNavigatorSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
     expect(sheetNavigatorSections.every((section) => section.shortLabel && section.icon)).toBe(true);
@@ -51,12 +40,52 @@ describe("character sheet layout customization", () => {
     expect(new Set(sheetNavigatorSections.map((section) => section.targetId)).size).toBe(sheetNavigatorSections.length);
   });
 
-  it("uses the grid navigator as the only live play shortcut surface", () => {
-    const navigatorIds = sheetNavigatorSections.map((section) => section.id);
+  it("classifies the live-play menu explicitly instead of inferring behavior from labels", () => {
+    expect(characterMenuItems.filter((item) => item.kind === "action").map((item) => item.label)).toEqual([
+      "HP / Combat",
+      "Roll Assistant",
+      "Dice Roller",
+      "Actions",
+      "Inventory",
+      "Features & Traits",
+      "Proficiencies & Training",
+      "Background / Biography",
+      "Notes",
+      "Soul Reaper",
+      "Export Character",
+      "Layout Customizer",
+      "Edit Portrait",
+    ]);
+    expect(characterMenuItems.filter((item) => item.kind === "route").map((item) => item.label)).toEqual([
+      "Spellbook",
+      "PDF Library",
+      "Profile",
+    ]);
+    expect(new Set(characterMenuItems.map((item) => item.id)).size).toBe(characterMenuItems.length);
+  });
 
-    expect(majorGameplayModuleSections.every((section) => navigatorIds.includes(section))).toBe(true);
-    expect(sheetNavigatorSections.find((section) => section.id === "roll-helper")?.label).toBe("Rolls");
-    expect(sheetNavigatorSections.find((section) => section.id === "dice")?.label).toBe("Dice");
+  it("resolves tools directly to overlays, routes, or export without an intermediate scroll", () => {
+    const item = (id: string) => characterMenuItems.find((candidate) => candidate.id === id)!;
+    const characterId = "character-123";
+
+    expect(characterMenuIntent(item("dice"), characterId)).toEqual({ kind: "overlay", targetId: "dice", enableLayoutEditing: false });
+    expect(characterMenuIntent(item("inventory"), characterId)).toEqual({ kind: "overlay", targetId: "inventory", enableLayoutEditing: false });
+    expect(characterMenuIntent(item("edit-portrait"), characterId)).toEqual({ kind: "overlay", targetId: "portrait", enableLayoutEditing: false });
+    expect(characterMenuIntent(item("layout"), characterId)).toEqual({ kind: "overlay", targetId: "layout", enableLayoutEditing: true });
+    expect(characterMenuIntent(item("spellbook"), characterId)).toEqual({ kind: "route", hash: "#spellbook/character-123" });
+    expect(characterMenuIntent(item("profile"), characterId)).toEqual({ kind: "route", hash: "#character/character-123" });
+    expect(characterMenuIntent(item("pdf-library"), characterId)).toEqual({ kind: "route", hash: "#library" });
+    expect(characterMenuIntent(item("export"), characterId)).toEqual({ kind: "export" });
+    expect(characterMenuItems.filter((candidate) => candidate.kind !== "section").every((candidate) => characterMenuIntent(candidate, characterId).kind !== "section")).toBe(true);
+  });
+
+  it("uses the active character id for character-scoped direct routes", () => {
+    const spellbook = characterMenuItems.find((item) => item.id === "spellbook")!;
+    const profile = characterMenuItems.find((item) => item.id === "profile")!;
+
+    expect(characterMenuIntent(spellbook, "cloud")).toEqual({ kind: "route", hash: "#spellbook/cloud" });
+    expect(characterMenuIntent(spellbook, "luna")).toEqual({ kind: "route", hash: "#spellbook/luna" });
+    expect(characterMenuIntent(profile, "luna")).toEqual({ kind: "route", hash: "#character/luna" });
   });
 
   it("opens and closes the sheet navigator modal state", () => {
@@ -69,10 +98,10 @@ describe("character sheet layout customization", () => {
 
   it("selects a navigator section without changing the character sheet route", () => {
     const currentRoute = "#sheet/character-123";
-    const selected = selectSheetNavigatorSection("inventory", currentRoute);
+    const selected = selectSheetNavigatorSection("abilities", currentRoute);
 
     expect(selected).toEqual({
-      targetId: sheetSectionDomId("inventory"),
+      targetId: "sheet-section-abilities",
       routeHash: currentRoute,
     });
   });

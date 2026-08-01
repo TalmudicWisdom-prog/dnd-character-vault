@@ -14,8 +14,8 @@ export function rememberRoute() {
   localStorage.setItem(lastRouteKey, currentRouteKey());
 }
 
-export function rememberScroll() {
-  sessionStorage.setItem(`${scrollPrefix}${currentRouteKey()}`, String(window.scrollY));
+export function rememberScroll(routeHash = currentRouteKey()) {
+  sessionStorage.setItem(`${scrollPrefix}${routeHash}`, String(window.scrollY));
 }
 
 export function restoreScroll() {

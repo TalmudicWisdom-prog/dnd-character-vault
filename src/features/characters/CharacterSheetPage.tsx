@@ -10,6 +10,7 @@ import { SoulReaperSection } from "./SoulReaperSection";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { CharacterHud } from "./CharacterHud";
 import { takeCharacterAnnouncement, takePendingSheetSection } from "../../app/activeCharacter";
+import { flushPendingCharacterEdits } from "../../app/sessionRestore";
 import { SpellDetailOverlay } from "../spells/SpellDetailOverlay";
 import { SpellSlotTracker } from "../spells/SpellSlotTracker";
 import { levelUpPreview } from "../../rules/levelUp";
@@ -19,18 +20,20 @@ import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, initiativeBonus, type RollAssistantMode } from "../../rules/rollAssistant";
 import { createCharacterBackup, downloadBackup } from "../../storage/backups";
 import {
+  characterMenuIntent,
+  characterMenuItems,
+  characterMenuRouteHash,
   defaultSheetLayoutOrder,
   isSheetLayoutSectionId,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
   reorderSheetLayoutOrder,
-  selectSheetNavigatorSection,
   sheetSectionScrollBehavior,
   sheetNavigatorSections,
   sheetSectionDomId,
+  type CharacterMenuItem,
   type SheetLayoutPlacement,
   type SheetLayoutSectionId,
-  type SheetNavigatorSection,
   type SheetNavigatorSectionId,
 } from "./sheetLayout";
 
@@ -80,6 +83,7 @@ const overlaySectionTitles: Record<SheetNavigatorSectionId, string> = {
   "speed-defenses": "Speed and defenses",
   book: "Book and PDF tools",
   layout: "Customize layout",
+  portrait: "Edit portrait",
 };
 
 const focusableOverlaySelector = [
@@ -202,10 +206,12 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
   const [activeModuleId, setActiveModuleId] = useState<SheetNavigatorSectionId | null>(null);
   const [switchAnnouncement, setSwitchAnnouncement] = useState("");
+  const [menuActionError, setMenuActionError] = useState("");
   const [selectedSpellId, setSelectedSpellId] = useState("");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
   const moduleDialogRef = useRef<HTMLElement | null>(null);
+  const moduleReturnFocusRef = useRef(false);
   const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
   const editVersion = useRef(0);
 
@@ -275,11 +281,18 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     }
   }, [characterId, sheet]);
 
+  const closeModuleOverlay = () => {
+    const shouldReturnFocus = moduleReturnFocusRef.current;
+    moduleReturnFocusRef.current = false;
+    setActiveModuleId(null);
+    if (shouldReturnFocus) window.setTimeout(() => document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus(), 0);
+  };
+
   useEffect(() => {
     if (!activeModuleId) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") setActiveModuleId(null);
+      if (event.key === "Escape") closeModuleOverlay();
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
@@ -330,14 +343,18 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
   };
 
   const exportCharacter = async () => {
+    setMenuActionError("");
     setStatus("Preparing character backup...");
     try {
+      await flushPendingCharacterEdits();
       const created = await createCharacterBackup(characterId);
       const result = await downloadBackup(created, "character");
       const action = result.deliveryMethod === "shared" ? "shared" : result.deliveryMethod === "opened" ? "opened in a new tab" : "download started";
       setStatus(`Character export ${action}: ${result.fileName} · ${result.fileSizeLabel} · ${result.timeLabel}`);
     } catch (error) {
-      setStatus(error instanceof DOMException && error.name === "AbortError" ? "Export canceled. No character backup was shared or downloaded." : error instanceof Error ? error.message : "Could not export character");
+      const message = error instanceof DOMException && error.name === "AbortError" ? "Export canceled. No character backup was shared or downloaded." : error instanceof Error ? error.message : "Could not export character";
+      setStatus(message);
+      setMenuActionError(message);
     }
   };
 
@@ -429,14 +446,38 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
     }
   };
 
-  const navigateSheet = (section: SheetNavigatorSection) => {
-    const { targetId } = selectSheetNavigatorSection(section.id, window.location.hash);
-    if (!document.getElementById(targetId)) {
-      setActiveModuleId(section.id);
-      return;
+  const restoreCharacterMenuFocus = () => {
+    window.setTimeout(() => document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus(), 0);
+  };
+
+  const handleCharacterMenuItem = async (item: CharacterMenuItem) => {
+    setMenuActionError("");
+    try {
+      const intent = characterMenuIntent(item, characterId);
+      switch (intent.kind) {
+        case "section":
+          setActiveModuleId(null);
+          scrollToSheetTargetId(intent.targetId);
+          return;
+        case "overlay":
+          moduleReturnFocusRef.current = true;
+          if (intent.enableLayoutEditing) setCustomizeLayout(true);
+          setActiveModuleId(intent.targetId);
+          return;
+        case "route":
+          await flushPendingCharacterEdits();
+          window.location.hash = intent.hash;
+          return;
+        case "export":
+          await exportCharacter();
+          restoreCharacterMenuFocus();
+          return;
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "The destination could not be opened.";
+      setMenuActionError(`${item.label} could not be opened. ${detail}`);
+      restoreCharacterMenuFocus();
     }
-    setActiveModuleId(null);
-    scrollToSheetTargetId(targetId);
   };
 
   const updateLayoutOrder = (change: (currentOrder: readonly string[]) => SheetLayoutSectionId[]) => {
@@ -610,8 +651,8 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         <small>Opening these tools is an intentional route change. The navigator itself keeps you on this sheet.</small>
       </div>
       <div className="layout-customize-actions">
-        <a className="primary-button button-link" href={`#spellbook/${characterId}`}>Open spellbook</a>
-        <a className="secondary-button button-link" href="#library">Open PDF Library</a>
+        <a className="primary-button button-link" href={characterMenuRouteHash("spellbook", characterId)}>Open spellbook</a>
+        <a className="secondary-button button-link" href={characterMenuRouteHash("pdf-library", characterId)}>Open PDF Library</a>
       </div>
     </div>
   );
@@ -709,7 +750,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         return <>
           <div className="form-grid"><label className="form-field"><span>Spellcasting ability</span><select onChange={(event) => edit((current) => ({ ...current, spellcastingAbility: event.target.value ? event.target.value as AbilityId : null }))} value={sheet.spellcastingAbility ?? ""}><option value="">None / not set</option>{abilityIds.map((ability) => <option key={ability} value={ability}>{abilityLabels[ability]}</option>)}</select></label><label className="form-field"><span>Spell save DC</span><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSaveDc: Number(event.target.value) }))} type="number" value={sheet.spellSaveDc} /></label><label className="form-field"><span>Spell attack bonus</span><input onChange={(event) => edit((current) => ({ ...current, spellAttackBonus: Number(event.target.value) }))} type="number" value={sheet.spellAttackBonus} /></label><label className="form-field level-up-field"><span>Spell slots <LevelUpHint /></span><div className="slot-grid">{Array.from({ length: 9 }, (_, index) => String(index + 1)).map((level) => <label key={level}><small>L{level}</small><input min={0} onChange={(event) => edit((current) => ({ ...current, spellSlots: { ...current.spellSlots, [level]: Number(event.target.value) } }))} type="number" value={sheet.spellSlots[level] ?? 0} /></label>)}</div></label><label className="form-field"><span>Cantrips</span><textarea onChange={(event) => edit((current) => ({ ...current, cantrips: event.target.value }))} rows={5} value={sheet.cantrips} /></label><label className="form-field"><span>Prepared spells</span><textarea onChange={(event) => edit((current) => ({ ...current, preparedSpells: event.target.value }))} rows={5} value={sheet.preparedSpells} /></label><label className="form-field full-width"><span>Spell notes</span><textarea onChange={(event) => edit((current) => ({ ...current, spellNotes: event.target.value }))} rows={5} value={sheet.spellNotes} /></label></div>
           <div className="sheet-spell-list">
-            <div className="form-section-heading"><div><span className="card-label">Prepared reference</span><h3>{spells.length} saved spells</h3></div><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Manage spellbook</a></div>
+            <div className="form-section-heading"><div><span className="card-label">Prepared reference</span><h3>{spells.length} saved spells</h3></div><a className="secondary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Manage spellbook</a></div>
             {spells.length ? <div className="spell-play-grid">{spells.map((spell) => <button className="spell-play-card" key={spell.id} onClick={() => setSelectedSpellId(spell.id)} type="button"><span>{spell.level === 0 ? "Cantrip" : `Level ${spell.level}`}</span><strong>{spell.name}</strong><small>{spell.school} · {spell.castingTime}</small></button>)}</div> : <div className="spell-empty compact-empty"><strong>No saved spells yet</strong><span>Add spells in the full spellbook, then tap one here for play details.</span></div>}
           </div>
           <SpellSlotTracker onChange={(nextSheet) => edit(() => nextSheet)} sheet={sheet} />
@@ -738,12 +779,22 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         return renderBookDetail();
       case "layout":
         return renderLayoutDetail();
+      case "portrait":
+        return <CharacterPortraitField
+          characterName={character.name}
+          label="Portrait"
+          onChange={(portraitDataUrl) => updateCharacterField({ portraitDataUrl })}
+          value={character.portraitDataUrl ?? ""}
+        />;
       case "dashboard":
         return null;
     }
   };
 
-  const openModuleOverlay = (id: SheetNavigatorSectionId) => setActiveModuleId(id);
+  const openModuleOverlay = (id: SheetNavigatorSectionId) => {
+    moduleReturnFocusRef.current = false;
+    setActiveModuleId(id);
+  };
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
     customizeMode: customizeLayout,
@@ -777,9 +828,9 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           <div className="dashboard-actions">
             {customizeLayout && <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>}
             <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
-            <a className="primary-button compact button-link" href={`#spellbook/${characterId}`}>Spellbook</a>
+            <a className="primary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Spellbook</a>
             <button className="secondary-button compact" onClick={() => void exportCharacter()} type="button">Export</button>
-            <a className="secondary-button compact button-link" href={`#character/${characterId}`}>Profile</a>
+            <a className="secondary-button compact button-link" href={characterMenuRouteHash("profile", characterId)}>Profile</a>
           </div>
         </header>
 
@@ -823,9 +874,10 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </section>
 
-      <CharacterHud character={character} onNavigate={navigateSheet} sections={sheetNavigatorSections} />
+      <CharacterHud character={character} items={characterMenuItems} onSelectMenuItem={(item) => void handleCharacterMenuItem(item)} />
 
       {switchAnnouncement && <p aria-live="polite" className="character-switch-toast" role="status">{switchAnnouncement}</p>}
+      {menuActionError && <p aria-live="assertive" className="panel inline-message tool-status" role="alert">{menuActionError}</p>}
 
       <section className="abilities-panel abilities-senses-region" id="sheet-section-abilities" aria-labelledby="abilities-senses-title" tabIndex={-1}>
         <div className="sheet-region-heading">
@@ -858,7 +910,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         </div>
       </div>}
 
-      {activeModuleId && <div className="module-overlay" onMouseDown={() => setActiveModuleId(null)} role="presentation">
+      {activeModuleId && <div className="module-overlay" onMouseDown={closeModuleOverlay} role="presentation">
         <section
           aria-labelledby="module-overlay-title"
           aria-modal="true"
@@ -873,7 +925,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
               <span className="card-label">Live play module</span>
               <h2 id="module-overlay-title">{overlaySectionTitles[activeModuleId]}</h2>
             </div>
-            <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={() => setActiveModuleId(null)} type="button">X</button>
+            <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={closeModuleOverlay} type="button">X</button>
           </div>
           <div className="module-overlay-body">
             {renderOverlayDetail(activeModuleId)}
@@ -976,7 +1028,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
         eyebrow="Spellbook and slots"
         title="Spells"
         summary={<div className="module-summary"><span>{preparedSpellCount} prepared</span><strong>{cantripCount} cantrips</strong><small>{totalSlotCount ? `${Math.max(0, totalSlotCount - usedSlotCount)} / ${totalSlotCount} slots remaining` : "No slots set"}</small></div>}
-        actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={`#spellbook/${characterId}`}>Full spellbook</a></>}
+        actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Full spellbook</a></>}
         onOpenDetails={() => openModuleOverlay("spells")}
       />
       </LayoutCard>

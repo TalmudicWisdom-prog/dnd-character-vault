@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { UpdatePrompt } from "../components/UpdatePrompt";
 import { CharacterEditorPage } from "../features/characters/CharacterEditorPage";
@@ -49,10 +49,12 @@ function routeFromHash(): AppRoute {
 
 export function App() {
   const [route, setRoute] = useState<AppRoute>(routeFromHash);
+  const currentRouteHashRef = useRef(window.location.hash || "#characters");
 
   useEffect(() => {
     const onHashChange = () => {
-      rememberScroll();
+      rememberScroll(currentRouteHashRef.current);
+      currentRouteHashRef.current = window.location.hash || "#characters";
       const next = routeFromHash();
       setRoute(next);
       rememberRoute();

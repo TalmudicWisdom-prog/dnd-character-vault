@@ -976,6 +976,7 @@ h1, h2, strong { color: var(--ink); }
 .sheet-section-option-icon { display: grid; place-items: center; width: 32px; height: 32px; color: var(--fantasy-gold); background: rgb(0 0 0 / 0.2); border: 1px solid color-mix(in srgb, var(--fantasy-gold) 42%, var(--sheet-border)); border-radius: 9px; font-size: 0.67rem; font-weight: 950; }
 .sheet-section-option.active .sheet-section-option-icon { color: #fff; border-color: color-mix(in srgb, #fff 58%, var(--fantasy-blue-glow)); }
 .sheet-section-option-label { min-width: 0; overflow: hidden; font-size: 0.78rem; line-height: 1.2; text-overflow: ellipsis; }
+.sheet-section-action-marker { display: grid; place-items: center; color: var(--fantasy-gold); font-size: 0.95rem; font-weight: 950; }
 .sheet-section-current-marker { display: grid; place-items: center; color: #fff; font-size: 0.86rem; font-weight: 950; }
 .sheet-section-arrival { animation: sheet-section-arrival 1s ease-out; }
 @keyframes sheet-section-popover-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }

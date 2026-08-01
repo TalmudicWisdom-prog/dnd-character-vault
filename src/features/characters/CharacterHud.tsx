@@ -6,12 +6,12 @@ import { flushPendingCharacterEdits } from "../../app/sessionRestore";
 import { db } from "../../storage/database";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { SheetNavigator } from "./SheetNavigator";
-import type { SheetNavigatorSection } from "./sheetLayout";
+import type { CharacterMenuItem, SheetNavigatorSection } from "./sheetLayout";
 
 type CharacterHudProps = {
   character: Character;
-  onNavigate: (section: SheetNavigatorSection) => void;
-  sections: SheetNavigatorSection[];
+  items: CharacterMenuItem[];
+  onSelectMenuItem: (item: CharacterMenuItem) => void;
 };
 
 export function switcherMode(characterCount: number) {
@@ -20,12 +20,13 @@ export function switcherMode(characterCount: number) {
   return "panel" as const;
 }
 
-export function CharacterHud({ character, onNavigate, sections }: CharacterHudProps) {
+export function CharacterHud({ character, items, onSelectMenuItem }: CharacterHudProps) {
   const storedCharacters = useLiveQuery(() => db.characters.toArray(), []) ?? [];
   const characters = useMemo(() => rankAvailableCharacters(storedCharacters), [storedCharacters]);
   const mode = switcherMode(characters.length);
   const [openHudPanel, setOpenHudPanel] = useState<"characters" | "sections" | null>(null);
-  const [activeSection, setActiveSection] = useState(sections[0]);
+  const sheetSections = useMemo(() => items.filter((item): item is SheetNavigatorSection => item.kind === "section"), [items]);
+  const [activeSection, setActiveSection] = useState(sheetSections[0]);
   const [query, setQuery] = useState("");
   const [switchingId, setSwitchingId] = useState("");
   const [isScrolling, setIsScrolling] = useState(false);
@@ -85,7 +86,7 @@ export function CharacterHud({ character, onNavigate, sections }: CharacterHudPr
     setSwitchingId(target.id);
     setOpenHudPanel(null);
     await flushPendingCharacterEdits();
-    rememberPendingSheetSection(activeSection?.targetId ?? sections[0]?.targetId ?? "");
+    rememberPendingSheetSection(activeSection?.targetId ?? sheetSections[0]?.targetId ?? "");
     await activateCharacter(target.id);
     queueCharacterAnnouncement(`Switched to ${target.name}.`);
     window.location.hash = `sheet/${target.id}`;
@@ -125,11 +126,11 @@ export function CharacterHud({ character, onNavigate, sections }: CharacterHudPr
       )}
 
       <SheetNavigator
+        items={items}
         onActiveSectionChange={setActiveSection}
-        onNavigate={onNavigate}
         onOpenChange={(open) => setOpenHudPanel(open ? "sections" : null)}
+        onSelect={onSelectMenuItem}
         open={openHudPanel === "sections"}
-        sections={sections}
       />
 
       {openHudPanel === "characters" && (

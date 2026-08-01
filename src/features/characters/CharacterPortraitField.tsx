@@ -1,4 +1,4 @@
-import { useId, useState, type ChangeEvent } from "react";
+import { useId, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 const maxSourceBytes = 8 * 1024 * 1024;
 const maxStoredDataUrlLength = 1_500_000;
@@ -90,7 +90,11 @@ export function CharacterPortraitField({ characterName, compact = false, label =
     <div className="portrait-picker-controls">
       <span className="form-field-label">{label}</span>
       <div className="portrait-picker-actions">
-        <label className="secondary-button compact file-button" htmlFor={inputId}>
+        <label className="secondary-button compact file-button" data-portrait-file-label htmlFor={inputId} onKeyDown={(event: KeyboardEvent<HTMLLabelElement>) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          document.getElementById(inputId)?.click();
+        }} tabIndex={0}>
           {value ? "Change picture" : "Add picture"}
           <input accept="image/*" id={inputId} onChange={(event) => void choosePortrait(event)} type="file" />
         </label>
