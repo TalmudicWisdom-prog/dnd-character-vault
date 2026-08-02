@@ -24,7 +24,7 @@ const emptyDraft: CharacterDraft = {
   characterClass: "",
   portraitDataUrl: "",
   portraitImageId: "",
-  portraitTransform: { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null },
+  portraitTransform: { mode: "cover", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null, version: 1, updatedAt: null },
   level: 1,
 };
 

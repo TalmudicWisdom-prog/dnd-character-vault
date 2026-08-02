@@ -1,17 +1,23 @@
 import { z } from "zod";
 
+export const portraitFramingModeSchema = z.enum(["cover", "contain"]);
+export type PortraitFramingMode = z.infer<typeof portraitFramingModeSchema>;
+
 export const portraitTransformSchema = z.object({
+  mode: portraitFramingModeSchema.default("cover"),
   zoom: z.number().min(1).max(8).default(1),
   offsetX: z.number().min(-4).max(4).default(0),
   offsetY: z.number().min(-4).max(4).default(0),
+  naturalWidth: z.number().int().positive().nullable().default(null),
+  naturalHeight: z.number().int().positive().nullable().default(null),
   version: z.number().int().min(1).default(1),
   updatedAt: z.string().datetime().nullable().default(null),
 });
 
 export type PortraitTransform = z.infer<typeof portraitTransformSchema>;
 
-export function centeredPortraitTransform(): PortraitTransform {
-  return { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null };
+export function centeredPortraitTransform(mode: PortraitFramingMode = "cover", naturalWidth: number | null = null, naturalHeight: number | null = null): PortraitTransform {
+  return { mode, zoom: 1, offsetX: 0, offsetY: 0, naturalWidth, naturalHeight, version: 1, updatedAt: null };
 }
 
 export const characterSchema = z.object({

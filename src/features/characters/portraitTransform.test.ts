@@ -5,13 +5,19 @@ import {
   fitImageWithoutCropping,
   initialPortraitTransform,
   panPortrait,
+  portraitBaseScale,
+  portraitFrameAspectForViewport,
   portraitOffsetBounds,
+  portraitRenderedSize,
+  smartPortraitMode,
+  switchPortraitMode,
   zoomPortrait,
   type PortraitGeometry,
 } from "./portraitTransform";
 
 const landscape: PortraitGeometry = { frameWidth: 400, frameHeight: 500, imageWidth: 1600, imageHeight: 900 };
 const portrait: PortraitGeometry = { frameWidth: 400, frameHeight: 500, imageWidth: 900, imageHeight: 1600 };
+const tallInWideFrame: PortraitGeometry = { frameWidth: 400, frameHeight: 225, imageWidth: 900, imageHeight: 1600 };
 
 describe("portrait positioning and cropping", () => {
   it("uses smart cover framing: landscape fits height and portrait fits width", () => {
@@ -39,7 +45,8 @@ describe("portrait positioning and cropping", () => {
   });
 
   it("resets to the non-destructive initial framing", () => {
-    expect(initialPortraitTransform()).toEqual({ zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null });
+    expect(initialPortraitTransform()).toEqual({ mode: "cover", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null, version: 1, updatedAt: null });
+    expect(initialPortraitTransform("contain", 900, 1600)).toMatchObject({ mode: "contain", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: 900, naturalHeight: 1600 });
   });
 
   it("falls back safely for non-finite zoom and offsets", () => {
@@ -55,6 +62,45 @@ describe("portrait positioning and cropping", () => {
   it("keeps image proportions instead of producing a square crop", () => {
     expect(fitImageWithoutCropping(4000, 1000, 2000)).toEqual({ width: 2000, height: 500 });
     expect(fitImageWithoutCropping(1000, 4000, 2000)).toEqual({ width: 500, height: 2000 });
+  });
+
+  it("uses cover scale for Fill Frame and contain scale for Show Full Image", () => {
+    expect(portraitBaseScale("cover", tallInWideFrame)).toBeCloseTo(400 / 900);
+    expect(portraitBaseScale("contain", tallInWideFrame)).toBeCloseTo(225 / 1600);
+    expect(portraitBaseScale("contain", tallInWideFrame)).toBeLessThan(portraitBaseScale("cover", tallInWideFrame));
+  });
+
+  it("shows a complete tall image in a wide frame without stretching", () => {
+    const rendered = portraitRenderedSize("contain", 1, tallInWideFrame);
+    expect(rendered.height).toBeCloseTo(225);
+    expect(rendered.width).toBeCloseTo(126.5625);
+    expect(rendered.width / rendered.height).toBeCloseTo(900 / 1600);
+    expect(rendered.width).toBeLessThanOrEqual(tallInWideFrame.frameWidth);
+    expect(rendered.height).toBeLessThanOrEqual(tallInWideFrame.frameHeight);
+  });
+
+  it("switches base modes safely and resets mode-specific zoom and offsets", () => {
+    const cropped = { ...centeredPortraitTransform("cover", 900, 1600), zoom: 2.4, offsetY: -0.3 };
+    const contained = switchPortraitMode(cropped, "contain", tallInWideFrame);
+    expect(contained).toMatchObject({ mode: "contain", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: 900, naturalHeight: 1600 });
+    expect(switchPortraitMode(contained, "cover", tallInWideFrame)).toMatchObject({ mode: "cover", zoom: 1, offsetX: 0, offsetY: 0 });
+  });
+
+  it("allows contained artwork to move within padding without losing it off-screen", () => {
+    const transform = centeredPortraitTransform("contain", 900, 1600);
+    const bounds = portraitOffsetBounds(1, tallInWideFrame, "contain");
+    expect(bounds.x).toBeGreaterThan(0);
+    expect(bounds.y).toBe(0);
+    const moved = panPortrait(transform, 10000, 10000, tallInWideFrame);
+    expect(moved.offsetX).toBeCloseTo(bounds.x);
+    expect(moved.offsetY).toBe(0);
+  });
+
+  it("chooses Show Full Image for dramatic aspect mismatch and Fill Frame for similar images", () => {
+    expect(smartPortraitMode(900, 1600, 16 / 9)).toBe("contain");
+    expect(smartPortraitMode(800, 1000, 4 / 5)).toBe("cover");
+    expect(portraitFrameAspectForViewport(390)).toBeCloseTo(16 / 9);
+    expect(portraitFrameAspectForViewport(768)).toBeCloseTo(4 / 5);
   });
 
   it("clamps the same normalized transform safely for responsive HUD dimensions", () => {

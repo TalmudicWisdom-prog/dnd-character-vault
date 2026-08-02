@@ -748,8 +748,11 @@ h1, h2, strong { color: var(--ink); }
   box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 255 255 / 0.03);
 }
 .portrait-frame > span:not(.portrait-image) { font-family: Georgia, serif; font-size: clamp(4rem, 11vw, 8rem); font-weight: 500; }
-.portrait-image { position: absolute; inset: 0; display: block; overflow: hidden; }
-.portrait-image-pan { position: absolute; inset: 0; display: block; will-change: transform; }
+.portrait-image { position: absolute; inset: 0; display: block; overflow: hidden; background: linear-gradient(145deg, color-mix(in srgb, var(--fantasy-bronze) 13%, #090706), #090706 62%); }
+.portrait-image-backdrop { position: absolute; z-index: 0; inset: -8%; display: block; overflow: hidden; background: #090706; }
+.portrait-image-backdrop::after { position: absolute; inset: 0; content: ""; background: linear-gradient(180deg, rgb(8 6 5 / 0.38), rgb(8 6 5 / 0.68)); }
+.portrait-image-backdrop img { width: 100%; height: 100%; object-fit: cover; filter: blur(18px) saturate(0.78); transform: scale(1.12); }
+.portrait-image-pan { position: absolute; z-index: 1; inset: 0; display: block; will-change: transform; }
 .portrait-image img { width: 100%; height: 100%; display: block; object-fit: cover; transform-origin: center; user-select: none; -webkit-user-drag: none; will-change: transform; }
 .portrait-image-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 10px; color: var(--muted); background: linear-gradient(180deg, var(--sheet-panel-strong), var(--sheet-panel)); font-size: 0.72rem; text-align: center; }
 .portrait-warning { margin: 0; padding: 8px 10px; color: var(--sheet-text); background: color-mix(in srgb, var(--fantasy-gold) 10%, transparent); border: 1px solid color-mix(in srgb, var(--fantasy-gold) 38%, var(--line)); border-radius: var(--radius-sm); font-size: 0.74rem; line-height: 1.4; }
@@ -834,6 +837,12 @@ h1, h2, strong { color: var(--ink); }
 .portrait-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .portrait-editor-header h2 { margin: 3px 0 0; font-family: var(--font-display); font-size: clamp(1.7rem, 5vw, 2.35rem); font-weight: 500; }
 .portrait-editor-dialog > p { margin: 0; color: var(--muted); line-height: 1.45; }
+.portrait-framing-control { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.portrait-framing-control button { min-height: 68px; display: grid; gap: 4px; align-content: center; padding: 10px 12px; color: var(--muted); background: color-mix(in srgb, var(--sheet-panel-strong) 82%, #000); border: 1px solid var(--sheet-border); border-radius: var(--radius-sm); text-align: left; }
+.portrait-framing-control button strong { color: var(--sheet-text); font-size: 0.88rem; }
+.portrait-framing-control button span { font-size: 0.7rem; line-height: 1.3; }
+.portrait-framing-control button.active { color: var(--sheet-text); background: color-mix(in srgb, var(--sheet-accent) 13%, var(--sheet-panel-strong)); border-color: color-mix(in srgb, var(--sheet-accent) 68%, var(--sheet-border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-accent) 20%, transparent); }
+.portrait-framing-control button.active strong::before { margin-right: 6px; content: "✓"; color: var(--sheet-accent); }
 .portrait-editor-frame {
   --portrait-frame-aspect: 4 / 5;
   position: relative;
@@ -1626,6 +1635,7 @@ h1, h2, strong { color: var(--ink); }
   .portrait-editor-backdrop { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
   .portrait-editor-dialog { max-height: calc(100dvh - 20px); padding: 14px; gap: 11px; border-radius: var(--radius-md); }
   .portrait-editor-frame { width: min(310px, 72vw); }
+  .portrait-framing-control button { min-height: 62px; padding: 8px 9px; }
   .portrait-editor-keyboard-help { display: none; }
   .dashboard .sheet-character-header { grid-column: 2; min-height: 132px; padding: 10px; }
   .dashboard .sheet-character-header h1 { font-size: clamp(1.65rem, 9vw, 2rem); overflow-wrap: anywhere; }

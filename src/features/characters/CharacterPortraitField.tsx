@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent,
 } from "react";
-import type { PortraitTransform } from "../../domain/models";
+import type { PortraitFramingMode, PortraitTransform } from "../../domain/models";
 import { centeredPortraitTransform } from "../../domain/models";
 import { PortraitImage } from "./PortraitImage";
 import {
@@ -17,6 +17,9 @@ import {
   initialPortraitTransform,
   maximumPortraitZoom,
   panPortrait,
+  portraitFrameAspectForViewport,
+  smartPortraitMode,
+  switchPortraitMode,
   validatePortraitTransform,
   zoomPortrait,
   type PortraitGeometry,
@@ -170,7 +173,12 @@ export function CharacterPortraitField({
   const resetPosition = () => {
     stopMomentum();
     setIsResetting(true);
-    setTransform(initialPortraitTransform());
+    setTransform(initialPortraitTransform(
+      transformRef.current.mode,
+      candidate?.width ?? transformRef.current.naturalWidth,
+      candidate?.height ?? transformRef.current.naturalHeight,
+    ));
+    setStatus(`${transformRef.current.mode === "contain" ? "Show Full Image" : "Fill Frame"} position reset to centered 100%.`);
     if (resetTimerRef.current != null) window.clearTimeout(resetTimerRef.current);
     resetTimerRef.current = window.setTimeout(() => setIsResetting(false), 220);
   };
@@ -204,7 +212,7 @@ export function CharacterPortraitField({
     setStatus("Opening portrait editor...");
     try {
       const image = await loadImage(value);
-      setTransform(safeTransform.transform);
+      setTransform({ ...safeTransform.transform, naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight });
       setCandidate({ dataUrl: value, imageId: imageId || crypto.randomUUID(), width: image.naturalWidth, height: image.naturalHeight });
       setStatus("");
     } catch (error) {
@@ -221,9 +229,10 @@ export function CharacterPortraitField({
     try {
       const prepared = await preparePortraitSource(file);
       stopMomentum();
-      setTransform(initialPortraitTransform());
+      const mode = smartPortraitMode(prepared.width, prepared.height, portraitFrameAspectForViewport(window.innerWidth));
+      setTransform(initialPortraitTransform(mode, prepared.width, prepared.height));
       setCandidate({ ...prepared, imageId: crypto.randomUUID() });
-      setStatus("Position the portrait, then save.");
+      setStatus(mode === "contain" ? "Show Full Image selected so the complete artwork is visible." : "Fill Frame selected. Position the portrait, then save.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not prepare that picture.");
     }
@@ -242,6 +251,8 @@ export function CharacterPortraitField({
     try {
       const savedTransform = {
         ...clampPortraitTransform(transformRef.current, geometry()),
+        naturalWidth: candidate.width,
+        naturalHeight: candidate.height,
         version: 1,
         updatedAt: new Date().toISOString(),
       };
@@ -268,12 +279,25 @@ export function CharacterPortraitField({
 
   const resetSavedFraming = async () => {
     if (!value) return;
-    await onChange({ imageDataUrl: value, imageId, transform: centeredPortraitTransform() });
-    setTransform(centeredPortraitTransform());
+    const reset = centeredPortraitTransform(safeTransform.transform.mode, safeTransform.transform.naturalWidth, safeTransform.transform.naturalHeight);
+    await onChange({ imageDataUrl: value, imageId, transform: reset });
+    setTransform(reset);
     setLocallySuppressed(false);
     setPortraitFailed(false);
     setPortraitWarning("");
     setStatus("Portrait framing reset. No other character data was changed.");
+  };
+
+  const changeFramingMode = (mode: PortraitFramingMode) => {
+    if (mode === transformRef.current.mode) return;
+    stopMomentum();
+    setIsResetting(true);
+    setTransform(switchPortraitMode(transformRef.current, mode, geometry()));
+    setStatus(mode === "contain"
+      ? "Show Full Image selected. The entire image is visible with background padding."
+      : "Fill Frame selected. The portrait fills the area and some cropping may occur.");
+    if (resetTimerRef.current != null) window.clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = window.setTimeout(() => setIsResetting(false), 220);
   };
 
   const beginMomentum = () => {
@@ -451,7 +475,12 @@ export function CharacterPortraitField({
               <div><span className="card-label">Live HUD preview</span><h2 id="portrait-editor-title">Position portrait</h2></div>
               <button aria-label="Cancel portrait editing" className="sheet-section-close" onClick={cancelEditor} type="button">×</button>
             </header>
-            <p id="portrait-editor-help">Drag to position. Pinch or use the slider to zoom. Double-tap to reset.</p>
+            <p id="portrait-editor-help">Choose whether to fill the banner or show the complete artwork, then drag and zoom to position it.</p>
+            <div aria-label="Portrait framing mode" className="portrait-framing-control" role="group">
+              <button aria-pressed={draftTransform.mode === "cover"} className={draftTransform.mode === "cover" ? "active" : ""} onClick={() => changeFramingMode("cover")} type="button"><strong>Fill Frame</strong><span>Fills the portrait area. Some cropping may occur.</span></button>
+              <button aria-pressed={draftTransform.mode === "contain"} className={draftTransform.mode === "contain" ? "active" : ""} onClick={() => changeFramingMode("contain")} type="button"><strong>Show Full Image</strong><span>Displays the entire image with background padding.</span></button>
+            </div>
+            <span aria-live="polite" className="sr-only">{status}</span>
             <div
               aria-label="Portrait positioning area. Use arrow keys to move, plus or minus to zoom, Enter to save, and Escape to cancel."
               className={isResetting ? "portrait-editor-frame resetting" : "portrait-editor-frame"}
@@ -471,7 +500,7 @@ export function CharacterPortraitField({
             </div>
             <div className="portrait-editor-zoom">
               <label htmlFor={`${replacementInputId}-zoom`}>Zoom <output>{Math.round(draftTransform.zoom * 100)}%</output></label>
-              <div><button aria-label="Zoom out" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom - 0.1)} type="button">−</button><input id={`${replacementInputId}-zoom`} max={maximumPortraitZoom} min={1} onChange={(event) => changeZoom(Number(event.target.value))} step={0.01} type="range" value={draftTransform.zoom} /><button aria-label="Zoom in" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom + 0.1)} type="button">+</button></div>
+              <div><button aria-label="Zoom out" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom - 0.1)} type="button">−</button><input aria-valuetext={`${Math.round(draftTransform.zoom * 100)}% relative to ${draftTransform.mode === "contain" ? "Show Full Image" : "Fill Frame"}`} id={`${replacementInputId}-zoom`} max={maximumPortraitZoom} min={1} onChange={(event) => changeZoom(Number(event.target.value))} step={0.01} type="range" value={draftTransform.zoom} /><button aria-label="Zoom in" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom + 0.1)} type="button">+</button></div>
             </div>
             <div className="portrait-editor-actions">
               <label className="secondary-button compact file-button" htmlFor={replacementInputId}>Replace image<input accept="image/*" id={replacementInputId} onChange={(event) => void choosePortrait(event)} type="file" /></label>

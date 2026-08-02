@@ -37,4 +37,14 @@ describe("portrait image crash containment", () => {
     expect(markup).toContain("Portrait could not be displayed");
     expect(markup).toContain("AV");
   });
+
+  it("renders the same undistorted contain treatment used by editor and live HUD", () => {
+    const markup = renderToStaticMarkup(
+      <PortraitImage src="data:image/jpeg;base64,tall" transform={centeredPortraitTransform("contain", 900, 1600)} />,
+    );
+    expect(markup).toContain('data-portrait-mode="contain"');
+    expect(markup).toContain("portrait-image-backdrop");
+    expect(markup).toContain("object-fit:contain");
+    expect(markup).toContain("portrait-image-foreground");
+  });
 });

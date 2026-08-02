@@ -53,9 +53,14 @@ class PortraitRenderBoundary extends Component<{ children: ReactNode; fallback?:
 
 function PortraitImageContent({ alt = "", className = "", decoding = "async", fallback, loading = "eager", onError, onInvalidTransform, src, transform }: PortraitImageProps) {
   const rootRef = useRef<HTMLSpanElement | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [geometry, setGeometry] = useState<PortraitGeometry>({ frameWidth: 0, frameHeight: 0, imageWidth: 0, imageHeight: 0 });
   const validation = validatePortraitTransform(transform);
+  const [failed, setFailed] = useState(false);
+  const [geometry, setGeometry] = useState<PortraitGeometry>({
+    frameWidth: 0,
+    frameHeight: 0,
+    imageWidth: validation.transform.naturalWidth ?? 0,
+    imageHeight: validation.transform.naturalHeight ?? 0,
+  });
   const sourceValid = isStablePortraitSource(src);
 
   const handleFailure = () => {
@@ -73,6 +78,15 @@ function PortraitImageContent({ alt = "", className = "", decoding = "async", fa
       try { onInvalidTransform?.(); } catch { /* Invalid metadata always falls back locally. */ }
     }
   }, [validation.valid, onInvalidTransform]);
+
+  useEffect(() => {
+    if (!validation.transform.naturalWidth || !validation.transform.naturalHeight) return;
+    setGeometry((current) => ({
+      ...current,
+      imageWidth: validation.transform.naturalWidth ?? current.imageWidth,
+      imageHeight: validation.transform.naturalHeight ?? current.imageHeight,
+    }));
+  }, [validation.transform.naturalWidth, validation.transform.naturalHeight]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -101,16 +115,18 @@ function PortraitImageContent({ alt = "", className = "", decoding = "async", fa
 
   const displayed = clampPortraitTransform(validation.transform, geometry);
   return (
-    <span className={`portrait-image ${className}`.trim()} ref={rootRef}>
+    <span className={`portrait-image ${className}`.trim()} data-portrait-mode={displayed.mode} ref={rootRef}>
+      {displayed.mode === "contain" && <span aria-hidden="true" className="portrait-image-backdrop"><img alt="" src={src} /></span>}
       <span className="portrait-image-pan" style={{ transform: `translate3d(${displayed.offsetX * 100}%, ${displayed.offsetY * 100}%, 0)` }}>
         <img
           alt={alt}
+          className="portrait-image-foreground"
           decoding={decoding}
           loading={loading}
           onError={handleFailure}
           onLoad={handleImageLoad}
           src={src}
-          style={{ transform: `scale(${displayed.zoom})` }}
+          style={{ objectFit: displayed.mode === "contain" ? "contain" : "cover", transform: `scale(${displayed.zoom})` }}
         />
       </span>
     </span>

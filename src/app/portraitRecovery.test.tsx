@@ -80,7 +80,7 @@ describe("portrait startup recovery", () => {
       level: 8,
       portraitDataUrl: "data:image/jpeg;base64,akiva",
       portraitImageId: "akiva-original",
-      portraitTransform: { zoom: 3, offsetX: -0.4, offsetY: 0.2, version: 1, updatedAt: "2026-08-01T12:00:00.000Z" },
+      portraitTransform: { mode: "contain", zoom: 3, offsetX: -0.4, offsetY: 0.2, naturalWidth: 900, naturalHeight: 1600, version: 1, updatedAt: "2026-08-01T12:00:00.000Z" },
     });
     await saveCharacterSheet({ ...createEmptyCharacterSheet(character.id), notes: "Important session notes", currentHp: 27, maxHp: 42 });
     local.setItem("vault:active-character-id", character.id);
@@ -89,7 +89,7 @@ describe("portrait startup recovery", () => {
 
     const restored = await db.characters.get(character.id);
     expect(restored).toMatchObject({ name: "Akiva", summary: "Preserve me", portraitDataUrl: "data:image/jpeg;base64,akiva", portraitImageId: "akiva-original" });
-    expect(restored?.portraitTransform).toEqual({ zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null });
+    expect(restored?.portraitTransform).toEqual({ mode: "cover", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null, version: 1, updatedAt: null });
     expect(await db.characterSheets.get(character.id)).toMatchObject({ notes: "Important session notes", currentHp: 27, maxHp: 42 });
     expect(local.getItem("vault:active-character-id")).toBe(character.id);
   });

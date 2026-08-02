@@ -100,7 +100,7 @@ describe("multi-character lifecycle", () => {
       favorite: false,
       lastOpenedAt: null,
       portraitImageId: "",
-      portraitTransform: { zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null },
+      portraitTransform: { mode: "cover", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: null, naturalHeight: null, version: 1, updatedAt: null },
     });
     expect((await db.characterSheets.get(characterId))?.characterId).toBe(characterId);
   });
@@ -148,5 +148,27 @@ describe("multi-character lifecycle", () => {
     await deleteCharacter(doomed.id);
     expect(await db.characters.get(survivor.id)).toBeTruthy();
     expect(await db.spells.get(survivorSpell.id)).toMatchObject({ name: "Safe Spell", characterId: survivor.id });
+  });
+
+  it("preserves independent framing modes and original portrait sources across character switches and reload", async () => {
+    const fullImageSource = "data:image/jpeg;base64,complete-tall-artwork";
+    const akiva = await createCharacter({
+      ...draft("Akiva"),
+      portraitDataUrl: fullImageSource,
+      portraitImageId: "akiva-tall",
+      portraitTransform: { mode: "contain", zoom: 1, offsetX: 0, offsetY: 0, naturalWidth: 900, naturalHeight: 1600, version: 1, updatedAt: null },
+    });
+    const cloud = await createCharacter({
+      ...draft("Cloud"),
+      portraitDataUrl: "data:image/jpeg;base64,cloud-wide",
+      portraitImageId: "cloud-wide",
+      portraitTransform: { mode: "cover", zoom: 1.4, offsetX: -0.1, offsetY: 0, naturalWidth: 1600, naturalHeight: 900, version: 1, updatedAt: null },
+    });
+
+    db.close();
+    await db.open();
+
+    expect(await db.characters.get(akiva.id)).toMatchObject({ portraitDataUrl: fullImageSource, portraitTransform: { mode: "contain", naturalWidth: 900, naturalHeight: 1600 } });
+    expect(await db.characters.get(cloud.id)).toMatchObject({ portraitTransform: { mode: "cover", zoom: 1.4 } });
   });
 });
