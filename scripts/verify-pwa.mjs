@@ -54,5 +54,8 @@ if (!/withResolvers:function\(\)\{/.test(appBundle)) {
 if (!serviceWorker.includes("fetch(request).then") || !serviceWorker.includes(".catch(() => caches.match(indexUrl))")) {
   throw new Error("Service worker must use network-first navigation with an offline shell fallback");
 }
+for (const marker of ["character-vault-hotfix-portrait-load-2026-08-01", "self.skipWaiting()", "client.navigate(client.url)"]) {
+  if (!serviceWorker.includes(marker)) throw new Error(`Service worker is missing portrait stability recovery marker: ${marker}`);
+}
 
 console.log(`PWA verified: relative manifest, FFXIV, multi-character, Safari-compatible PDF and structured spell import in ${appEntry}, and ${shellFiles.length} cached offline files.`);

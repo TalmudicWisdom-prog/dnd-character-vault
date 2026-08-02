@@ -27,6 +27,7 @@ for (const path of files) {
 
 const cacheVersion = digest.digest("hex").slice(0, 12);
 const serviceWorker = `const CACHE_NAME = "character-vault-shell-${cacheVersion}";
+const STABILITY_HOTFIX_MARKER = "character-vault-hotfix-portrait-load-2026-08-01";
 const APP_SHELL = ${JSON.stringify(shellFiles, null, 2)};
 const scopeUrl = new URL("./", self.registration.scope);
 const indexUrl = new URL("index.html", scopeUrl).href;
@@ -37,18 +38,27 @@ function shellUrl(path) {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL.map(shellUrl))),
+    Promise.all([caches.has(STABILITY_HOTFIX_MARKER), caches.open(CACHE_NAME)])
+      .then(([alreadyApplied, cache]) => cache.addAll(APP_SHELL.map(shellUrl))
+        .then(() => alreadyApplied ? undefined : self.skipWaiting())),
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key.startsWith("character-vault-shell-") && key !== CACHE_NAME)
-        .map((key) => caches.delete(key))),
-    ),
+    (async () => {
+      const hotfixAlreadyApplied = await caches.has(STABILITY_HOTFIX_MARKER);
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith("character-vault-shell-") && key !== CACHE_NAME)
+        .map((key) => caches.delete(key)));
+      await self.clients.claim();
+      if (!hotfixAlreadyApplied) {
+        await caches.open(STABILITY_HOTFIX_MARKER);
+        const clients = await self.clients.matchAll({ type: "window" });
+        await Promise.all(clients.map((client) => client.navigate(client.url)));
+      }
+    })(),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("message", (event) => {

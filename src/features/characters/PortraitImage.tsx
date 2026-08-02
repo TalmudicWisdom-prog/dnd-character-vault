@@ -1,21 +1,78 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode, type SyntheticEvent } from "react";
 import type { PortraitTransform } from "../../domain/models";
-import { centeredPortraitTransform } from "../../domain/models";
-import { clampPortraitTransform, type PortraitGeometry } from "./portraitTransform";
+import { clampPortraitTransform, type PortraitGeometry, validatePortraitTransform } from "./portraitTransform";
 
-type PortraitImageProps = {
+export type PortraitImageProps = {
   alt?: string;
   className?: string;
   decoding?: "async" | "auto" | "sync";
+  fallback?: ReactNode;
   loading?: "eager" | "lazy";
   onError?: () => void;
+  onInvalidTransform?: () => void;
   src: string;
   transform?: PortraitTransform;
 };
 
-export function PortraitImage({ alt = "", className = "", decoding = "async", loading = "eager", onError, src, transform }: PortraitImageProps) {
+type ImageLoadEvent = { currentTarget: Pick<HTMLImageElement, "naturalHeight" | "naturalWidth"> | null } | null;
+
+export function capturePortraitImageDimensions(event: ImageLoadEvent) {
+  const image = event?.currentTarget ?? null;
+  const naturalWidth = Number(image?.naturalWidth ?? 0);
+  const naturalHeight = Number(image?.naturalHeight ?? 0);
+  return {
+    naturalWidth: Number.isFinite(naturalWidth) && naturalWidth > 0 ? naturalWidth : 0,
+    naturalHeight: Number.isFinite(naturalHeight) && naturalHeight > 0 ? naturalHeight : 0,
+  };
+}
+
+export function isStablePortraitSource(src: string) {
+  return Boolean(src.trim()) && !src.trim().toLocaleLowerCase().startsWith("blob:");
+}
+
+function PortraitFallback({ children }: { children?: ReactNode }) {
+  return <span aria-label="Portrait could not be displayed" className="portrait-image-fallback">{children ?? "Portrait unavailable"}</span>;
+}
+
+class PortraitRenderBoundary extends Component<{ children: ReactNode; fallback?: ReactNode; onError?: () => void }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`Portrait rendering failed: ${error.name}: ${error.message}\n${info.componentStack}`);
+    try { this.props.onError?.(); } catch { /* Portrait recovery callbacks must never escape this boundary. */ }
+  }
+
+  render() {
+    return this.state.failed ? <PortraitFallback>{this.props.fallback}</PortraitFallback> : this.props.children;
+  }
+}
+
+function PortraitImageContent({ alt = "", className = "", decoding = "async", fallback, loading = "eager", onError, onInvalidTransform, src, transform }: PortraitImageProps) {
   const rootRef = useRef<HTMLSpanElement | null>(null);
+  const [failed, setFailed] = useState(false);
   const [geometry, setGeometry] = useState<PortraitGeometry>({ frameWidth: 0, frameHeight: 0, imageWidth: 0, imageHeight: 0 });
+  const validation = validatePortraitTransform(transform);
+  const sourceValid = isStablePortraitSource(src);
+
+  const handleFailure = () => {
+    setFailed(true);
+    try { onError?.(); } catch { /* A portrait callback cannot take down its parent view. */ }
+  };
+
+  useEffect(() => {
+    setFailed(false);
+    if (!sourceValid) handleFailure();
+  }, [src, sourceValid]);
+
+  useEffect(() => {
+    if (!validation.valid) {
+      try { onInvalidTransform?.(); } catch { /* Invalid metadata always falls back locally. */ }
+    }
+  }, [validation.valid, onInvalidTransform]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -30,8 +87,19 @@ export function PortraitImage({ alt = "", className = "", decoding = "async", lo
     return () => observer.disconnect();
   }, []);
 
-  const displayed = clampPortraitTransform(transform ?? centeredPortraitTransform(), geometry);
+  const handleImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    // Capture primitives before React/Safari releases currentTarget. Never close over the event.
+    const { naturalWidth, naturalHeight } = capturePortraitImageDimensions(event);
+    if (naturalWidth <= 0 || naturalHeight <= 0) {
+      handleFailure();
+      return;
+    }
+    setGeometry((current) => ({ ...current, imageWidth: naturalWidth, imageHeight: naturalHeight }));
+  };
 
+  if (failed || !sourceValid) return <PortraitFallback>{fallback}</PortraitFallback>;
+
+  const displayed = clampPortraitTransform(validation.transform, geometry);
   return (
     <span className={`portrait-image ${className}`.trim()} ref={rootRef}>
       <span className="portrait-image-pan" style={{ transform: `translate3d(${displayed.offsetX * 100}%, ${displayed.offsetY * 100}%, 0)` }}>
@@ -39,16 +107,20 @@ export function PortraitImage({ alt = "", className = "", decoding = "async", lo
           alt={alt}
           decoding={decoding}
           loading={loading}
-          onError={onError}
-          onLoad={(event) => setGeometry((current) => ({
-            ...current,
-            imageWidth: event.currentTarget.naturalWidth,
-            imageHeight: event.currentTarget.naturalHeight,
-          }))}
+          onError={handleFailure}
+          onLoad={handleImageLoad}
           src={src}
           style={{ transform: `scale(${displayed.zoom})` }}
         />
       </span>
     </span>
+  );
+}
+
+export function PortraitImage(props: PortraitImageProps) {
+  return (
+    <PortraitRenderBoundary fallback={props.fallback} key={props.src} onError={props.onError}>
+      <PortraitImageContent {...props} />
+    </PortraitRenderBoundary>
   );
 }

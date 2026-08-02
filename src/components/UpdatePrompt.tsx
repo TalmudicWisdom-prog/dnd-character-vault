@@ -7,7 +7,7 @@ export function UpdatePrompt() {
 
   useEffect(() => onUpdateAvailable(() => {
     setVisible(true);
-    setMessage("Update Available");
+    setMessage("An important stability update is ready.");
   }), []);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export function UpdatePrompt() {
     <aside className={visible ? "update-prompt visible" : "update-prompt"} role="status">
       <strong>{message}</strong>
       {visible ? <div>
-        <button className="primary-button compact" onClick={() => installWaitingUpdate()} type="button">Install Now</button>
+        <button className="primary-button compact" onClick={() => installWaitingUpdate()} type="button">Reload safely</button>
         <button className="secondary-button compact" onClick={() => { setVisible(false); setMessage("Update postponed. Check Settings when you are ready."); window.setTimeout(() => setMessage(""), 2200); }} type="button">Later</button>
       </div> : <small>Pull-to-refresh checked for app updates. Your local vault data stays on this device.</small>}
     </aside>

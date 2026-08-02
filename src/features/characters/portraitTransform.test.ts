@@ -42,6 +42,16 @@ describe("portrait positioning and cropping", () => {
     expect(initialPortraitTransform()).toEqual({ zoom: 1, offsetX: 0, offsetY: 0, version: 1, updatedAt: null });
   });
 
+  it("falls back safely for non-finite zoom and offsets", () => {
+    const invalid = clampPortraitTransform({
+      ...centeredPortraitTransform(),
+      zoom: Number.NaN,
+      offsetX: Number.POSITIVE_INFINITY,
+      offsetY: Number.NaN,
+    }, landscape);
+    expect(invalid).toEqual(centeredPortraitTransform());
+  });
+
   it("keeps image proportions instead of producing a square crop", () => {
     expect(fitImageWithoutCropping(4000, 1000, 2000)).toEqual({ width: 2000, height: 500 });
     expect(fitImageWithoutCropping(1000, 4000, 2000)).toEqual({ width: 500, height: 2000 });

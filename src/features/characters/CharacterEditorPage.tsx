@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { PageHeader } from "../../components/PageHeader";
-import { portraitTransformSchema, type CharacterDraft } from "../../domain/models";
+import type { CharacterDraft } from "../../domain/models";
 import {
   createCharacter,
   deleteCharacter,
@@ -13,6 +13,7 @@ import { db } from "../../storage/database";
 import { CharacterPortraitField } from "./CharacterPortraitField";
 import { activateCharacter, queueCharacterAnnouncement } from "../../app/activeCharacter";
 import { reimportSpellsFromLinkedPdf } from "../../import/spellPersistence";
+import { validatePortraitTransform } from "./portraitTransform";
 
 const emptyDraft: CharacterDraft = {
   name: "",
@@ -29,7 +30,7 @@ const emptyDraft: CharacterDraft = {
 
 type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
 
-export function CharacterEditorPage({ characterId }: { characterId: string }) {
+export function CharacterEditorPage({ characterId, suppressPortrait = false }: { characterId: string; suppressPortrait?: boolean }) {
   const isNew = characterId === "new";
   const character = useLiveQuery(
     async () => isNew ? undefined : (await db.characters.get(characterId)) ?? null,
@@ -197,7 +198,8 @@ export function CharacterEditorPage({ characterId }: { characterId: string }) {
                       setStatus("unsaved");
                     }
                   }}
-                  transform={portraitTransformSchema.parse(draft.portraitTransform)}
+                  suppressed={suppressPortrait}
+                  transform={validatePortraitTransform(draft.portraitTransform).transform}
                   value={draft.portraitDataUrl ?? ""}
                 />
               </div>

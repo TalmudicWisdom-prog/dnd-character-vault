@@ -7,7 +7,7 @@ function currentRouteKey() {
 
 export function savedRouteHash() {
   const saved = localStorage.getItem(lastRouteKey);
-  return saved?.startsWith("#") ? saved : "";
+  return saved?.startsWith("#") ? safeStartupRoute(saved) : "";
 }
 
 export function rememberRoute() {
@@ -40,3 +40,4 @@ export async function flushPendingCharacterEdits() {
   }));
   await Promise.allSettled(pending);
 }
+import { safeStartupRoute } from "./portraitRecovery";

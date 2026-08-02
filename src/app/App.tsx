@@ -17,6 +17,7 @@ import { getSettings } from "../storage/database";
 import type { PageId } from "./navigation";
 import { flushBeforeBackgrounding, rememberRoute, rememberScroll, restoreScroll, savedRouteHash } from "./sessionRestore";
 import { activateCharacter, resolveActiveCharacter } from "./activeCharacter";
+import { clearPortraitRecoveryState, safeStartupRoute, shouldSuppressPortrait } from "./portraitRecovery";
 
 type AppRoute =
   | { page: PageId; characterId?: never }
@@ -28,7 +29,7 @@ type AppRoute =
   | { page: "legal"; characterId?: never };
 
 function routeFromHash(): AppRoute {
-  const route = (window.location.hash || savedRouteHash()).replace(/^#/, "");
+  const route = safeStartupRoute(window.location.hash || savedRouteHash()).replace(/^#/, "");
   if (route.startsWith("character/")) {
     return { page: "character", characterId: route.replace("character/", "") };
   }
@@ -64,6 +65,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const requestedRoute = window.location.hash || savedRouteHash();
+    const safeRoute = safeStartupRoute(requestedRoute);
+    if (requestedRoute && safeRoute !== requestedRoute) {
+      window.location.hash = safeRoute;
+      return;
+    }
     if (!window.location.hash && savedRouteHash()) {
       window.location.hash = savedRouteHash();
       return;
@@ -77,6 +84,11 @@ export function App() {
 
   useEffect(() => {
     restoreScroll();
+  }, [route]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(clearPortraitRecoveryState, 1500);
+    return () => window.clearTimeout(timer);
   }, [route]);
 
   useEffect(() => {
@@ -136,8 +148,8 @@ export function App() {
     <AppShell currentPage={route.page === "character" || route.page === "sheet" || route.page === "spellbook" ? "characters" : route.page === "pdf" ? "library" : route.page === "import" ? "tools" : route.page === "legal" ? "settings" : route.page}>
       <UpdatePrompt />
       {route.page === "characters" && <CharacterListPage />}
-      {route.page === "character" && (route.characterId === "new" ? <CreateCharacterWizardPage /> : <CharacterEditorPage characterId={route.characterId} />)}
-      {route.page === "sheet" && <CharacterSheetPage characterId={route.characterId} />}
+      {route.page === "character" && (route.characterId === "new" ? <CreateCharacterWizardPage /> : <CharacterEditorPage characterId={route.characterId} suppressPortrait={shouldSuppressPortrait(route.characterId)} />)}
+      {route.page === "sheet" && <CharacterSheetPage characterId={route.characterId} suppressPortrait={shouldSuppressPortrait(route.characterId)} />}
       {route.page === "spellbook" && <SpellbookPage characterId={route.characterId} />}
       {route.page === "library" && <PdfLibraryPage />}
       {route.page === "pdf" && <PdfViewerPage documentId={route.documentId} />}

@@ -191,7 +191,7 @@ function InlineRollFeedback({ result }: { result?: InlineRollResult }) {
   return <output aria-live="polite" className="inline-roll-result" key={result.id}>{result.text}</output>;
 }
 
-export function CharacterSheetPage({ characterId }: { characterId: string }) {
+export function CharacterSheetPage({ characterId, suppressPortrait = false }: { characterId: string; suppressPortrait?: boolean }) {
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
   const spells = useLiveQuery(() => db.spells.where("characterId").equals(characterId).toArray(), [characterId]) ?? [];
   const [sheet, setSheet] = useState<CharacterSheet | null>(null);
@@ -785,6 +785,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           imageId={character.portraitImageId}
           label="Portrait"
           onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
+          suppressed={suppressPortrait}
           transform={character.portraitTransform}
           value={character.portraitDataUrl ?? ""}
         />;
@@ -821,6 +822,7 @@ export function CharacterSheetPage({ characterId }: { characterId: string }) {
           imageId={character.portraitImageId}
           label="Portrait"
           onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
+          suppressed={suppressPortrait}
           transform={character.portraitTransform}
           value={character.portraitDataUrl ?? ""}
         />

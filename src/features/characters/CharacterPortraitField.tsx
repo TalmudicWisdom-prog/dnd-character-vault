@@ -17,6 +17,7 @@ import {
   initialPortraitTransform,
   maximumPortraitZoom,
   panPortrait,
+  validatePortraitTransform,
   zoomPortrait,
   type PortraitGeometry,
 } from "./portraitTransform";
@@ -94,6 +95,7 @@ type CharacterPortraitFieldProps = {
   imageId?: string;
   label?: string;
   onChange: (portrait: PortraitValue) => void | Promise<void>;
+  suppressed?: boolean;
   transform?: PortraitTransform;
   value: string;
 };
@@ -120,6 +122,7 @@ export function CharacterPortraitField({
   imageId = "",
   label = "Character picture",
   onChange,
+  suppressed = false,
   transform = centeredPortraitTransform(),
   value,
 }: CharacterPortraitFieldProps) {
@@ -139,6 +142,10 @@ export function CharacterPortraitField({
   const [draftTransform, setDraftTransform] = useState<PortraitTransform>(transform);
   const [isResetting, setIsResetting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [portraitFailed, setPortraitFailed] = useState(false);
+  const [portraitWarning, setPortraitWarning] = useState("");
+  const [locallySuppressed, setLocallySuppressed] = useState(suppressed);
+  const safeTransform = validatePortraitTransform(transform);
 
   const geometry = (): PortraitGeometry => {
     const bounds = editorFrameRef.current?.getBoundingClientRect();
@@ -174,6 +181,14 @@ export function CharacterPortraitField({
   }, []);
 
   useEffect(() => {
+    if (suppressed) setLocallySuppressed(true);
+  }, [suppressed]);
+
+  useEffect(() => {
+    if (!safeTransform.valid && value) setPortraitWarning("Portrait framing was reset because its saved settings were invalid.");
+  }, [safeTransform.valid, value]);
+
+  useEffect(() => {
     if (!candidate) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -189,7 +204,7 @@ export function CharacterPortraitField({
     setStatus("Opening portrait editor...");
     try {
       const image = await loadImage(value);
-      setTransform(transform);
+      setTransform(safeTransform.transform);
       setCandidate({ dataUrl: value, imageId: imageId || crypto.randomUUID(), width: image.naturalWidth, height: image.naturalHeight });
       setStatus("");
     } catch (error) {
@@ -217,7 +232,7 @@ export function CharacterPortraitField({
   const cancelEditor = () => {
     stopMomentum();
     setCandidate(null);
-    setTransform(transform);
+    setTransform(safeTransform.transform);
     setStatus(value ? "Existing portrait kept unchanged." : "No portrait was saved.");
   };
 
@@ -232,6 +247,9 @@ export function CharacterPortraitField({
       };
       await onChange({ imageDataUrl: candidate.dataUrl, imageId: candidate.imageId, transform: savedTransform });
       setCandidate(null);
+      setLocallySuppressed(false);
+      setPortraitFailed(false);
+      setPortraitWarning("");
       setStatus("Portrait and position saved locally.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save that portrait.");
@@ -242,7 +260,20 @@ export function CharacterPortraitField({
 
   const removePortrait = async () => {
     await onChange({ imageDataUrl: "", imageId: "", transform: centeredPortraitTransform() });
+    setLocallySuppressed(false);
+    setPortraitFailed(false);
+    setPortraitWarning("");
     setStatus("Picture removed.");
+  };
+
+  const resetSavedFraming = async () => {
+    if (!value) return;
+    await onChange({ imageDataUrl: value, imageId, transform: centeredPortraitTransform() });
+    setTransform(centeredPortraitTransform());
+    setLocallySuppressed(false);
+    setPortraitFailed(false);
+    setPortraitWarning("");
+    setStatus("Portrait framing reset. No other character data was changed.");
   };
 
   const beginMomentum = () => {
@@ -377,13 +408,32 @@ export function CharacterPortraitField({
         {value && <button className="text-button danger" onClick={() => void removePortrait()} type="button">Remove</button>}
       </div>
       <small>{status || "The full image and its framing are stored locally and included in backups."}</small>
+      {portraitWarning && <p className="portrait-warning" role="status">{portraitWarning}</p>}
+      {value && (portraitFailed || locallySuppressed) && <div className="portrait-recovery-panel" role="alert">
+        <strong>Portrait could not be displayed.</strong>
+        <span>The rest of this character is safe and remains available.</span>
+        <div>
+          <button className="secondary-button compact" onClick={() => void resetSavedFraming()} type="button">Reset Portrait Framing</button>
+          <label className="secondary-button compact file-button" htmlFor={`${inputId}-recovery`}>Choose Another Image<input accept="image/*" id={`${inputId}-recovery`} onChange={(event) => void choosePortrait(event)} type="file" /></label>
+          <button className="secondary-button compact" onClick={() => setLocallySuppressed(true)} type="button">Continue Without Portrait</button>
+          <button className="text-button danger" onClick={() => void removePortrait()} type="button">Remove Portrait</button>
+        </div>
+      </div>}
     </div>
   );
 
   return (
     <div className={compact ? "portrait-picker compact" : "portrait-picker"}>
       <div className="portrait-preview portrait-frame" aria-label={value ? `${characterName} character picture` : `${characterName} picture placeholder`}>
-        {value ? <PortraitImage src={value} transform={transform} /> : <span aria-hidden="true">{characterInitial(characterName)}</span>}
+        {value && !locallySuppressed
+          ? <PortraitImage
+            fallback={<span aria-hidden="true">{characterInitial(characterName)}</span>}
+            onError={() => { setPortraitFailed(true); setLocallySuppressed(true); }}
+            onInvalidTransform={() => setPortraitWarning("Portrait framing was reset because its saved settings were invalid.")}
+            src={value}
+            transform={safeTransform.transform}
+          />
+          : <span aria-hidden="true">{characterInitial(characterName)}</span>}
       </div>
       {compact ? <details className="portrait-management"><summary>Edit portrait</summary>{controls}</details> : controls}
 
