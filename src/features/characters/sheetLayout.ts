@@ -1,5 +1,14 @@
 export type CharacterMenuAction =
   | "open-health-combat"
+  | "open-armor-class"
+  | "open-initiative"
+  | "open-conditions"
+  | "open-inspiration"
+  | "open-vitals"
+  | "open-abilities"
+  | "open-saving-throws"
+  | "open-senses"
+  | "open-skills"
   | "open-rolls"
   | "open-dice"
   | "open-actions"
@@ -17,11 +26,29 @@ export type CharacterMenuAction =
 
 export type CharacterMenuRoute = "spellbook" | "profile" | "pdf-library";
 
+export type HudModuleCategory = "core" | "combat" | "character" | "reference";
+export type HudModuleKind =
+  | "identity"
+  | "armor-class"
+  | "initiative"
+  | "health"
+  | "conditions"
+  | "inspiration"
+  | "vitals"
+  | "abilities"
+  | "saving-throws"
+  | "senses"
+  | "skills"
+  | "optional";
+
 type SheetModuleDefinition = {
   id: string;
   title: string;
   label: string;
   icon: string;
+  category: HudModuleCategory;
+  homeKind: HudModuleKind;
+  availability?: "soul-reaper-attached";
   defaultVisible: boolean;
   menu: {
     id: string;
@@ -37,19 +64,28 @@ type SheetModuleDefinition = {
  * floating command menu.
  */
 export const sheetModuleDefinitions = [
-  { id: "health-combat", title: "Health and combat", label: "HP / Combat", icon: "HP", defaultVisible: true, menu: { id: "health-combat", kind: "action", label: "HP / Combat", shortLabel: "Combat", icon: "HP", actionId: "open-health-combat" } },
-  { id: "roll-helper", title: "What Do I Roll?", label: "Roll Assistant", icon: "R", defaultVisible: true, menu: { id: "roll-helper", kind: "action", label: "Roll Assistant", shortLabel: "Rolls", icon: "R", actionId: "open-rolls" } },
-  { id: "attacks", title: "Attacks and damage", label: "Actions", icon: "A", defaultVisible: true, menu: { id: "attacks", kind: "action", label: "Actions", shortLabel: "Actions", icon: "A", actionId: "open-actions" } },
-  { id: "dice", title: "Dice", label: "Dice Roller", icon: "D20", defaultVisible: true, menu: { id: "dice", kind: "action", label: "Dice Roller", shortLabel: "Dice", icon: "D20", actionId: "open-dice" } },
-  { id: "spells", title: "Spells", label: "Spellbook", icon: "S", defaultVisible: true, menu: { id: "spellbook", kind: "route", label: "Spellbook", shortLabel: "Spells", icon: "S", routeId: "spellbook" } },
-  { id: "notes", title: "Character notes", label: "Notes", icon: "N", defaultVisible: true, menu: { id: "notes", kind: "action", label: "Notes", shortLabel: "Notes", icon: "N", actionId: "open-notes" } },
-  { id: "features", title: "Features and traits", label: "Features & Traits", icon: "F", defaultVisible: true, menu: { id: "features", kind: "action", label: "Features & Traits", shortLabel: "Features", icon: "F", actionId: "open-features" } },
-  { id: "inventory", title: "Inventory", label: "Inventory", icon: "I", defaultVisible: true, menu: { id: "inventory", kind: "action", label: "Inventory", shortLabel: "Inventory", icon: "I", actionId: "open-inventory" } },
-  { id: "soul-reaper", title: "Soul Reaper", label: "Soul Reaper", icon: "SR", defaultVisible: true, menu: { id: "soul-reaper", kind: "action", label: "Soul Reaper", shortLabel: "Soul Reaper", icon: "SR", actionId: "open-soul-reaper" } },
-  { id: "identity", title: "Character identity", label: "Identity", icon: "ID", defaultVisible: true, menu: { id: "identity", kind: "action", label: "Character Identity", shortLabel: "Identity", icon: "ID", actionId: "open-identity" } },
-  { id: "level-preview", title: "Next level preview", label: "Next Level", icon: "L+", defaultVisible: true, menu: { id: "level-preview", kind: "action", label: "Next Level Preview", shortLabel: "Next Level", icon: "L+", actionId: "open-level-preview" } },
-  { id: "roleplay", title: "Biography", label: "Biography", icon: "B", defaultVisible: true, menu: { id: "roleplay", kind: "action", label: "Background / Biography", shortLabel: "Biography", icon: "B", actionId: "open-biography" } },
-  { id: "training", title: "Proficiencies and languages", label: "Training", icon: "T", defaultVisible: true, menu: { id: "training", kind: "action", label: "Proficiencies & Training", shortLabel: "Training", icon: "T", actionId: "open-training" } },
+  { id: "identity", title: "Character identity", label: "Portrait & Identity", icon: "ID", category: "core", homeKind: "identity", defaultVisible: true, menu: { id: "identity", kind: "action", label: "Character Identity", shortLabel: "Identity", icon: "ID", actionId: "open-identity" } },
+  { id: "armor-class", title: "Armor Class", label: "Armor Class", icon: "AC", category: "core", homeKind: "armor-class", defaultVisible: true, menu: { id: "armor-class", kind: "action", label: "Armor Class", shortLabel: "AC", icon: "AC", actionId: "open-armor-class" } },
+  { id: "initiative", title: "Initiative", label: "Initiative", icon: "INI", category: "core", homeKind: "initiative", defaultVisible: true, menu: { id: "initiative", kind: "action", label: "Initiative", shortLabel: "Initiative", icon: "INI", actionId: "open-initiative" } },
+  { id: "health-combat", title: "Hit Points and recovery", label: "Hit Points / Rest", icon: "HP", category: "core", homeKind: "health", defaultVisible: true, menu: { id: "health-combat", kind: "action", label: "HP / Combat", shortLabel: "Combat", icon: "HP", actionId: "open-health-combat" } },
+  { id: "conditions", title: "Conditions", label: "Conditions", icon: "C", category: "combat", homeKind: "conditions", defaultVisible: true, menu: { id: "conditions", kind: "action", label: "Conditions", shortLabel: "Conditions", icon: "C", actionId: "open-conditions" } },
+  { id: "inspiration", title: "Heroic Inspiration", label: "Heroic Inspiration", icon: "I", category: "combat", homeKind: "inspiration", defaultVisible: true, menu: { id: "inspiration", kind: "action", label: "Heroic Inspiration", shortLabel: "Inspiration", icon: "I", actionId: "open-inspiration" } },
+  { id: "vitals", title: "Speed, Hit Dice, Death Saves", label: "Speed / Hit Dice / Death Saves", icon: "V", category: "combat", homeKind: "vitals", defaultVisible: true, menu: { id: "vitals", kind: "action", label: "Speed, Hit Dice & Death Saves", shortLabel: "Vitals", icon: "V", actionId: "open-vitals" } },
+  { id: "abilities", title: "Ability Scores", label: "Ability Scores", icon: "A", category: "core", homeKind: "abilities", defaultVisible: true, menu: { id: "abilities", kind: "action", label: "Ability Scores", shortLabel: "Abilities", icon: "A", actionId: "open-abilities" } },
+  { id: "saving-throws", title: "Saving Throws", label: "Saving Throws", icon: "SV", category: "core", homeKind: "saving-throws", defaultVisible: true, menu: { id: "saving-throws", kind: "action", label: "Saving Throws", shortLabel: "Saves", icon: "SV", actionId: "open-saving-throws" } },
+  { id: "senses", title: "Senses", label: "Senses", icon: "SE", category: "core", homeKind: "senses", defaultVisible: true, menu: { id: "senses", kind: "action", label: "Senses", shortLabel: "Senses", icon: "SE", actionId: "open-senses" } },
+  { id: "skills", title: "Skills", label: "Skills", icon: "SK", category: "character", homeKind: "skills", defaultVisible: false, menu: { id: "skills", kind: "action", label: "Skills", shortLabel: "Skills", icon: "SK", actionId: "open-skills" } },
+  { id: "roll-helper", title: "What Do I Roll?", label: "Roll Assistant", icon: "R", category: "reference", homeKind: "optional", defaultVisible: true, menu: { id: "roll-helper", kind: "action", label: "Roll Assistant", shortLabel: "Rolls", icon: "R", actionId: "open-rolls" } },
+  { id: "attacks", title: "Attacks and damage", label: "Actions", icon: "A", category: "combat", homeKind: "optional", defaultVisible: true, menu: { id: "attacks", kind: "action", label: "Actions", shortLabel: "Actions", icon: "A", actionId: "open-actions" } },
+  { id: "dice", title: "Dice", label: "Dice Roller", icon: "D20", category: "reference", homeKind: "optional", defaultVisible: true, menu: { id: "dice", kind: "action", label: "Dice Roller", shortLabel: "Dice", icon: "D20", actionId: "open-dice" } },
+  { id: "spells", title: "Spells", label: "Spellbook", icon: "S", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "spellbook", kind: "route", label: "Spellbook", shortLabel: "Spells", icon: "S", routeId: "spellbook" } },
+  { id: "notes", title: "Character notes", label: "Notes", icon: "N", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "notes", kind: "action", label: "Notes", shortLabel: "Notes", icon: "N", actionId: "open-notes" } },
+  { id: "features", title: "Features and traits", label: "Features & Traits", icon: "F", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "features", kind: "action", label: "Features & Traits", shortLabel: "Features", icon: "F", actionId: "open-features" } },
+  { id: "inventory", title: "Inventory", label: "Inventory", icon: "I", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "inventory", kind: "action", label: "Inventory", shortLabel: "Inventory", icon: "I", actionId: "open-inventory" } },
+  { id: "soul-reaper", title: "Soul Reaper", label: "Soul Reaper", icon: "SR", category: "character", homeKind: "optional", availability: "soul-reaper-attached", defaultVisible: true, menu: { id: "soul-reaper", kind: "action", label: "Soul Reaper", shortLabel: "Soul Reaper", icon: "SR", actionId: "open-soul-reaper" } },
+  { id: "level-preview", title: "Next level preview", label: "Next Level", icon: "L+", category: "reference", homeKind: "optional", defaultVisible: true, menu: { id: "level-preview", kind: "action", label: "Next Level Preview", shortLabel: "Next Level", icon: "L+", actionId: "open-level-preview" } },
+  { id: "roleplay", title: "Biography", label: "Biography", icon: "B", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "roleplay", kind: "action", label: "Background / Biography", shortLabel: "Biography", icon: "B", actionId: "open-biography" } },
+  { id: "training", title: "Proficiencies and languages", label: "Training", icon: "T", category: "character", homeKind: "optional", defaultVisible: true, menu: { id: "training", kind: "action", label: "Proficiencies & Training", shortLabel: "Training", icon: "T", actionId: "open-training" } },
 ] as const satisfies readonly SheetModuleDefinition[];
 
 export type SheetLayoutSectionId = typeof sheetModuleDefinitions[number]["id"];
@@ -67,9 +103,6 @@ export function sheetSectionDomId(sectionId: SheetLayoutSectionId) {
 
 export const structuralSheetSectionIds = [
   "dashboard",
-  "abilities",
-  "skills",
-  "speed-defenses",
   "book",
   "layout",
   "portrait",
@@ -97,6 +130,15 @@ export type SheetNavigatorSection = CharacterMenuItemBase & {
 
 export const characterMenuOverlayTargets: Partial<Record<CharacterMenuAction, SheetNavigatorSectionId>> = {
   "open-health-combat": "health-combat",
+  "open-armor-class": "armor-class",
+  "open-initiative": "initiative",
+  "open-conditions": "conditions",
+  "open-inspiration": "inspiration",
+  "open-vitals": "vitals",
+  "open-abilities": "abilities",
+  "open-saving-throws": "saving-throws",
+  "open-senses": "senses",
+  "open-skills": "skills",
   "open-rolls": "roll-helper",
   "open-dice": "dice",
   "open-actions": "attacks",
@@ -142,9 +184,6 @@ const moduleMenuItems: CharacterMenuItem[] = sheetModuleDefinitions.map((module)
 
 export const characterMenuItems: CharacterMenuItem[] = [
   { id: "dashboard", kind: "section", label: "Dashboard", shortLabel: "Dashboard", icon: "D", targetId: sheetNavigatorDomId("dashboard") },
-  { id: "abilities", kind: "section", label: "Abilities, Saves, Senses", shortLabel: "Abilities", icon: "A", targetId: sheetNavigatorDomId("abilities") },
-  { id: "skills", kind: "section", label: "Skills", shortLabel: "Skills", icon: "S", targetId: sheetNavigatorDomId("skills") },
-  { id: "speed-defenses", kind: "section", label: "Speed & Defenses", shortLabel: "Defenses", icon: "AC", targetId: sheetNavigatorDomId("speed-defenses") },
   ...moduleMenuItems,
   { id: "pdf-library", kind: "route", label: "PDF Library", shortLabel: "PDF", icon: "P", routeId: "pdf-library" },
   { id: "profile", kind: "route", label: "Profile", shortLabel: "Profile", icon: "ID", routeId: "profile" },
@@ -203,7 +242,12 @@ export function chooseSheetNavigatorSection(
 }
 
 export const majorGameplayModuleSections: SheetLayoutSectionId[] = [
+  "identity",
   "health-combat",
+  "conditions",
+  "abilities",
+  "saving-throws",
+  "senses",
   "roll-helper",
   "dice",
   "attacks",
@@ -216,6 +260,11 @@ export const majorGameplayModuleSections: SheetLayoutSectionId[] = [
 
 export function isSheetLayoutSectionId(value: string): value is SheetLayoutSectionId {
   return defaultLayoutSet.has(value);
+}
+
+export function hudModuleIsAvailable(sectionId: SheetLayoutSectionId, context: { soulReaperAttached: boolean }) {
+  const definition = sheetModuleDefinitions.find((module) => module.id === sectionId);
+  return !definition || !("availability" in definition) || definition.availability !== "soul-reaper-attached" || context.soulReaperAttached;
 }
 
 export function normalizeSheetLayoutOrder(savedOrder: readonly string[] = []) {

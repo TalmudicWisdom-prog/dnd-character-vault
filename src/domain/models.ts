@@ -73,6 +73,24 @@ export type CharacterDraft = z.input<typeof characterDraftSchema>;
 export const abilityIdSchema = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 export type AbilityId = z.infer<typeof abilityIdSchema>;
 
+export const conditionIdSchema = z.enum([
+  "blinded",
+  "charmed",
+  "deafened",
+  "frightened",
+  "grappled",
+  "incapacitated",
+  "invisible",
+  "paralyzed",
+  "petrified",
+  "poisoned",
+  "prone",
+  "restrained",
+  "stunned",
+  "unconscious",
+]);
+export type ConditionId = z.infer<typeof conditionIdSchema>;
+
 export const skillIdSchema = z.enum([
   "acrobatics",
   "animalHandling",
@@ -120,6 +138,10 @@ export const characterSheetSchema = z.object({
   hitDice: z.string().max(100).default(""),
   deathSaveSuccesses: z.number().int().min(0).max(3).default(0),
   deathSaveFailures: z.number().int().min(0).max(3).default(0),
+  activeConditions: z.array(conditionIdSchema).default([]),
+  exhaustionLevel: z.number().int().min(0).max(6).default(0),
+  heroicInspiration: z.boolean().default(true),
+  customSenses: z.string().max(10000).default(""),
   attacks: z.string().max(20000).default(""),
   weapons: z.string().max(20000).default(""),
   damageNotes: z.string().max(20000).default(""),

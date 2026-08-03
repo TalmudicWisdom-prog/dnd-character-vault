@@ -8,6 +8,7 @@ import {
   chooseSheetNavigatorSection,
   closeSheetNavigator,
   defaultSheetLayoutOrder,
+  hudModuleIsAvailable,
   majorGameplayModuleSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
@@ -34,9 +35,6 @@ describe("character sheet layout customization", () => {
   it("defines navigator options for every major live sheet area", () => {
     expect(sheetNavigatorSections.map((section) => section.label)).toEqual([
       "Dashboard",
-      "Abilities, Saves, Senses",
-      "Skills",
-      "Speed & Defenses",
     ]);
     expect(sheetNavigatorSections.every((section) => section.targetId.startsWith("sheet-section-"))).toBe(true);
     expect(sheetNavigatorSections.every((section) => section.shortLabel && section.icon)).toBe(true);
@@ -46,7 +44,17 @@ describe("character sheet layout customization", () => {
 
   it("classifies the live-play menu explicitly instead of inferring behavior from labels", () => {
     expect(characterMenuItems.filter((item) => item.kind === "action").map((item) => item.label)).toEqual([
+      "Character Identity",
+      "Armor Class",
+      "Initiative",
       "HP / Combat",
+      "Conditions",
+      "Heroic Inspiration",
+      "Speed, Hit Dice & Death Saves",
+      "Ability Scores",
+      "Saving Throws",
+      "Senses",
+      "Skills",
       "Roll Assistant",
       "Actions",
       "Dice Roller",
@@ -54,7 +62,6 @@ describe("character sheet layout customization", () => {
       "Features & Traits",
       "Inventory",
       "Soul Reaper",
-      "Character Identity",
       "Next Level Preview",
       "Background / Biography",
       "Proficiencies & Training",
@@ -73,6 +80,12 @@ describe("character sheet layout customization", () => {
   it("derives every customizable HUD module and command-menu destination from one registry", () => {
     expect(defaultSheetLayoutOrder).toEqual(sheetModuleDefinitions.map((module) => module.id));
     expect(sheetModuleDefinitions.every((module) => characterMenuItems.some((item) => item.id === module.menu.id))).toBe(true);
+  });
+
+  it("uses registry availability instead of character names for attached modules", () => {
+    expect(hudModuleIsAvailable("soul-reaper", { soulReaperAttached: false })).toBe(false);
+    expect(hudModuleIsAvailable("soul-reaper", { soulReaperAttached: true })).toBe(true);
+    expect(hudModuleIsAvailable("inventory", { soulReaperAttached: false })).toBe(true);
   });
 
   it("resolves tools directly to overlays, routes, or export without an intermediate scroll", () => {
@@ -111,10 +124,10 @@ describe("character sheet layout customization", () => {
 
   it("selects a navigator section without changing the character sheet route", () => {
     const currentRoute = "#sheet/character-123";
-    const selected = selectSheetNavigatorSection("abilities", currentRoute);
+    const selected = selectSheetNavigatorSection("dashboard", currentRoute);
 
     expect(selected).toEqual({
-      targetId: "sheet-section-abilities",
+      targetId: "sheet-section-dashboard",
       routeHash: currentRoute,
     });
   });
@@ -125,18 +138,23 @@ describe("character sheet layout customization", () => {
   });
 
   it("closes the navigator and returns the intended scroll target when a section is chosen", () => {
-    const result = chooseSheetNavigatorSection({ open: true }, "skills", "#sheet/character-123");
+    const result = chooseSheetNavigatorSection({ open: true }, "dashboard", "#sheet/character-123");
 
     expect(result.state.open).toBe(false);
     expect(result.routeHash).toBe("#sheet/character-123");
-    expect(result.targetId).toBe("sheet-section-skills");
+    expect(result.targetId).toBe("sheet-section-dashboard");
   });
 
   it("keeps every major gameplay module available in phone layouts", () => {
     const normalized = normalizeSheetLayoutOrder(["spells", "health-combat"]);
 
     expect(majorGameplayModuleSections).toEqual([
+      "identity",
       "health-combat",
+      "conditions",
+      "abilities",
+      "saving-throws",
+      "senses",
       "roll-helper",
       "dice",
       "attacks",
@@ -160,14 +178,15 @@ describe("character sheet layout customization", () => {
     expect(normalizeSheetModuleVisibility({}).spells).toBe(true);
   });
 
-  it("keeps structural abilities and saves out of the draggable gameplay order", () => {
+  it("includes universal instruments in the draggable order and drops unknown legacy ids", () => {
     const normalized = normalizeSheetLayoutOrder(["abilities", "proficiencies", "spells"]);
 
-    expect(defaultSheetLayoutOrder).not.toContain("abilities");
+    expect(defaultSheetLayoutOrder).toContain("abilities");
+    expect(defaultSheetLayoutOrder).toContain("saving-throws");
     expect(defaultSheetLayoutOrder).not.toContain("proficiencies");
-    expect(normalized).not.toContain("abilities");
+    expect(normalized).toContain("abilities");
     expect(normalized).not.toContain("proficiencies");
-    expect(normalized[0]).toBe("spells");
+    expect(normalized[0]).toBe("abilities");
   });
 
   it("saves custom layout order per character", async () => {
@@ -178,7 +197,7 @@ describe("character sheet layout customization", () => {
     await saveCharacterSheet({ ...sheet, sheetLayoutOrder: customOrder });
     const reloaded = await getOrCreateCharacterSheet(character.id);
 
-    expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).slice(0, 3)).toEqual(["health-combat", "roll-helper", "attacks"]);
+    expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).slice(0, 3)).toEqual(["identity", "armor-class", "initiative"]);
     expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).indexOf("spells")).toBe(defaultSheetLayoutOrder.indexOf("spells") - 1);
   });
 

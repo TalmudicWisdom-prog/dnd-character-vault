@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { AbilityId, Character, CharacterSheet, SkillId } from "../../domain/models";
+import type { AbilityId, Character, CharacterSheet, ConditionId, SkillId } from "../../domain/models";
 import { abilityModifier, formatModifier, proficiencyBonusForLevel, skillAbilities, skillModifier } from "../../domain/dndMath";
 import { DiceRoller } from "../../components/DiceRoller";
 import { abilityIds, getOrCreateCharacterSheet, saveCharacterSheet, skillIds } from "../../storage/characterSheets";
@@ -14,7 +14,8 @@ import { flushPendingCharacterEdits } from "../../app/sessionRestore";
 import { SpellDetailOverlay } from "../spells/SpellDetailOverlay";
 import { SpellSlotTracker } from "../spells/SpellSlotTracker";
 import { levelUpPreview } from "../../rules/levelUp";
-import { applyRestRecovery, buildRestPreview, restLabels, type RestKind } from "../../rules/spellSlots";
+import { restLabels, type RestKind } from "../../rules/spellSlots";
+import { applyHudRestRecovery, buildHudRestPreview } from "../../rules/hudRest";
 import { rollFormula, type DiceRollResult } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, initiativeBonus, type RollAssistantMode } from "../../rules/rollAssistant";
@@ -23,6 +24,7 @@ import {
   characterMenuIntent,
   characterMenuItems,
   characterMenuRouteHash,
+  hudModuleIsAvailable,
   isSheetLayoutSectionId,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
@@ -38,6 +40,7 @@ import {
   type SheetLayoutSectionId,
   type SheetNavigatorSectionId,
 } from "./sheetLayout";
+import { conditionDefinitions, conditionSummary } from "./conditions";
 
 const abilityLabels: Record<AbilityId, string> = {
   str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA",
@@ -68,9 +71,6 @@ const layoutSectionTitles = Object.fromEntries(
 const overlaySectionTitles: Record<SheetNavigatorSectionId, string> = {
   ...layoutSectionTitles,
   dashboard: "Dashboard",
-  abilities: "Abilities, Saves, Senses",
-  skills: "Skills",
-  "speed-defenses": "Speed and defenses",
   book: "Book and PDF tools",
   layout: "Customize layout",
   portrait: "Edit portrait",
@@ -202,6 +202,7 @@ function InlineRollFeedback({ result }: { result?: InlineRollResult }) {
 export function CharacterSheetPage({ characterId, suppressPortrait = false }: { characterId: string; suppressPortrait?: boolean }) {
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
   const spells = useLiveQuery(() => db.spells.where("characterId").equals(characterId).toArray(), [characterId]) ?? [];
+  const soulReaperProgression = useLiveQuery(() => db.soulReaperProgressions.get(characterId), [characterId]);
   const [sheet, setSheet] = useState<CharacterSheet | null>(null);
   const [loadError, setLoadError] = useState("");
   const [status, setStatus] = useState("Saved locally");
@@ -213,6 +214,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const [rollMode, setRollMode] = useState<RollAssistantMode>(() => localStorage.getItem("vault:roll-mode") === "veteran" ? "veteran" : "beginner");
   const [showAbilityLegend, setShowAbilityLegend] = useState(() => localStorage.getItem("vault:ability-legend-hidden") !== "true");
   const [activeModuleId, setActiveModuleId] = useState<SheetNavigatorSectionId | null>(null);
+  const [activeRest, setActiveRest] = useState<RestKind | null>(null);
   const [switchAnnouncement, setSwitchAnnouncement] = useState("");
   const [menuActionError, setMenuActionError] = useState("");
   const [selectedSpellId, setSelectedSpellId] = useState("");
@@ -220,6 +222,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
   const moduleDialogRef = useRef<HTMLElement | null>(null);
   const moduleReturnFocusRef = useRef(false);
+  const overlayReturnElementRef = useRef<HTMLElement | null>(null);
   const draggingSectionRef = useRef<SheetLayoutSectionId | null>(null);
   const editVersion = useRef(0);
 
@@ -228,6 +231,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     setSheet(null);
     setStatus("Opening character...");
     setActiveModuleId(null);
+    setActiveRest(null);
     void getOrCreateCharacterSheet(characterId)
       .then((loaded) => { if (active) { setSheet(loaded); setStatus("Saved locally"); } })
       .catch((error: unknown) => { if (active) setLoadError(error instanceof Error ? `${error.name}: ${error.message}` : String(error)); });
@@ -291,13 +295,19 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
 
   const closeModuleOverlay = () => {
     const shouldReturnFocus = moduleReturnFocusRef.current;
+    const returnElement = overlayReturnElementRef.current;
     moduleReturnFocusRef.current = false;
+    overlayReturnElementRef.current = null;
     setActiveModuleId(null);
-    if (shouldReturnFocus) window.setTimeout(() => document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus(), 0);
+    setActiveRest(null);
+    window.setTimeout(() => {
+      if (returnElement?.isConnected) returnElement.focus();
+      else if (shouldReturnFocus) document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus();
+    }, 0);
   };
 
   useEffect(() => {
-    if (!activeModuleId) return;
+    if (!activeModuleId && !activeRest) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") closeModuleOverlay();
@@ -311,7 +321,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [activeModuleId]);
+  }, [activeModuleId, activeRest]);
 
   const trapModuleFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== "Tab") return;
@@ -399,33 +409,19 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     setStatus("Saved locally");
   };
 
-  const restPreviewText = (rest: RestKind) => {
+  const openRest = (rest: RestKind) => {
     if (!sheet) return;
-    const preview = buildRestPreview(sheet, rest);
-    const recovering = preview.filter((resource) => resource.recovers);
-    const notRecovering = preview.filter((resource) => !resource.recovers);
-    return [
-      `${restLabels[rest]} recovery preview`,
-      recovering.length ? `Will recover:\n${recovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} -> ${resource.remainingAfter}/${resource.maximum} remaining`).join("\n")}` : "Will recover: nothing",
-      notRecovering.length ? `Will not recover:\n${notRecovering.map((resource) => `- ${resource.label}: ${resource.remainingBefore}/${resource.maximum} remaining (${resource.recovery.recoverOn})`).join("\n")}` : "Will not recover: none",
-      "Apply this rest?",
-    ].join("\n\n");
+    overlayReturnElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setActiveModuleId(null);
+    setActiveRest(rest);
   };
 
-  const applyRest = (rest: RestKind) => {
-    if (!sheet) return;
-    const message = restPreviewText(rest);
-    if (!message || !window.confirm(message)) return;
-    edit((current) => applyRestRecovery(current, rest));
-    setQuickRoll(`${restLabels[rest]} applied: configured spell resources recovered.`);
-  };
-
-  const longRest = () => {
-    applyRest("longRest");
-  };
-
-  const shortRest = () => {
-    applyRest("shortRest");
+  const confirmRest = () => {
+    if (!activeRest) return;
+    const rest = activeRest;
+    edit((current) => applyHudRestRecovery(current, rest));
+    setQuickRoll(`${restLabels[rest]} applied. Recovery was saved atomically.`);
+    closeModuleOverlay();
   };
 
   const setAssistantMode = (mode: RollAssistantMode) => {
@@ -480,6 +476,8 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
             openLayoutCustomizer();
             return;
           }
+          overlayReturnElementRef.current = document.querySelector<HTMLButtonElement>(".sheet-section-trigger");
+          setActiveRest(null);
           setActiveModuleId(intent.targetId);
           return;
         case "route":
@@ -554,6 +552,8 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const initiativeModifier = initiativeBonus(sheet);
   const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
   const moduleVisibility = normalizeSheetModuleVisibility(sheet.sheetModuleVisibility);
+  const moduleIsAvailable = (id: SheetLayoutSectionId) => hudModuleIsAvailable(id, { soulReaperAttached: Boolean(soulReaperProgression) });
+  const customizableLayoutOrder = layoutOrder.filter(moduleIsAvailable);
   const passivePerception = 10 + skillModifier(sheet, "perception");
   const hpMaximum = Math.max(sheet.maxHp, 1);
   const hpPercent = Math.max(0, Math.min(100, Math.round((sheet.currentHp / hpMaximum) * 100)));
@@ -562,7 +562,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     character.characterClass,
     `Level ${character.level}`,
   ].filter(Boolean).join(" / ");
-  const conditionsSummary = sheet.notes.trim() ? "Notes" : "Clear";
+  const conditionsSummary = conditionSummary(sheet.activeConditions, sheet.exhaustionLevel);
   const activeSaveCount = abilityIds.filter((ability) => sheet.savingThrows[ability]).length;
   const activeSkillCount = skillIds.filter((skill) => sheet.skillProficiencies[skill]).length;
   const passiveInsight = 10 + skillModifier(sheet, "insight");
@@ -599,6 +599,116 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       </aside>}
     </div>
   );
+
+  const renderHudAbilityScores = () => (
+    <div className="hud-ability-grid" aria-label="Ability scores">
+      {abilityIds.map((ability) => {
+        const score = sheet.abilityScores[ability] ?? 10;
+        const modifier = formatModifier(abilityModifier(score));
+        return <button
+          aria-label={`Roll ${abilityFullLabels[ability]} check, modifier ${modifier}`}
+          className="hud-ability-instrument"
+          key={ability}
+          onClick={() => rollNow(`${abilityFullLabels[ability]} check`, `d20${modifier}`, `hud-ability-${ability}`)}
+          type="button"
+        >
+          <span className="hud-instrument-label">{abilityFullLabels[ability]}</span>
+          <span aria-hidden="true" className="hud-ability-geometry">
+            <svg viewBox="0 0 100 100"><polygon points="50,8 91,77 9,77" /><polygon points="50,92 9,23 91,23" /></svg>
+            <strong>{modifier}</strong>
+          </span>
+          <small>Score {score}</small>
+          <InlineRollFeedback result={inlineRolls[`hud-ability-${ability}`]} />
+        </button>;
+      })}
+    </div>
+  );
+
+  const renderHudSavingThrows = () => (
+    <div className="hud-save-list" aria-label="Saving throws">
+      {abilityIds.map((ability) => {
+        const proficient = sheet.savingThrows[ability] ?? false;
+        const modifier = abilityModifier(sheet.abilityScores[ability] ?? 10) + (proficient ? sheet.proficiencyBonus : 0);
+        return <button
+          aria-label={`Roll ${abilityFullLabels[ability]} saving throw, ${proficient ? "proficient" : "not proficient"}, modifier ${formatModifier(modifier)}`}
+          className="hud-save-instrument"
+          key={ability}
+          onClick={() => rollNow(`${abilityFullLabels[ability]} save`, `d20${formatModifier(modifier)}`, `hud-save-${ability}`)}
+          type="button"
+        >
+          <span>{abilityFullLabels[ability]}</span>
+          <i aria-hidden="true" />
+          <small>{proficient ? "Proficient" : "Untrained"}</small>
+          <strong>{formatModifier(modifier)}</strong>
+          <InlineRollFeedback result={inlineRolls[`hud-save-${ability}`]} />
+        </button>;
+      })}
+    </div>
+  );
+
+  const renderHudSenses = () => (
+    <div className="hud-sense-list" aria-label="Passive senses">
+      <div><strong>{passivePerception}</strong><span>Passive Perception</span></div>
+      <div><strong>{passiveInvestigation}</strong><span>Passive Investigation</span></div>
+      <div><strong>{passiveInsight}</strong><span>Passive Insight</span></div>
+      {sheet.customSenses.trim() && <p>{sheet.customSenses}</p>}
+    </div>
+  );
+
+  const updateCondition = (conditionId: ConditionId, active: boolean) => {
+    edit((current) => ({
+      ...current,
+      activeConditions: active
+        ? [...new Set([...current.activeConditions, conditionId])]
+        : current.activeConditions.filter((id) => id !== conditionId),
+    }));
+  };
+
+  const renderConditionsDetail = () => (
+    <div className="conditions-selector">
+      <div className="module-summary">
+        <span>Active summary</span>
+        <strong aria-live="polite">{conditionsSummary}</strong>
+        <small>Changes are saved only for {character.name}.</small>
+      </div>
+      <div className="condition-option-list">
+        {conditionDefinitions.map((condition) => <details className={sheet.activeConditions.includes(condition.id) ? "condition-option active" : "condition-option"} key={condition.id}>
+          <summary>
+            <label>
+              <input checked={sheet.activeConditions.includes(condition.id)} onChange={(event) => updateCondition(condition.id, event.target.checked)} type="checkbox" />
+              <strong>{condition.label}</strong>
+            </label>
+            <span>Rules</span>
+          </summary>
+          <p>{condition.summary}</p>
+        </details>)}
+      </div>
+      <label className="form-field condition-exhaustion"><span>Exhaustion level</span><select onChange={(event) => edit((current) => ({ ...current, exhaustionLevel: Number(event.target.value) }))} value={sheet.exhaustionLevel}>{Array.from({ length: 7 }, (_, level) => <option key={level} value={level}>{level === 0 ? "None" : `Level ${level}`}</option>)}</select></label>
+      <button className="secondary-button" disabled={!sheet.activeConditions.length && sheet.exhaustionLevel === 0} onClick={() => edit((current) => ({ ...current, activeConditions: [], exhaustionLevel: 0 }))} type="button">Clear all conditions</button>
+    </div>
+  );
+
+  const renderRestReview = (rest: RestKind) => {
+    const preview = buildHudRestPreview(sheet, rest);
+    return <div className="rest-review">
+      <div className="module-summary">
+        <span>Recovery preview</span>
+        <strong>{restLabels[rest]}</strong>
+        <small>Nothing changes until you confirm.</small>
+      </div>
+      <div className="rest-preview-list">
+        {preview.map((effect) => <div className={effect.changes ? "rest-preview-item changing" : "rest-preview-item"} key={effect.id}>
+          <span><strong>{effect.label}</strong><small>{effect.changes ? "Will recover" : "No automatic change"}</small></span>
+          <span className="rest-preview-values"><b>{effect.before}</b><i aria-hidden="true">→</i><b>{effect.after}</b></span>
+          {effect.note && <p>{effect.note}</p>}
+        </div>)}
+      </div>
+      <div className="rest-review-actions">
+        <button className="secondary-button" onClick={closeModuleOverlay} type="button">Cancel</button>
+        <button className="primary-button" onClick={confirmRest} type="button">Confirm {restLabels[rest]}</button>
+      </div>
+    </div>;
+  };
 
   const renderSensesPassives = () => (
     <div className="senses-passives-grid">
@@ -698,6 +808,25 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
 
   const renderModuleDetail = (id: SheetLayoutSectionId) => {
     switch (id) {
+      case "armor-class":
+      case "initiative":
+      case "vitals":
+        return renderModuleDetail("health-combat");
+      case "conditions":
+        return renderConditionsDetail();
+      case "inspiration":
+        return <div className="inspiration-detail">
+          <div className="module-summary"><span>Heroic Inspiration</span><strong>{sheet.heroicInspiration ? "Ready" : "Used"}</strong><small>This state belongs to {character.name}.</small></div>
+          <button aria-pressed={sheet.heroicInspiration} className={sheet.heroicInspiration ? "primary-button" : "secondary-button"} onClick={() => edit((current) => ({ ...current, heroicInspiration: !current.heroicInspiration }))} type="button">Mark {sheet.heroicInspiration ? "Used" : "Ready"}</button>
+        </div>;
+      case "abilities":
+        return renderAbilitiesSavesSensesDetail();
+      case "saving-throws":
+        return renderSavingThrowsPanel();
+      case "senses":
+        return <div className="senses-detail">{renderHudSenses()}<label className="form-field full-width"><span>Other senses</span><textarea onChange={(event) => edit((current) => ({ ...current, customSenses: event.target.value }))} placeholder="Darkvision 60 ft., tremorsense, or another stored sense" rows={4} value={sheet.customSenses} /></label></div>;
+      case "skills":
+        return renderSkillsPanel({ expanded: true });
       case "dice":
         return <DiceRoller compact context="Local only. Results are not sent anywhere." label="Table dice" />;
       case "roll-helper":
@@ -794,12 +923,6 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const renderOverlayDetail = (id: SheetNavigatorSectionId) => {
     if (isSheetLayoutSectionId(id)) return renderModuleDetail(id);
     switch (id) {
-      case "abilities":
-        return renderAbilitiesSavesSensesDetail();
-      case "skills":
-        return renderSkillsPanel({ expanded: true });
-      case "speed-defenses":
-        return renderModuleDetail("health-combat");
       case "book":
         return renderBookDetail();
       case "layout":
@@ -821,103 +944,31 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
 
   const openModuleOverlay = (id: SheetNavigatorSectionId) => {
     moduleReturnFocusRef.current = false;
+    overlayReturnElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setActiveRest(null);
     setActiveModuleId(id);
   };
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
     id,
     style: { order: layoutOrder.indexOf(id) },
-    visible: moduleVisibility[id],
+    visible: moduleVisibility[id] && moduleIsAvailable(id),
   });
 
   return (
     <section className={customizeLayout ? "page sheet-page layout-editing" : "page sheet-page"}>
-      <section className="dashboard" id="sheet-section-dashboard" aria-labelledby="sheet-character-title" tabIndex={-1}>
-        <CharacterPortraitField
-          characterName={character.name}
-          compact
-          imageId={character.portraitImageId}
-          label="Portrait"
-          onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
-          suppressed={suppressPortrait}
-          transform={character.portraitTransform}
-          value={character.portraitDataUrl ?? ""}
-        />
-
-        <header className="sheet-character-header">
-          <span className="eyebrow">Live play HUD</span>
-          <h1 id="sheet-character-title">{character.name}</h1>
-          <p>{characterSubtitle || "Touch-friendly live play sheet"}</p>
-          <div className="dashboard-actions">
-            {customizeLayout && <button className="secondary-button compact" onClick={resetLayout} type="button">Restore Default Layout</button>}
-            <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => customizeLayout ? setCustomizeLayout(false) : openLayoutCustomizer()} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
-            <a className="primary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Spellbook</a>
-            <button className="secondary-button compact" onClick={() => void exportCharacter()} type="button">Export</button>
-            <a className="secondary-button compact button-link" href={characterMenuRouteHash("profile", characterId)}>Profile</a>
-          </div>
-        </header>
-
-        <div className="combat-summary" aria-label="Combat summary">
-          <button className="combat-summary-card armor-card" onClick={() => setActiveModuleId("health-combat")} type="button">
-            <span>Armor Class</span>
-            <strong>{sheet.armorClass}</strong>
-            <small>Defense</small>
-          </button>
-          <button className="combat-summary-card initiative-card" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "dashboard-initiative") : setActiveModuleId("health-combat")} type="button">
-            <span>Initiative</span>
-            <strong>{formatModifier(initiativeModifier)}</strong>
-            <small>{initiativeRow ? "Tap to roll" : "Edit in combat"}</small>
-            <InlineRollFeedback result={inlineRolls["dashboard-initiative"]} />
-          </button>
-          <button className="combat-summary-card hp-summary-card" onClick={() => setActiveModuleId("health-combat")} type="button">
-            <span>Hit Points</span>
-            <strong>{sheet.currentHp}/{sheet.maxHp}</strong>
-            <small>{sheet.temporaryHp} temporary</small>
-            <i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i>
-          </button>
-          <button className="combat-summary-card conditions-card" onClick={() => setActiveModuleId("notes")} type="button">
-            <span>Conditions</span>
-            <strong>{conditionsSummary}</strong>
-            <small>Play notes</small>
-          </button>
-          <div className="inspiration-status" aria-label="Inspiration status">
-            <span>Heroic Inspiration</span>
-            <strong>Ready</strong>
-          </div>
-          <div className="important-combat-status">
-            <span><strong>Speed</strong>{sheet.speed}</span>
-            <span><strong>Hit Dice</strong>{sheet.hitDice || "Unset"}</span>
-            <span><strong>Death Saves</strong>{sheet.deathSaveSuccesses}S / {sheet.deathSaveFailures}F</span>
-          </div>
+      <header className="hud-page-masthead" id="sheet-section-dashboard" tabIndex={-1}>
+        <div><span className="eyebrow">Character Vault</span><h1>Live HUD</h1><p>Favorite tools for {character.name}. The floating Character Menu always keeps everything available.</p></div>
+        <div className="hud-page-actions">
+          <span className="hud-save-state">{status}</span>
+          <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => customizeLayout ? setCustomizeLayout(false) : openLayoutCustomizer()} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
         </div>
-
-        <div className="sheet-header-meta">
-          <span>{character.campaign || "No campaign set"}</span>
-          <strong>{status}</strong>
-        </div>
-      </section>
+      </header>
 
       <CharacterHud character={character} items={characterMenuItems} onSelectMenuItem={(item) => void handleCharacterMenuItem(item)} />
 
       {switchAnnouncement && <p aria-live="polite" className="character-switch-toast" role="status">{switchAnnouncement}</p>}
       {menuActionError && <p aria-live="assertive" className="panel inline-message tool-status" role="alert">{menuActionError}</p>}
-
-      <section className="abilities-panel abilities-senses-region" id="sheet-section-abilities" aria-labelledby="abilities-senses-title" tabIndex={-1}>
-        <div className="sheet-region-heading">
-          <div>
-            <span className="card-label">Abilities, saves, senses</span>
-            <h2 id="abilities-senses-title">At-a-glance checks</h2>
-          </div>
-          <label className="form-field compact-field"><span>Proficiency</span><input min={2} max={6} onChange={(event) => edit((current) => ({ ...current, proficiencyBonus: Number(event.target.value) }))} type="number" value={sheet.proficiencyBonus} /></label>
-          {!showAbilityLegend && <button className="secondary-button compact ability-legend-toggle" onClick={() => setAbilityLegendVisible(true)} type="button">Show legend</button>}
-        </div>
-        {renderAbilityScores()}
-        {renderSensesPassives()}
-        <div className="saves-skills-grid">
-          {renderSavingThrowsPanel()}
-          {renderSkillsPanel({ withId: true })}
-        </div>
-      </section>
 
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
@@ -938,43 +989,76 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
           onDragStart={startLayoutDrag}
           onMove={moveLayoutCard}
           onVisibilityChange={updateModuleVisibility}
-          order={layoutOrder}
+          order={customizableLayoutOrder}
           visibility={moduleVisibility}
         />
       </div>}
 
-      {activeModuleId && <div className="module-overlay" onMouseDown={closeModuleOverlay} role="presentation">
-        <section
-          aria-labelledby="module-overlay-title"
-          aria-modal="true"
-          className="module-overlay-dialog"
-          onKeyDown={trapModuleFocus}
-          onMouseDown={(event) => event.stopPropagation()}
-          ref={moduleDialogRef}
-          role="dialog"
-        >
-          <div className="module-overlay-header">
-            <div>
-              <span className="card-label">Live play module</span>
-              <h2 id="module-overlay-title">{overlaySectionTitles[activeModuleId]}</h2>
-            </div>
-            <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={closeModuleOverlay} type="button">X</button>
-          </div>
-          <div className="module-overlay-body">
-            {renderOverlayDetail(activeModuleId)}
-          </div>
+      <div className={customizeLayout ? "live-hud-canvas customizing" : "live-hud-canvas"} aria-label="Character live HUD">
+      <LayoutCard {...layoutProps("identity")}>
+        <section className="hud-module hud-identity-module" aria-labelledby="sheet-character-title">
+          <CharacterPortraitField
+            characterName={character.name}
+            compact
+            imageId={character.portraitImageId}
+            label="Portrait"
+            onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
+            suppressed={suppressPortrait}
+            transform={character.portraitTransform}
+            value={character.portraitDataUrl ?? ""}
+          />
+          <div className="hud-identity-copy"><span className="card-label">Active character</span><h2 id="sheet-character-title">{character.name}</h2><p>{characterSubtitle || "Touch-friendly live play sheet"}</p><small>{character.campaign || "No campaign set"}</small></div>
+          <button className="hud-module-link" onClick={() => openModuleOverlay("identity")} type="button">Edit identity</button>
         </section>
-      </div>}
+      </LayoutCard>
 
-      {selectedSpell && <SpellDetailOverlay
-        onActivity={setQuickRoll}
-        onClose={() => setSelectedSpellId("")}
-        onSheetChange={updateSheetFromSpellCast}
-        sheet={sheet}
-        spell={selectedSpell}
-      />}
+      <LayoutCard {...layoutProps("armor-class")}>
+        <button className="hud-module hud-orb-module" onClick={() => openModuleOverlay("armor-class")} type="button"><span>Armor Class</span><strong>{sheet.armorClass}</strong><small>Defense</small></button>
+      </LayoutCard>
 
-      <div className={customizeLayout ? "sheet-layout-stack gameplay-grid customizing" : "sheet-layout-stack gameplay-grid"} aria-label="Gameplay modules">
+      <LayoutCard {...layoutProps("initiative")}>
+        <button className="hud-module hud-orb-module" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "hud-initiative") : openModuleOverlay("initiative")} type="button"><span>Initiative</span><strong>{formatModifier(initiativeModifier)}</strong><small>{initiativeRow ? "Tap to roll" : "Edit combat"}</small><InlineRollFeedback result={inlineRolls["hud-initiative"]} /></button>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("health-combat")}>
+        <section className="hud-module hud-health-module" aria-labelledby="hud-health-title">
+          <button className="hud-health-primary" onClick={() => openModuleOverlay("health-combat")} type="button"><span id="hud-health-title">Hit Points</span><strong>{sheet.currentHp}<small> / {sheet.maxHp}</small></strong><em>{sheet.temporaryHp} Temporary</em><i aria-hidden="true"><b style={{ width: `${hpPercent}%` }} /></i></button>
+          <div className="hud-rest-actions"><button className="secondary-button compact" onClick={() => openRest("shortRest")} type="button">Short Rest</button><button className="primary-button compact" onClick={() => openRest("longRest")} type="button">Long Rest</button></div>
+        </section>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("conditions")}>
+        <button className="hud-module hud-conditions-module" onClick={() => openModuleOverlay("conditions")} type="button"><span>Conditions</span><strong>{conditionsSummary}</strong><small>{sheet.activeConditions.length || sheet.exhaustionLevel ? "Tap to manage" : "No active conditions"}</small></button>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("inspiration")}>
+        <button aria-pressed={sheet.heroicInspiration} className={sheet.heroicInspiration ? "hud-module hud-inspiration-module ready" : "hud-module hud-inspiration-module"} onClick={() => edit((current) => ({ ...current, heroicInspiration: !current.heroicInspiration }))} type="button"><span>Heroic Inspiration</span><strong>{sheet.heroicInspiration ? "Ready" : "Used"}</strong><small>Tap to toggle</small></button>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("vitals")}>
+        <section className="hud-module hud-vitals-module" aria-label="Speed, hit dice, and death saves">
+          <button onClick={() => openModuleOverlay("vitals")} type="button"><span>Speed</span><strong>{sheet.speed}</strong><small>feet</small></button>
+          <button className={!sheet.hitDice.trim() ? "needs-attention" : ""} onClick={() => openModuleOverlay("vitals")} type="button"><span>Hit Dice</span><strong>{sheet.hitDice || "Unset"}</strong><small>{sheet.hitDice ? "Rest resource" : "Tap to set"}</small></button>
+          <div className="hud-death-saves"><span>Death Saves</span><div><strong>Successes</strong>{[1, 2, 3].map((value) => <button aria-label={`Set death save successes to ${value}`} aria-pressed={sheet.deathSaveSuccesses >= value} key={`success-${value}`} onClick={() => edit((current) => ({ ...current, deathSaveSuccesses: current.deathSaveSuccesses === value ? value - 1 : value }))} type="button">{value}</button>)}</div><div><strong>Failures</strong>{[1, 2, 3].map((value) => <button aria-label={`Set death save failures to ${value}`} aria-pressed={sheet.deathSaveFailures >= value} key={`failure-${value}`} onClick={() => edit((current) => ({ ...current, deathSaveFailures: current.deathSaveFailures === value ? value - 1 : value }))} type="button">{value}</button>)}</div></div>
+        </section>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("abilities")}>
+        <section className="hud-module hud-abilities-module"><header><div><span className="card-label">Ability Scores</span><h2>Core checks</h2></div><button className="hud-module-link" onClick={() => openModuleOverlay("abilities")} type="button">Edit scores</button></header>{renderHudAbilityScores()}</section>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("saving-throws")}>
+        <section className="hud-module hud-saves-module"><header><div><span className="card-label">Saving Throws</span><h2>{activeSaveCount} proficient</h2></div><button className="hud-module-link" onClick={() => openModuleOverlay("saving-throws")} type="button">Edit</button></header>{renderHudSavingThrows()}</section>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("senses")}>
+        <section className="hud-module hud-senses-module"><header><div><span className="card-label">Senses</span><h2>Passive awareness</h2></div><button className="hud-module-link" onClick={() => openModuleOverlay("senses")} type="button">Edit</button></header>{renderHudSenses()}</section>
+      </LayoutCard>
+
+      <LayoutCard {...layoutProps("skills")}>
+        <GameplayCard eyebrow="Checks" title="Skills" summary={<div className="module-summary"><span>{activeSkillCount} proficient</span><strong>Perception {formatModifier(skillModifier(sheet, "perception"))}</strong><small>Insight {formatModifier(skillModifier(sheet, "insight"))} · Investigation {formatModifier(skillModifier(sheet, "investigation"))}</small></div>} onOpenDetails={() => openModuleOverlay("skills")} />
+      </LayoutCard>
+
       <LayoutCard {...layoutProps("dice")}>
       <GameplayCard
         eyebrow="Optional rolling"
@@ -999,15 +1083,6 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       />
       </LayoutCard>
 
-      <LayoutCard {...layoutProps("identity")}>
-      <GameplayCard
-        eyebrow="Overview"
-        title="Identity"
-        summary={<div className="module-summary"><span>{character.campaign || "No campaign"}</span><strong>{character.background || "Background unset"}</strong><small>{character.concept || "No concept yet"}</small></div>}
-        onOpenDetails={() => openModuleOverlay("identity")}
-      />
-      </LayoutCard>
-
       <LayoutCard {...layoutProps("level-preview")}>
       <GameplayCard
         eyebrow="Level up foundation"
@@ -1024,16 +1099,6 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
         title="Biography"
         summary={<div className="module-summary"><span>{character.personalityNotes ? "Personality saved" : "Personality empty"}</span><strong>{character.goals ? "Goals noted" : "No goals yet"}</strong><small>{character.backstory ? "Backstory available" : "No backstory yet"}</small></div>}
         onOpenDetails={() => openModuleOverlay("roleplay")}
-      />
-      </LayoutCard>
-
-      <LayoutCard {...layoutProps("health-combat")}>
-      <GameplayCard
-        eyebrow="HP details"
-        title="Health"
-        summary={<div className="module-summary hp-module-summary"><span>{sheet.currentHp}/{sheet.maxHp} HP</span><strong>{sheet.temporaryHp} temp</strong><small>{hpPreview || "Ready for damage or healing"}</small><div className="hp-quick-deltas compact-deltas" aria-label="Quick HP changes">{[-1, -5, -10].map((amount) => <button className="quick-value damage-quick" key={amount} onClick={() => void changeHp("damage", Math.abs(amount))} type="button">{amount}</button>)}{[1, 5, 10].map((amount) => <button className="quick-value healing-quick" key={amount} onClick={() => void changeHp("healing", amount)} type="button">+{amount}</button>)}</div></div>}
-        actions={<div className="inline-roll-control"><button className="secondary-button compact" disabled={!initiativeRow} onClick={() => initiativeRow && rollNow("Initiative", initiativeRow.formula, "health-initiative")} type="button">Roll initiative</button><InlineRollFeedback result={inlineRolls["health-initiative"]} /></div>}
-        onOpenDetails={() => openModuleOverlay("health-combat")}
       />
       </LayoutCard>
 
@@ -1061,7 +1126,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
         eyebrow="Spellbook and slots"
         title="Spells"
         summary={<div className="module-summary"><span>{preparedSpellCount} prepared</span><strong>{cantripCount} cantrips</strong><small>{totalSlotCount ? `${Math.max(0, totalSlotCount - usedSlotCount)} / ${totalSlotCount} slots remaining` : "No slots set"}</small></div>}
-        actions={<><button className="secondary-button compact" onClick={shortRest} type="button">Short Rest</button><button className="primary-button compact" onClick={longRest} type="button">Long Rest</button><a className="secondary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Full spellbook</a></>}
+        actions={<a className="secondary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Full spellbook</a>}
         onOpenDetails={() => openModuleOverlay("spells")}
       />
       </LayoutCard>
@@ -1102,6 +1167,37 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       />
       </LayoutCard>
       </div>
+
+      {(activeModuleId || activeRest) && <div className="module-overlay" onMouseDown={closeModuleOverlay} role="presentation">
+        <section
+          aria-labelledby="module-overlay-title"
+          aria-modal="true"
+          className="module-overlay-dialog"
+          onKeyDown={trapModuleFocus}
+          onMouseDown={(event) => event.stopPropagation()}
+          ref={moduleDialogRef}
+          role="dialog"
+        >
+          <div className="module-overlay-header">
+            <div>
+              <span className="card-label">Live play module</span>
+              <h2 id="module-overlay-title">{activeRest ? restLabels[activeRest] : activeModuleId ? overlaySectionTitles[activeModuleId] : "Live HUD"}</h2>
+            </div>
+            <button aria-label="Close module" autoFocus className="module-overlay-close" onClick={closeModuleOverlay} type="button">X</button>
+          </div>
+          <div className="module-overlay-body">
+            {activeRest ? renderRestReview(activeRest) : activeModuleId ? renderOverlayDetail(activeModuleId) : null}
+          </div>
+        </section>
+      </div>}
+
+      {selectedSpell && <SpellDetailOverlay
+        onActivity={setQuickRoll}
+        onClose={() => setSelectedSpellId("")}
+        onSheetChange={updateSheetFromSpellCast}
+        sheet={sheet}
+        spell={selectedSpell}
+      />}
     </section>
   );
 }

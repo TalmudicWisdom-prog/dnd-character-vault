@@ -16,11 +16,11 @@ describe("floating character section navigator", () => {
   });
 
   it("lists the shared section definitions and marks the current section accessibly", () => {
-    const abilities = sheetNavigatorSections.find((section) => section.id === "abilities")!;
+    const dashboard = sheetNavigatorSections.find((section) => section.id === "dashboard")!;
     const markup = renderToStaticMarkup(
       <SheetNavigator
         defaultOpen
-        initialActiveTargetId={abilities.targetId}
+        initialActiveTargetId={dashboard.targetId}
         items={characterMenuItems}
         onSelect={vi.fn()}
       />,
@@ -30,7 +30,7 @@ describe("floating character section navigator", () => {
     expect(markup).toContain("Character Menu");
     expect(markup.match(/class="sheet-section-option(?: active)?"/g)).toHaveLength(characterMenuItems.length);
     expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain("Abilities, Saves, Senses, current section");
+    expect(markup).toContain("Dashboard, current section");
     expect(characterMenuItems.every((item) => markup.includes(`data-section-id="${item.id}"`))).toBe(true);
   });
 
@@ -43,7 +43,8 @@ describe("floating character section navigator", () => {
     expect(markup).toContain('aria-label="Open Profile"');
     expect(markup).toContain('aria-label="Open Export Character"');
     expect(markup).toContain('aria-label="Open Edit Portrait"');
-    expect(markup).toContain('aria-label="Go to Abilities, Saves, Senses"');
+    expect(markup).toContain('aria-label="Open Ability Scores"');
+    expect(markup).toContain('aria-label="Open Conditions"');
     expect(markup).toContain('data-menu-kind="action"');
     expect(markup).toContain('data-menu-kind="route"');
     expect(markup).toContain('data-menu-kind="section"');
