@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { PortraitFramingMode, PortraitTransform } from "../../domain/models";
 import { centeredPortraitTransform } from "../../domain/models";
-import { PortraitImage } from "./PortraitImage";
+import { PortraitViewport } from "./PortraitImage";
 import {
   clampPortraitTransform,
   fitImageWithoutCropping,
@@ -448,17 +448,22 @@ export function CharacterPortraitField({
 
   return (
     <div className={compact ? "portrait-picker compact" : "portrait-picker"}>
-      <div className="portrait-preview portrait-frame" aria-label={value ? `${characterName} character picture` : `${characterName} picture placeholder`}>
-        {value && !locallySuppressed
-          ? <PortraitImage
-            fallback={<span aria-hidden="true">{characterInitial(characterName)}</span>}
-            onError={() => { setPortraitFailed(true); setLocallySuppressed(true); }}
-            onInvalidTransform={() => setPortraitWarning("Portrait framing was reset because its saved settings were invalid.")}
-            src={value}
-            transform={safeTransform.transform}
-          />
-          : <span aria-hidden="true">{characterInitial(characterName)}</span>}
-      </div>
+      <PortraitViewport
+        aria-label={value ? `${characterName} character picture` : `${characterName} picture placeholder`}
+        className="portrait-preview portrait-frame"
+        image={value && !locallySuppressed
+          ? {
+            fallback: <span aria-hidden="true">{characterInitial(characterName)}</span>,
+            onError: () => { setPortraitFailed(true); setLocallySuppressed(true); },
+            onInvalidTransform: () => setPortraitWarning("Portrait framing was reset because its saved settings were invalid."),
+            src: value,
+            transform: safeTransform.transform,
+          }
+          : undefined}
+        surface="hud"
+      >
+        {(!value || locallySuppressed) && <span aria-hidden="true">{characterInitial(characterName)}</span>}
+      </PortraitViewport>
       {compact ? <details className="portrait-management"><summary>Edit portrait</summary>{controls}</details> : controls}
 
       {candidate && (
@@ -481,9 +486,10 @@ export function CharacterPortraitField({
               <button aria-pressed={draftTransform.mode === "contain"} className={draftTransform.mode === "contain" ? "active" : ""} onClick={() => changeFramingMode("contain")} type="button"><strong>Show Full Image</strong><span>Displays the entire image with background padding.</span></button>
             </div>
             <span aria-live="polite" className="sr-only">{status}</span>
-            <div
+            <PortraitViewport
               aria-label="Portrait positioning area. Use arrow keys to move, plus or minus to zoom, Enter to save, and Escape to cancel."
               className={isResetting ? "portrait-editor-frame resetting" : "portrait-editor-frame"}
+              image={{ src: candidate.dataUrl, transform: draftTransform }}
               onDoubleClick={resetPosition}
               onKeyDown={onFrameKeyDown}
               onPointerCancel={onPointerEnd}
@@ -493,11 +499,11 @@ export function CharacterPortraitField({
               onWheel={onWheel}
               ref={editorFrameRef}
               role="application"
+              surface="editor"
               tabIndex={0}
             >
-              <PortraitImage src={candidate.dataUrl} transform={draftTransform} />
               <span aria-hidden="true" className="portrait-editor-guide" />
-            </div>
+            </PortraitViewport>
             <div className="portrait-editor-zoom">
               <label htmlFor={`${replacementInputId}-zoom`}>Zoom <output>{Math.round(draftTransform.zoom * 100)}%</output></label>
               <div><button aria-label="Zoom out" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom - 0.1)} type="button">−</button><input aria-valuetext={`${Math.round(draftTransform.zoom * 100)}% relative to ${draftTransform.mode === "contain" ? "Show Full Image" : "Fill Frame"}`} id={`${replacementInputId}-zoom`} max={maximumPortraitZoom} min={1} onChange={(event) => changeZoom(Number(event.target.value))} step={0.01} type="range" value={draftTransform.zoom} /><button aria-label="Zoom in" className="secondary-button compact" onClick={() => changeZoom(draftTransform.zoom + 0.1)} type="button">+</button></div>

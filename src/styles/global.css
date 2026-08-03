@@ -739,19 +739,22 @@ h1, h2, strong { color: var(--ink); }
 .dashboard-actions > * {
   min-width: 0;
 }
-.portrait-frame {
+.portrait-render-frame {
   --portrait-frame-aspect: 4 / 5;
   position: relative;
-  min-height: 260px;
   display: grid;
   place-items: center;
+  aspect-ratio: var(--portrait-frame-aspect);
   overflow: hidden;
-  color: var(--sheet-accent);
   background:
     radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--fantasy-blue) 16%, transparent), transparent 55%),
     linear-gradient(180deg, var(--sheet-panel-strong), var(--sheet-panel));
   border: 1px solid color-mix(in srgb, var(--fantasy-gold) 42%, var(--sheet-border));
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+}
+.portrait-frame {
+  min-height: 260px;
+  color: var(--sheet-accent);
   box-shadow: var(--shadow-panel), inset 0 0 0 1px rgb(255 255 255 / 0.03);
 }
 .portrait-frame > span:not(.portrait-image) { font-family: Georgia, serif; font-size: clamp(4rem, 11vw, 8rem); font-weight: 500; }
@@ -789,13 +792,14 @@ h1, h2, strong { color: var(--ink); }
 .portrait-picker.compact {
   position: relative;
   grid-template-columns: 1fr;
-  align-content: stretch;
+  align-content: start;
+  align-self: start;
   padding: 0;
   background: transparent;
   border: 0;
   border-radius: 0;
 }
-.portrait-picker.compact .portrait-frame { min-height: 100%; width: 100%; aspect-ratio: var(--portrait-frame-aspect); border-radius: var(--radius-md); }
+.portrait-picker.compact .portrait-frame { width: 100%; min-height: 0; height: auto; aspect-ratio: var(--portrait-frame-aspect); }
 .portrait-management { position: absolute; right: 8px; bottom: 8px; left: 8px; z-index: 2; }
 .portrait-management summary {
   min-height: 34px;
@@ -851,15 +855,8 @@ h1, h2, strong { color: var(--ink); }
 .portrait-framing-control button.active { color: var(--sheet-text); background: color-mix(in srgb, var(--sheet-accent) 13%, var(--sheet-panel-strong)); border-color: color-mix(in srgb, var(--sheet-accent) 68%, var(--sheet-border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-accent) 20%, transparent); }
 .portrait-framing-control button.active strong::before { margin-right: 6px; content: "✓"; color: var(--sheet-accent); }
 .portrait-editor-frame {
-  --portrait-frame-aspect: 4 / 5;
-  position: relative;
   width: min(360px, 74vw);
-  aspect-ratio: var(--portrait-frame-aspect);
   justify-self: center;
-  overflow: hidden;
-  background: #080706;
-  border: 2px solid color-mix(in srgb, var(--fantasy-gold) 72%, #fff);
-  border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgb(0 0 0 / 0.46), inset 0 0 0 1px rgb(255 255 255 / 0.12);
   cursor: grab;
   touch-action: none;
@@ -1622,8 +1619,8 @@ h1, h2, strong { color: var(--ink); }
   .page-header { margin-bottom: 30px; }
   .dashboard { grid-template-columns: minmax(82px, 96px) minmax(0, 1fr); gap: 9px; margin-bottom: 10px; padding: 10px; }
   .dashboard .portrait-picker.compact { grid-column: 1; min-height: 132px; }
-  .portrait-frame, .portrait-editor-frame { --portrait-frame-aspect: 3 / 4; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 132px; aspect-ratio: var(--portrait-frame-aspect); border-radius: var(--radius-md); }
+  .portrait-render-frame { --portrait-frame-aspect: 3 / 4; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 0; aspect-ratio: var(--portrait-frame-aspect); }
   .portrait-management { right: 6px; bottom: 6px; left: 6px; }
   .portrait-management summary { min-height: 28px; font-size: 0.66rem; }
   .portrait-management .portrait-picker-controls { padding: 7px; }
@@ -1816,8 +1813,8 @@ h1, h2, strong { color: var(--ink); }
   .dashboard .combat-summary,
   .dashboard .sheet-header-meta { grid-column: 1; }
   .dashboard .portrait-picker.compact { min-height: 152px; }
-  .portrait-frame, .portrait-editor-frame { --portrait-frame-aspect: 16 / 9; }
-  .dashboard .portrait-picker.compact .portrait-frame { min-height: 152px; aspect-ratio: var(--portrait-frame-aspect); }
+  .portrait-render-frame { --portrait-frame-aspect: 16 / 9; }
+  .dashboard .portrait-picker.compact .portrait-frame { min-height: 0; aspect-ratio: var(--portrait-frame-aspect); }
   .portrait-editor-frame { width: min(100%, 390px); }
   .portrait-editor-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .portrait-editor-actions .portrait-editor-action-spacer { display: none; }

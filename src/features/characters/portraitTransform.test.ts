@@ -114,4 +114,22 @@ describe("portrait positioning and cropping", () => {
       expect(Number.isFinite(result.offsetY)).toBe(true);
     }
   });
+
+  it("produces identical iPad crop composition at editor and HUD sizes", () => {
+    const editor: PortraitGeometry = { frameWidth: 360, frameHeight: 450, imageWidth: 900, imageHeight: 1600 };
+    const hud: PortraitGeometry = { frameWidth: 192, frameHeight: 240, imageWidth: 900, imageHeight: 1600 };
+    const saved = { ...centeredPortraitTransform("cover", 900, 1600), zoom: 1.6, offsetX: 0, offsetY: -0.18 };
+
+    const editorBounds = portraitOffsetBounds(saved.zoom, editor, saved.mode);
+    const hudBounds = portraitOffsetBounds(saved.zoom, hud, saved.mode);
+    expect(editorBounds.x).toBeCloseTo(hudBounds.x);
+    expect(editorBounds.y).toBeCloseTo(hudBounds.y);
+    expect(clampPortraitTransform(saved, editor)).toEqual(clampPortraitTransform(saved, hud));
+
+    const editorRendered = portraitRenderedSize(saved.mode, saved.zoom, editor);
+    const hudRendered = portraitRenderedSize(saved.mode, saved.zoom, hud);
+    expect(editorRendered.width / editor.frameWidth).toBeCloseTo(hudRendered.width / hud.frameWidth);
+    expect(editorRendered.height / editor.frameHeight).toBeCloseTo(hudRendered.height / hud.frameHeight);
+    expect(portraitFrameAspectForViewport(768)).toBeCloseTo(editor.frameWidth / editor.frameHeight);
+  });
 });

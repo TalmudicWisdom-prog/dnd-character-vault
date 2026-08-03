@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { centeredPortraitTransform } from "../../domain/models";
-import { capturePortraitImageDimensions, isStablePortraitSource, PortraitImage } from "./PortraitImage";
+import { capturePortraitImageDimensions, isStablePortraitSource, PortraitImage, PortraitViewport } from "./PortraitImage";
 
 describe("portrait image crash containment", () => {
   it("captures natural dimensions synchronously and reads currentTarget only once", () => {
@@ -46,5 +46,20 @@ describe("portrait image crash containment", () => {
     expect(markup).toContain("portrait-image-backdrop");
     expect(markup).toContain("object-fit:contain");
     expect(markup).toContain("portrait-image-foreground");
+  });
+
+  it("uses one shared portrait viewport for the editor and saved HUD", () => {
+    const transform = { ...centeredPortraitTransform("cover", 900, 1600), zoom: 1.6, offsetY: -0.18 };
+    const hud = renderToStaticMarkup(<PortraitViewport className="portrait-frame" image={{ src: "data:image/jpeg;base64,akiva", transform }} surface="hud" />);
+    const editor = renderToStaticMarkup(<PortraitViewport className="portrait-editor-frame" image={{ src: "data:image/jpeg;base64,akiva", transform }} surface="editor" />);
+
+    for (const markup of [hud, editor]) {
+      expect(markup).toContain("portrait-render-frame");
+      expect(markup).toContain('data-portrait-mode="cover"');
+      expect(markup).toContain("portrait-image-pan");
+      expect(markup).toContain("object-fit:cover;transform:scale(1.6)");
+    }
+    expect(hud).toContain('data-portrait-surface="hud"');
+    expect(editor).toContain('data-portrait-surface="editor"');
   });
 });

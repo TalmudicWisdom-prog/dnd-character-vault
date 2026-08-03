@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode, type SyntheticEvent } from "react";
+import { Component, forwardRef, useEffect, useLayoutEffect, useRef, useState, type ErrorInfo, type HTMLAttributes, type ReactNode, type SyntheticEvent } from "react";
 import type { PortraitTransform } from "../../domain/models";
 import { clampPortraitTransform, type PortraitGeometry, validatePortraitTransform } from "./portraitTransform";
 
@@ -88,7 +88,7 @@ function PortraitImageContent({ alt = "", className = "", decoding = "async", fa
     }));
   }, [validation.transform.naturalWidth, validation.transform.naturalHeight]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || typeof ResizeObserver === "undefined") return;
     const update = () => {
@@ -140,3 +140,27 @@ export function PortraitImage(props: PortraitImageProps) {
     </PortraitRenderBoundary>
   );
 }
+
+export type PortraitViewportProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
+  children?: ReactNode;
+  image?: PortraitImageProps;
+  surface: "editor" | "hud";
+};
+
+/** Shared frame and renderer used by both the interactive editor and saved HUD. */
+export const PortraitViewport = forwardRef<HTMLDivElement, PortraitViewportProps>(function PortraitViewport(
+  { children, className = "", image, surface, ...frameProps },
+  ref,
+) {
+  return (
+    <div
+      {...frameProps}
+      className={`portrait-render-frame ${className}`.trim()}
+      data-portrait-surface={surface}
+      ref={ref}
+    >
+      {image && <PortraitImage {...image} />}
+      {children}
+    </div>
+  );
+});
