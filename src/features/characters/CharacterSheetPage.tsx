@@ -20,6 +20,7 @@ import { rollFormula, type DiceRollResult } from "../../dice/dice";
 import { applyDamage, applyHealing } from "../../rules/hitPoints";
 import { buildRollAssistantRows, initiativeBonus, type RollAssistantMode } from "../../rules/rollAssistant";
 import { createCharacterBackup, downloadBackup } from "../../storage/backups";
+import { clearPortraitRecoveryState } from "../../app/portraitRecovery";
 import {
   characterMenuIntent,
   characterMenuItems,
@@ -220,6 +221,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const [selectedSpellId, setSelectedSpellId] = useState("");
   const [customizeLayout, setCustomizeLayout] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<SheetLayoutSectionId | null>(null);
+  const [portraitSuppressed, setPortraitSuppressed] = useState(suppressPortrait);
   const moduleDialogRef = useRef<HTMLElement | null>(null);
   const moduleReturnFocusRef = useRef(false);
   const overlayReturnElementRef = useRef<HTMLElement | null>(null);
@@ -237,6 +239,16 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       .catch((error: unknown) => { if (active) setLoadError(error instanceof Error ? `${error.name}: ${error.message}` : String(error)); });
     return () => { active = false; };
   }, [characterId]);
+
+  useEffect(() => {
+    setPortraitSuppressed(suppressPortrait);
+    if (!suppressPortrait) return;
+    const timer = window.setTimeout(() => {
+      clearPortraitRecoveryState();
+      setPortraitSuppressed(false);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [characterId, suppressPortrait]);
 
   useEffect(() => {
     if (!sheet || status !== "Unsaved changes") return;
@@ -378,6 +390,12 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
 
   const updateCharacterField = async (changes: Partial<Character>) => {
     await db.characters.update(characterId, { ...changes, updatedAt: new Date().toISOString() });
+  };
+
+  const updateCharacterPortrait = async (portrait: { imageDataUrl: string; imageId: string; transform: Character["portraitTransform"] }) => {
+    await updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform });
+    clearPortraitRecoveryState();
+    setPortraitSuppressed(false);
   };
 
   const rollNow = (label: string, formula: string, inlineKey?: string) => {
@@ -932,8 +950,8 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
           characterName={character.name}
           imageId={character.portraitImageId}
           label="Portrait"
-          onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
-          suppressed={suppressPortrait}
+          onChange={updateCharacterPortrait}
+          suppressed={portraitSuppressed}
           transform={character.portraitTransform}
           value={character.portraitDataUrl ?? ""}
         />;
@@ -1002,8 +1020,8 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
             compact
             imageId={character.portraitImageId}
             label="Portrait"
-            onChange={(portrait) => updateCharacterField({ portraitDataUrl: portrait.imageDataUrl, portraitImageId: portrait.imageId, portraitTransform: portrait.transform })}
-            suppressed={suppressPortrait}
+            onChange={updateCharacterPortrait}
+            suppressed={portraitSuppressed}
             transform={character.portraitTransform}
             value={character.portraitDataUrl ?? ""}
           />

@@ -16,7 +16,7 @@ import {
 import { db } from "./database";
 
 export const BACKUP_FORMAT_VERSION = 3;
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.1.1";
 export type RestoreMode = "new" | "merge-skip" | "merge-replace";
 
 const backupPayloadSchema = z.object({

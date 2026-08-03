@@ -5,7 +5,7 @@ export default defineConfig({
   base: "./",
   plugins: [react()],
   define: {
-    __BUILD_ID__: JSON.stringify(`1.1.0-spell-import-${Date.now().toString(36)}`),
+    __BUILD_ID__: JSON.stringify(`1.1.1-portrait-update-hotfix-${Date.now().toString(36)}`),
   },
   build: {
     rollupOptions: {

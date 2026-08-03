@@ -42,7 +42,7 @@ if (!manifest.icons?.some((icon) => icon.sizes === "192x192") || !manifest.icons
 const appEntry = indexDocument.match(/src="\.\/(assets\/app-[^"]+\.js)"/)?.[1];
 if (!appEntry) throw new Error("Production entry must use a content-addressed application bundle");
 const appBundle = await readFile(join(distDirectory, appEntry), "utf8");
-for (const marker of ["ffxiv-companion-dawntrail", "Final Fantasy Companion Guide", "arms-of-hadar", "1.1.0-spell-import-"]) {
+for (const marker of ["ffxiv-companion-dawntrail", "Final Fantasy Companion Guide", "arms-of-hadar", "1.1.1-portrait-update-hotfix-"]) {
   if (!appBundle.includes(marker)) throw new Error(`Production application bundle is missing ${marker}`);
 }
 if (!shellFiles.some((path) => /^assets\/pdf\.worker\.min-[^.]+\.mjs$/.test(path))) {
@@ -54,7 +54,7 @@ if (!/withResolvers:function\(\)\{/.test(appBundle)) {
 if (!serviceWorker.includes("fetch(request).then") || !serviceWorker.includes(".catch(() => caches.match(indexUrl))")) {
   throw new Error("Service worker must use network-first navigation with an offline shell fallback");
 }
-for (const marker of ["character-vault-hotfix-portrait-load-2026-08-01", "self.skipWaiting()", "client.navigate(client.url)"]) {
+for (const marker of ["character-vault-hotfix-portrait-update-2026-08-03", "event.waitUntil(self.skipWaiting())", "client.navigate(client.url)"]) {
   if (!serviceWorker.includes(marker)) throw new Error(`Service worker is missing portrait stability recovery marker: ${marker}`);
 }
 

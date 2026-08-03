@@ -27,7 +27,7 @@ for (const path of files) {
 
 const cacheVersion = digest.digest("hex").slice(0, 12);
 const serviceWorker = `const CACHE_NAME = "character-vault-shell-${cacheVersion}";
-const STABILITY_HOTFIX_MARKER = "character-vault-hotfix-portrait-load-2026-08-01";
+const STABILITY_HOTFIX_MARKER = "character-vault-hotfix-portrait-update-2026-08-03";
 const APP_SHELL = ${JSON.stringify(shellFiles, null, 2)};
 const scopeUrl = new URL("./", self.registration.scope);
 const indexUrl = new URL("index.html", scopeUrl).href;
@@ -62,7 +62,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+  if (event.data?.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("fetch", (event) => {

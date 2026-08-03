@@ -189,8 +189,9 @@ export function CharacterPortraitField({
   }, []);
 
   useEffect(() => {
-    if (suppressed) setLocallySuppressed(true);
-  }, [suppressed]);
+    setLocallySuppressed(suppressed);
+    if (!suppressed) setPortraitFailed(false);
+  }, [imageId, suppressed]);
 
   useEffect(() => {
     if (!safeTransform.valid && value) setPortraitWarning("Portrait framing was reset because its saved settings were invalid.");

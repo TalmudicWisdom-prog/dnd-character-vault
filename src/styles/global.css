@@ -1169,8 +1169,8 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
 .hud-orb-module strong { font-family: var(--font-display); font-size: clamp(2.35rem, 5vw, 4rem); font-weight: 500; line-height: 0.9; }
 .hud-orb-module small, .hud-conditions-module small, .hud-inspiration-module small { color: var(--sheet-text-muted); font-size: 0.72rem; font-weight: 800; }
 .hud-identity-module { position: relative; display: grid; grid-template-columns: minmax(110px, 0.42fr) minmax(0, 0.58fr); gap: 14px; align-items: center; padding: 12px; border-radius: var(--radius-md); }
-.hud-identity-module .portrait-picker.compact { align-self: stretch; min-height: 210px; }
-.hud-identity-module .portrait-picker.compact .portrait-frame { height: 100%; aspect-ratio: auto; }
+.hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 210px; align-self: stretch; min-height: var(--hud-portrait-frame-height); }
+.hud-identity-module .portrait-picker.compact .portrait-frame { height: auto; min-height: var(--hud-portrait-frame-height); aspect-ratio: auto; }
 .hud-identity-copy { min-width: 0; display: grid; gap: 5px; align-content: center; }
 .hud-identity-copy h2 { margin: 0; overflow-wrap: normal; word-break: normal; font-family: var(--font-display); font-size: clamp(1.75rem, 2.5vw, 2.45rem); font-weight: 500; line-height: 0.98; }
 .hud-identity-copy p, .hud-identity-copy small { margin: 0; color: var(--sheet-text-muted); line-height: 1.35; }
@@ -1989,7 +1989,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .live-hud-canvas > .layout-card[data-layout-card-id="saving-throws"],
   .live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: span 6; }
   .hud-identity-module { grid-template-columns: minmax(110px, 0.44fr) minmax(0, 0.56fr); }
-  .hud-identity-module .portrait-picker.compact { min-height: 230px; }
+  .hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 230px; }
   .hud-vitals-module { grid-template-columns: 0.7fr 0.85fr 1.75fr; }
   .hud-save-list { grid-template-columns: 1fr; }
 }
@@ -2012,7 +2012,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
   .live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 6; }
   .hud-identity-module { grid-template-columns: minmax(104px, 0.38fr) minmax(0, 0.62fr); }
-  .hud-identity-module .portrait-picker.compact { min-height: 180px; }
+  .hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 180px; }
   .hud-identity-copy h2 { font-size: clamp(1.85rem, 10vw, 2.8rem); }
   .hud-orb-module { min-height: 150px; }
   .hud-vitals-module { grid-template-columns: 1fr 1fr; }
@@ -2031,8 +2031,8 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .hud-page-masthead p { font-size: 0.78rem; }
   .hud-save-state { font-size: 0.68rem; }
   .hud-identity-module { grid-template-columns: 1fr; padding: 9px; }
-  .hud-identity-module .portrait-picker.compact { min-height: 0; }
-  .hud-identity-module .portrait-picker.compact .portrait-frame { height: auto; aspect-ratio: 16 / 9; }
+  .hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 0px; }
+  .hud-identity-module .portrait-picker.compact .portrait-frame { aspect-ratio: 16 / 9; }
   .hud-identity-copy { padding: 4px 6px 42px; }
   .hud-orb-module { min-height: 136px; }
   .hud-rest-actions { grid-template-columns: 1fr; }
@@ -2070,7 +2070,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
   .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 3; }
   .live-hud-canvas > .layout-card[data-layout-card-id="vitals"] { grid-column: 1 / -1; }
-  .hud-identity-module .portrait-picker.compact { min-height: 150px; }
+  .hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 150px; }
   .hud-orb-module { min-height: 150px; }
 }
 
