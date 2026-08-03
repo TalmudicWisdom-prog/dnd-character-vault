@@ -112,6 +112,7 @@ describe("manual backup and restore", () => {
       pactMagicRecovery: { "2": { recoverOn: "shortRest", recoverAmount: "all" } },
       notes: "Concentrating on Call Lightning.",
       sheetLayoutOrder: ["spells", "roll-helper", "health-combat"],
+      sheetModuleVisibility: { notes: false, inventory: true, "soul-reaper": false },
     });
     const spell = await createSpell(cloud.id, "Call Lightning");
     await saveSpell({ ...spell, level: 3, school: "Conjuration", description: "Storm cloud follows Cloud." });
@@ -143,6 +144,7 @@ describe("manual backup and restore", () => {
     expect(restoredSheet?.pactMagicSlotsUsed).toMatchObject({ "2": 1 });
     expect(restoredSheet?.pactMagicRecovery["2"]).toMatchObject({ recoverOn: "shortRest", recoverAmount: "all" });
     expect(restoredSheet?.sheetLayoutOrder).toEqual(["spells", "roll-helper", "health-combat"]);
+    expect(restoredSheet?.sheetModuleVisibility).toEqual({ notes: false, inventory: true, "soul-reaper": false });
     expect(restoredSpells).toEqual([expect.objectContaining({ name: "Call Lightning", level: 3, description: "Storm cloud follows Cloud." })]);
     expect(restoredItems).toEqual([expect.objectContaining({ name: "Storm Staff", category: "Arcane focus", effectsAndStats: "+1 spell attack", favorite: true })]);
   });

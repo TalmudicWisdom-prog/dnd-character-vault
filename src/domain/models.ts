@@ -148,6 +148,7 @@ export const characterSheetSchema = z.object({
   specialAbilities: z.string().max(30000).default(""),
   notes: z.string().max(50000),
   sheetLayoutOrder: z.array(z.string().max(60)).default([]),
+  sheetModuleVisibility: z.record(z.string().max(60), z.boolean()).default({}),
   updatedAt: z.string().datetime(),
 });
 export type CharacterSheet = z.infer<typeof characterSheetSchema>;

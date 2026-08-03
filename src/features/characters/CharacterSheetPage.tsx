@@ -23,11 +23,13 @@ import {
   characterMenuIntent,
   characterMenuItems,
   characterMenuRouteHash,
-  defaultSheetLayoutOrder,
   isSheetLayoutSectionId,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
+  normalizeSheetModuleVisibility,
   reorderSheetLayoutOrder,
+  setSheetModuleVisibility,
+  sheetModuleDefinitions,
   sheetSectionScrollBehavior,
   sheetNavigatorSections,
   sheetSectionDomId,
@@ -59,21 +61,9 @@ const skillLabels: Record<SkillId, string> = {
   religion: "Religion", sleightOfHand: "Sleight of Hand", stealth: "Stealth", survival: "Survival",
 };
 
-const layoutSectionTitles: Record<SheetLayoutSectionId, string> = {
-  dice: "Dice",
-  "roll-helper": "What Do I Roll?",
-  identity: "Character identity",
-  "level-preview": "Next level preview",
-  roleplay: "Biography",
-  "health-combat": "Health and combat",
-  attacks: "Attacks and damage",
-  training: "Proficiencies and languages",
-  spells: "Spells",
-  features: "Features and traits",
-  notes: "Character notes",
-  "soul-reaper": "Soul Reaper",
-  inventory: "Inventory",
-};
+const layoutSectionTitles = Object.fromEntries(
+  sheetModuleDefinitions.map((module) => [module.id, module.title]),
+) as Record<SheetLayoutSectionId, string>;
 
 const overlaySectionTitles: Record<SheetNavigatorSectionId, string> = {
   ...layoutSectionTitles,
@@ -101,27 +91,46 @@ function LevelUpHint() {
 
 type LayoutCardProps = {
   children: ReactNode;
-  customizeMode: boolean;
-  dragging: boolean;
   id: SheetLayoutSectionId;
-  index: number;
   style?: CSSProperties;
-  title: string;
-  total: number;
+  visible: boolean;
+};
+
+export function LayoutCard({ children, id, style, visible }: LayoutCardProps) {
+  if (!visible) return null;
+  return (
+    <div className="layout-card" data-layout-card-id={id} data-module-visible="true" data-sheet-section-id={id} id={sheetSectionDomId(id)} style={style} tabIndex={-1}>
+      <div className="layout-card-content">{children}</div>
+    </div>
+  );
+}
+
+type LayoutCustomizerListProps = {
+  draggingId: SheetLayoutSectionId | null;
+  order: SheetLayoutSectionId[];
+  visibility: Record<SheetLayoutSectionId, boolean>;
   onDragEnd: (event: PointerEvent<HTMLButtonElement>) => void;
   onDragMove: (event: PointerEvent<HTMLButtonElement>) => void;
   onDragStart: (id: SheetLayoutSectionId, event: PointerEvent<HTMLButtonElement>) => void;
   onMove: (id: SheetLayoutSectionId, direction: "up" | "down") => void;
+  onVisibilityChange: (id: SheetLayoutSectionId, visible: boolean) => void;
 };
 
-function LayoutCard({ children, customizeMode, dragging, id, index, style, title, total, onDragEnd, onDragMove, onDragStart, onMove }: LayoutCardProps) {
+export function LayoutCustomizerList({ draggingId, order, visibility, onDragEnd, onDragMove, onDragStart, onMove, onVisibilityChange }: LayoutCustomizerListProps) {
   return (
-    <div className={customizeMode ? `layout-card customizing${dragging ? " dragging" : ""}` : "layout-card"} data-layout-card-id={id} data-sheet-section-id={id} id={sheetSectionDomId(id)} style={style} tabIndex={-1}>
-      {customizeMode && (
-        <div className="layout-card-controls">
+    <div aria-label="Home Screen modules" className="layout-module-list">
+      {order.map((id, index) => {
+        const module = sheetModuleDefinitions.find((candidate) => candidate.id === id)!;
+        const visible = visibility[id];
+        return <div className={`layout-card-controls${visible ? " visible" : " hidden"}${draggingId === id ? " dragging" : ""}`} data-layout-card-id={id} data-module-visible={visible} key={id}>
+          <label className="layout-visibility-toggle">
+            <input aria-label={`Show ${module.label} on Home Screen`} checked={visible} onChange={(event) => onVisibilityChange(id, event.target.checked)} type="checkbox" />
+            <span aria-hidden="true" className="layout-module-icon">{module.icon}</span>
+            <span><strong>{module.label}</strong><small>{visible ? "Shown on Home Screen" : "Hidden from Home Screen"}</small></span>
+          </label>
           <button
-            aria-label={`Drag ${title}`}
-            aria-pressed={dragging}
+            aria-label={`Drag ${module.label}`}
+            aria-pressed={draggingId === id}
             className="layout-drag-handle"
             onPointerCancel={onDragEnd}
             onPointerDown={(event) => onDragStart(id, event)}
@@ -130,15 +139,14 @@ function LayoutCard({ children, customizeMode, dragging, id, index, style, title
             type="button"
           >
             <span aria-hidden="true">::</span>
-            <strong>{title}</strong>
+            <strong>Drag</strong>
           </button>
           <div className="layout-move-buttons">
             <button className="secondary-button compact" disabled={index === 0} onClick={() => onMove(id, "up")} type="button">Move up</button>
-            <button className="secondary-button compact" disabled={index === total - 1} onClick={() => onMove(id, "down")} type="button">Move down</button>
+            <button className="secondary-button compact" disabled={index === order.length - 1} onClick={() => onMove(id, "down")} type="button">Move down</button>
           </div>
-        </div>
-      )}
-      {children}
+        </div>;
+      })}
     </div>
   );
 }
@@ -450,6 +458,11 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     window.setTimeout(() => document.querySelector<HTMLButtonElement>(".sheet-section-trigger")?.focus(), 0);
   };
 
+  const openLayoutCustomizer = () => {
+    setCustomizeLayout(true);
+    window.requestAnimationFrame(() => scrollToSheetTargetId("sheet-layout-customizer"));
+  };
+
   const handleCharacterMenuItem = async (item: CharacterMenuItem) => {
     setMenuActionError("");
     try {
@@ -461,7 +474,12 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
           return;
         case "overlay":
           moduleReturnFocusRef.current = true;
-          if (intent.enableLayoutEditing) setCustomizeLayout(true);
+          if (intent.enableLayoutEditing) {
+            moduleReturnFocusRef.current = false;
+            setActiveModuleId(null);
+            openLayoutCustomizer();
+            return;
+          }
           setActiveModuleId(intent.targetId);
           return;
         case "route":
@@ -488,9 +506,15 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     updateLayoutOrder((currentOrder) => moveSheetLayoutSection(currentOrder, sectionId, direction));
   };
 
+  const updateModuleVisibility = (sectionId: SheetLayoutSectionId, visible: boolean) => {
+    edit((current) => ({
+      ...current,
+      sheetModuleVisibility: setSheetModuleVisibility(current.sheetModuleVisibility, sectionId, visible),
+    }));
+  };
+
   const resetLayout = () => {
-    updateLayoutOrder(() => []);
-    setCustomizeLayout(false);
+    edit((current) => ({ ...current, sheetLayoutOrder: [], sheetModuleVisibility: {} }));
     setDraggingSectionId(null);
     draggingSectionRef.current = null;
   };
@@ -529,6 +553,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   const initiativeRow = rollRows.find((row) => row.id === "initiative");
   const initiativeModifier = initiativeBonus(sheet);
   const layoutOrder = normalizeSheetLayoutOrder(sheet.sheetLayoutOrder);
+  const moduleVisibility = normalizeSheetModuleVisibility(sheet.sheetModuleVisibility);
   const passivePerception = 10 + skillModifier(sheet, "perception");
   const hpMaximum = Math.max(sheet.maxHp, 1);
   const hpPercent = Math.max(0, Math.min(100, Math.round((sheet.currentHp / hpMaximum) * 100)));
@@ -661,12 +686,12 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
     <div className="layout-overlay-actions">
       <div className="module-summary">
         <span>Per character</span>
-        <strong>{customizeLayout ? "Layout editing is on" : "Customize module order"}</strong>
-        <small>Only gameplay modules are draggable. Dashboard and abilities stay fixed.</small>
+        <strong>{customizeLayout ? "HUD customization is on" : "Customize the Live HUD"}</strong>
+        <small>Show, hide, and reorder Home Screen modules. The Character Menu always keeps every module available.</small>
       </div>
       <div className="layout-customize-actions">
-        <button className={customizeLayout ? "primary-button" : "secondary-button"} onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done editing" : "Start customizing"}</button>
-        <button className="secondary-button" onClick={resetLayout} type="button">Reset layout</button>
+        <button className={customizeLayout ? "primary-button" : "secondary-button"} onClick={() => customizeLayout ? setCustomizeLayout(false) : openLayoutCustomizer()} type="button">{customizeLayout ? "Done editing" : "Start customizing"}</button>
+        <button className="secondary-button" onClick={resetLayout} type="button">Restore Default Layout</button>
       </div>
     </div>
   );
@@ -800,17 +825,9 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
   };
 
   const layoutProps = (id: SheetLayoutSectionId) => ({
-    customizeMode: customizeLayout,
-    dragging: draggingSectionId === id,
     id,
-    index: layoutOrder.indexOf(id),
-    onDragEnd: endLayoutDrag,
-    onDragMove: moveLayoutDrag,
-    onDragStart: startLayoutDrag,
-    onMove: moveLayoutCard,
     style: { order: layoutOrder.indexOf(id) },
-    title: layoutSectionTitles[id],
-    total: defaultSheetLayoutOrder.length,
+    visible: moduleVisibility[id],
   });
 
   return (
@@ -832,8 +849,8 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
           <h1 id="sheet-character-title">{character.name}</h1>
           <p>{characterSubtitle || "Touch-friendly live play sheet"}</p>
           <div className="dashboard-actions">
-            {customizeLayout && <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>}
-            <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => setCustomizeLayout((current) => !current)} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
+            {customizeLayout && <button className="secondary-button compact" onClick={resetLayout} type="button">Restore Default Layout</button>}
+            <button className={customizeLayout ? "primary-button compact" : "secondary-button compact"} data-testid="customize-layout-button" onClick={() => customizeLayout ? setCustomizeLayout(false) : openLayoutCustomizer()} type="button">{customizeLayout ? "Done" : "Customize Layout"}</button>
             <a className="primary-button compact button-link" href={characterMenuRouteHash("spellbook", characterId)}>Spellbook</a>
             <button className="secondary-button compact" onClick={() => void exportCharacter()} type="button">Export</button>
             <a className="secondary-button compact button-link" href={characterMenuRouteHash("profile", characterId)}>Profile</a>
@@ -904,16 +921,26 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
 
       {quickRoll && <p className="panel inline-message tool-status" role="status">{quickRoll}</p>}
 
-      {customizeLayout && <div className="layout-customize-bar">
+      {customizeLayout && <div className="layout-customize-bar" id="sheet-layout-customizer" tabIndex={-1}>
         <div>
           <span className="card-label">Editing layout</span>
-          <h2>Reorder this character's play sheet</h2>
-          <p>Drag section handles on touch or mouse. Move up and Move down stay available for precise control. Tap Done when finished.</p>
+          <h2>Show, hide, and reorder this character's HUD</h2>
+          <p>Use each checkbox to choose Home Screen favorites. Drag modules or use Move up and Move down for precise control. Hidden modules remain in the Character Menu and keep all their data.</p>
         </div>
         <div className="layout-customize-actions">
-          <button className="secondary-button compact" onClick={resetLayout} type="button">Reset Layout</button>
+          <button className="secondary-button compact" onClick={resetLayout} type="button">Restore Default Layout</button>
           <button className="primary-button compact" onClick={() => setCustomizeLayout(false)} type="button">Done</button>
         </div>
+        <LayoutCustomizerList
+          draggingId={draggingSectionId}
+          onDragEnd={endLayoutDrag}
+          onDragMove={moveLayoutDrag}
+          onDragStart={startLayoutDrag}
+          onMove={moveLayoutCard}
+          onVisibilityChange={updateModuleVisibility}
+          order={layoutOrder}
+          visibility={moduleVisibility}
+        />
       </div>}
 
       {activeModuleId && <div className="module-overlay" onMouseDown={closeModuleOverlay} role="presentation">

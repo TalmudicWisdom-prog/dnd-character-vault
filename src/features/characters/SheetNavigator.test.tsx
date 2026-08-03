@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { nearestVisibleSheetSection, SheetNavigator } from "./SheetNavigator";
-import { characterMenuItems, sheetNavigatorSections } from "./sheetLayout";
+import { characterMenuItems, sheetModuleDefinitions, sheetNavigatorSections } from "./sheetLayout";
 
 describe("floating character section navigator", () => {
   it("renders a floating accessible trigger without the old Current Section card or GRID control", () => {
@@ -47,6 +47,11 @@ describe("floating character section navigator", () => {
     expect(markup).toContain('data-menu-kind="action"');
     expect(markup).toContain('data-menu-kind="route"');
     expect(markup).toContain('data-menu-kind="section"');
+  });
+
+  it("always lists every HUD module regardless of Home Screen visibility", () => {
+    const markup = renderToStaticMarkup(<SheetNavigator defaultOpen items={characterMenuItems} onSelect={vi.fn()} />);
+    expect(sheetModuleDefinitions.every((module) => markup.includes(`data-section-id="${module.menu.id}"`))).toBe(true);
   });
 
   it("chooses the visible section nearest the stable top anchor without boundary flicker", () => {

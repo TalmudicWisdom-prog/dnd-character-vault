@@ -11,10 +11,14 @@ import {
   majorGameplayModuleSections,
   moveSheetLayoutSection,
   normalizeSheetLayoutOrder,
+  normalizeSheetModuleVisibility,
   openSheetNavigator,
   selectSheetNavigatorSection,
+  setSheetModuleVisibility,
+  sheetModuleDefinitions,
   sheetSectionScrollBehavior,
   sheetNavigatorSections,
+  visibleSheetLayoutOrder,
 } from "./sheetLayout";
 
 describe("character sheet layout customization", () => {
@@ -44,14 +48,16 @@ describe("character sheet layout customization", () => {
     expect(characterMenuItems.filter((item) => item.kind === "action").map((item) => item.label)).toEqual([
       "HP / Combat",
       "Roll Assistant",
-      "Dice Roller",
       "Actions",
-      "Inventory",
-      "Features & Traits",
-      "Proficiencies & Training",
-      "Background / Biography",
+      "Dice Roller",
       "Notes",
+      "Features & Traits",
+      "Inventory",
       "Soul Reaper",
+      "Character Identity",
+      "Next Level Preview",
+      "Background / Biography",
+      "Proficiencies & Training",
       "Export Character",
       "Layout Customizer",
       "Edit Portrait",
@@ -64,12 +70,19 @@ describe("character sheet layout customization", () => {
     expect(new Set(characterMenuItems.map((item) => item.id)).size).toBe(characterMenuItems.length);
   });
 
+  it("derives every customizable HUD module and command-menu destination from one registry", () => {
+    expect(defaultSheetLayoutOrder).toEqual(sheetModuleDefinitions.map((module) => module.id));
+    expect(sheetModuleDefinitions.every((module) => characterMenuItems.some((item) => item.id === module.menu.id))).toBe(true);
+  });
+
   it("resolves tools directly to overlays, routes, or export without an intermediate scroll", () => {
     const item = (id: string) => characterMenuItems.find((candidate) => candidate.id === id)!;
     const characterId = "character-123";
 
     expect(characterMenuIntent(item("dice"), characterId)).toEqual({ kind: "overlay", targetId: "dice", enableLayoutEditing: false });
     expect(characterMenuIntent(item("inventory"), characterId)).toEqual({ kind: "overlay", targetId: "inventory", enableLayoutEditing: false });
+    expect(characterMenuIntent(item("identity"), characterId)).toEqual({ kind: "overlay", targetId: "identity", enableLayoutEditing: false });
+    expect(characterMenuIntent(item("level-preview"), characterId)).toEqual({ kind: "overlay", targetId: "level-preview", enableLayoutEditing: false });
     expect(characterMenuIntent(item("edit-portrait"), characterId)).toEqual({ kind: "overlay", targetId: "portrait", enableLayoutEditing: false });
     expect(characterMenuIntent(item("layout"), characterId)).toEqual({ kind: "overlay", targetId: "layout", enableLayoutEditing: true });
     expect(characterMenuIntent(item("spellbook"), characterId)).toEqual({ kind: "route", hash: "#spellbook/character-123" });
@@ -136,6 +149,17 @@ describe("character sheet layout customization", () => {
     expect(majorGameplayModuleSections.every((section) => normalized.includes(section))).toBe(true);
   });
 
+  it("shows, hides, and restores modules without changing their saved order", () => {
+    const customOrder = normalizeSheetLayoutOrder(["inventory", "spells", "health-combat"]);
+    const hiddenSpells = setSheetModuleVisibility({}, "spells", false);
+
+    expect(normalizeSheetModuleVisibility(hiddenSpells).spells).toBe(false);
+    expect(visibleSheetLayoutOrder(customOrder, hiddenSpells)).not.toContain("spells");
+    expect(visibleSheetLayoutOrder(customOrder, hiddenSpells)[0]).toBe("inventory");
+    expect(normalizeSheetLayoutOrder(customOrder)).toContain("spells");
+    expect(normalizeSheetModuleVisibility({}).spells).toBe(true);
+  });
+
   it("keeps structural abilities and saves out of the draggable gameplay order", () => {
     const normalized = normalizeSheetLayoutOrder(["abilities", "proficiencies", "spells"]);
 
@@ -158,14 +182,38 @@ describe("character sheet layout customization", () => {
     expect(normalizeSheetLayoutOrder(reloaded.sheetLayoutOrder).indexOf("spells")).toBe(defaultSheetLayoutOrder.indexOf("spells") - 1);
   });
 
+  it("persists visibility per character while preserving hidden module data", async () => {
+    const cloud = await createCharacter({ name: "Cloud", characterClass: "Soul Reaper", ancestry: "Human" });
+    const akiva = await createCharacter({ name: "Akiva", characterClass: "Fighter", ancestry: "Human" });
+    const cloudSheet = createEmptyCharacterSheet(cloud.id);
+    const akivaSheet = createEmptyCharacterSheet(akiva.id);
+
+    await saveCharacterSheet({
+      ...cloudSheet,
+      notes: "Cloud's private combat notes remain intact.",
+      sheetModuleVisibility: { spells: false, notes: false, "soul-reaper": true },
+    });
+    await saveCharacterSheet({
+      ...akivaSheet,
+      sheetModuleVisibility: { spells: true, notes: true, "soul-reaper": false },
+    });
+
+    const reloadedCloud = await getOrCreateCharacterSheet(cloud.id);
+    const reloadedAkiva = await getOrCreateCharacterSheet(akiva.id);
+    expect(normalizeSheetModuleVisibility(reloadedCloud.sheetModuleVisibility)).toMatchObject({ spells: false, notes: false, "soul-reaper": true });
+    expect(reloadedCloud.notes).toBe("Cloud's private combat notes remain intact.");
+    expect(normalizeSheetModuleVisibility(reloadedAkiva.sheetModuleVisibility)).toMatchObject({ spells: true, notes: true, "soul-reaper": false });
+  });
+
   it("reset layout restores the default order for that character", async () => {
     const character = await createCharacter({ name: "Bram", characterClass: "Fighter", ancestry: "Dwarf" });
     const sheet = createEmptyCharacterSheet(character.id);
 
     await saveCharacterSheet({ ...sheet, sheetLayoutOrder: moveSheetLayoutSection(sheet.sheetLayoutOrder, "health-combat", "up") });
-    const reset = await saveCharacterSheet({ ...(await getOrCreateCharacterSheet(character.id)), sheetLayoutOrder: [] });
+    const reset = await saveCharacterSheet({ ...(await getOrCreateCharacterSheet(character.id)), sheetLayoutOrder: [], sheetModuleVisibility: {} });
 
     expect(normalizeSheetLayoutOrder(reset.sheetLayoutOrder)).toEqual([...defaultSheetLayoutOrder]);
+    expect(normalizeSheetModuleVisibility(reset.sheetModuleVisibility)).toEqual(normalizeSheetModuleVisibility({}));
   });
 
   it("custom layout does not affect another character", async () => {
