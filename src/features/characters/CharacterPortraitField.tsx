@@ -465,7 +465,7 @@ export function CharacterPortraitField({
       >
         {(!value || locallySuppressed) && <span aria-hidden="true">{characterInitial(characterName)}</span>}
       </PortraitViewport>
-      {compact ? <details className="portrait-management"><summary>Edit portrait</summary>{controls}</details> : controls}
+      {compact ? <details className="portrait-management"><summary><svg aria-hidden="true" className="portrait-management-icon" viewBox="0 0 24 24"><path d="M8.5 6 10 4h4l1.5 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5Z" /><circle cx="12" cy="12.5" r="4" /></svg><span className="portrait-management-label">Edit portrait</span></summary>{controls}</details> : controls}
 
       {candidate && (
         <div className="portrait-editor-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) cancelEditor(); }}>

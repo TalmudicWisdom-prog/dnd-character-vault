@@ -1987,7 +1987,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .live-hud-canvas > .layout-card[data-layout-card-id="vitals"] { grid-column: span 9; }
   .live-hud-canvas > .layout-card[data-layout-card-id="abilities"] { grid-column: 1 / -1; }
   .live-hud-canvas > .layout-card[data-layout-card-id="saving-throws"],
-  .live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: 1 / -1; }
   .hud-identity-module { grid-template-columns: minmax(110px, 0.44fr) minmax(0, 0.56fr); }
   .hud-identity-module .portrait-picker.compact { --hud-portrait-frame-height: 230px; }
   .hud-vitals-module { grid-template-columns: 0.7fr 0.85fr 1.75fr; }
@@ -2587,4 +2587,339 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .spell-level-ribbon { transition: none; }
   .desk-action-card:hover,
   .desk-action-card:focus-visible { transform: none; }
+}
+
+/* Live HUD concept specification: quiet floating surfaces and instrument-first hierarchy. */
+body:has(.sheet-page) {
+  background:
+    radial-gradient(circle at 62% 0%, rgb(25 61 75 / 0.18), transparent 38rem),
+    radial-gradient(circle at 88% 42%, rgb(23 68 77 / 0.1), transparent 34rem),
+    linear-gradient(135deg, #050909, #071012 48%, #050909);
+}
+.sheet-page { width: min(1460px, 100%); padding: 48px 28px 70px; }
+.hud-page-masthead { margin-bottom: 24px; padding: 0 8px; border-bottom: 0; }
+.hud-page-masthead h1 { margin: 10px 0 8px; font-size: clamp(3rem, 5.2vw, 4.25rem); letter-spacing: 0.01em; }
+.hud-page-masthead p { max-width: 760px; color: color-mix(in srgb, var(--sheet-text) 86%, var(--sheet-text-muted)); font-size: 0.94rem; }
+.hud-page-actions { align-self: end; padding-bottom: 2px; }
+.hud-page-actions .secondary-button { background: rgb(8 15 16 / 0.74); border-color: color-mix(in srgb, var(--fantasy-gold) 42%, transparent); box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); }
+.live-hud-canvas {
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+}
+.live-hud-canvas > .layout-card { grid-column: span 8; }
+.live-hud-canvas > .layout-card[data-layout-card-id="identity"] { grid-column: span 10; }
+.live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
+.live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 3; }
+.live-hud-canvas > .layout-card[data-layout-card-id="health-combat"] { grid-column: span 8; }
+.live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
+.live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 6; }
+.live-hud-canvas > .layout-card[data-layout-card-id="vitals"] { grid-column: span 12; }
+.live-hud-canvas > .layout-card[data-layout-card-id="abilities"] { grid-column: 1 / -1; }
+.live-hud-canvas > .layout-card[data-layout-card-id="saving-throws"],
+.live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: span 12; }
+.live-hud-canvas .layout-card-content { border-radius: 10px; }
+.hud-module,
+.live-hud-canvas .gameplay-card {
+  color: #f3eadb;
+  background:
+    linear-gradient(150deg, rgb(17 29 31 / 0.74), rgb(8 15 16 / 0.66)),
+    radial-gradient(circle at 50% 0%, rgb(46 91 99 / 0.08), transparent 72%);
+  border: 1px solid rgb(139 174 174 / 0.035);
+  border-radius: 10px;
+  box-shadow: 0 14px 35px rgb(0 0 0 / 0.2), inset 0 1px rgb(255 255 255 / 0.012);
+  backdrop-filter: blur(16px) saturate(0.84);
+}
+.hud-module:hover,
+.hud-module:focus-within {
+  border-color: rgb(212 144 52 / 0.34);
+  box-shadow: 0 16px 38px rgb(0 0 0 / 0.26), 0 0 0 1px rgb(212 144 52 / 0.08);
+}
+.hud-module > span,
+.hud-orb-module > span,
+.hud-health-primary > span,
+.hud-vitals-module span,
+.hud-status-copy > span {
+  color: #e9e2d7;
+  font-size: 0.65rem;
+  letter-spacing: 0.105em;
+}
+.hud-glyph { width: 34px; height: 34px; fill: none; stroke: #e88b12; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+
+.hud-identity-module {
+  min-height: 254px;
+  grid-template-columns: minmax(154px, 194px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px 18px;
+  align-items: center;
+  padding: 0 18px 14px 6px;
+}
+.hud-identity-module .portrait-picker.compact {
+  --hud-portrait-frame-height: 0px;
+  width: 100%;
+  max-width: 194px;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: center;
+  overflow: visible;
+}
+.hud-identity-module .portrait-picker.compact .portrait-frame {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 1;
+  border: 2px solid #d77c0c;
+  border-radius: 50%;
+  box-shadow: 0 18px 38px rgb(0 0 0 / 0.32), 0 0 28px rgb(33 148 95 / 0.08);
+}
+.hud-identity-module .portrait-image,
+.hud-identity-module .portrait-image-backdrop { border-radius: 50%; }
+.hud-identity-copy { align-content: end; gap: 7px; padding-top: 28px; }
+.hud-identity-copy h2 { font-size: clamp(2rem, 3.2vw, 2.6rem); }
+.hud-identity-copy p { color: #f0e8dc; font-size: 0.95rem; }
+.hud-identity-copy small { color: #e2d8ca; font-size: 0.82rem; }
+.hud-identity-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hud-identity-actions .hud-module-link { min-height: 38px; padding: 7px 13px; color: #f0e7db; background: rgb(6 11 12 / 0.66); border-color: rgb(215 124 12 / 0.52); font-weight: 700; }
+.hud-identity-actions .hud-module-link:last-child { color: #e58b16; }
+.hud-identity-module > .hud-module-link { position: static; }
+.hud-identity-module .portrait-management { right: auto; bottom: -12px; left: 50%; width: 48px; transform: translateX(-50%); }
+.hud-identity-module .portrait-management summary {
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  color: #f6ede1;
+  background: #0a1112;
+  border: 1px solid #d77c0c;
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.45);
+}
+.portrait-management-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.portrait-management-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.hud-identity-module .portrait-management .portrait-picker-controls {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  width: min(340px, calc(100vw - 32px));
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.hud-orb-module {
+  position: relative;
+  min-height: 254px;
+  align-content: center;
+  gap: 3px;
+  padding: 20px 7px;
+  clip-path: none;
+  border-radius: 10px;
+}
+.hud-orb-module::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(96px, 78%);
+  aspect-ratio: 1;
+  content: "";
+  border: 1px solid rgb(215 124 12 / 0.62);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 24%, rgb(204 123 20 / 0.11), transparent 68%);
+  transform: translate(-50%, -42%);
+}
+.hud-orb-module > * { position: relative; z-index: 1; }
+.hud-orb-module > span { align-self: end; margin-bottom: 7px; }
+.hud-orb-module .hud-glyph { width: 31px; height: 31px; margin-bottom: -4px; }
+.hud-orb-module strong { font-size: clamp(2.6rem, 4.4vw, 3.45rem); }
+.hud-orb-module small { align-self: end; margin-top: 24px; color: #e7dfd4; font-size: 0.76rem; font-weight: 500; }
+
+.hud-health-module { min-height: 254px; padding: 18px 20px 16px; }
+.hud-health-primary { gap: 7px; }
+.hud-health-primary strong { font-size: clamp(3.5rem, 6vw, 5rem); }
+.hud-health-primary strong small { color: #eee3d4; font-size: 0.58em; }
+.hud-health-primary em { color: #eee6db; font-weight: 500; }
+.hud-health-primary > i { height: 8px; }
+.hud-rest-actions { gap: 12px; }
+.hud-rest-actions .secondary-button,
+.hud-rest-actions .primary-button { min-height: 46px; border-color: rgb(215 124 12 / 0.56); }
+
+.hud-conditions-module,
+.hud-inspiration-module {
+  min-height: 135px;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 14px;
+  align-content: center;
+  justify-items: stretch;
+  padding: 14px 18px;
+  text-align: left;
+}
+.hud-conditions-module .hud-glyph { width: 60px; height: 60px; stroke: #2fbf72; }
+.hud-inspiration-module .hud-glyph { width: 62px; height: 62px; }
+.hud-status-copy { min-width: 0; display: grid; gap: 5px; align-content: center; }
+.hud-status-copy strong { font-size: clamp(1.5rem, 2.6vw, 2rem); }
+.hud-status-copy small { color: #e7dfd4; font-weight: 500; }
+.hud-inspiration-module.ready { background: linear-gradient(150deg, rgb(17 29 31 / 0.74), rgb(8 15 16 / 0.66)); border-color: rgb(139 174 174 / 0.035); }
+
+.hud-vitals-module { min-height: 135px; grid-template-columns: 0.75fr 0.95fr 1.65fr; gap: 0; padding: 13px 10px; }
+.hud-vitals-module > button {
+  min-height: 108px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 2px 9px;
+  place-content: center;
+  justify-items: start;
+  padding: 10px 16px;
+  border: 0;
+  border-right: 1px solid rgb(215 124 12 / 0.32);
+  border-radius: 0;
+}
+.hud-vitals-module > button .hud-glyph { grid-row: 2; width: 30px; height: 30px; align-self: center; }
+.hud-vitals-module > button > span { grid-column: 1 / -1; }
+.hud-vitals-module > button > strong { grid-column: 2; grid-row: 2; font-size: clamp(1.75rem, 3vw, 2.25rem); }
+.hud-vitals-module > button:nth-child(2) > strong { font-size: clamp(1.45rem, 2.4vw, 2rem); white-space: nowrap; }
+.hud-vitals-module > button > small { grid-column: 2; grid-row: 3; font-weight: 500; }
+.hud-death-saves { padding: 8px 12px 8px 22px; }
+.hud-death-saves > div { grid-template-columns: minmax(64px, 1fr) repeat(3, 32px); }
+.hud-death-saves button { width: 32px; height: 32px; border-color: rgb(215 124 12 / 0.62); }
+.hud-death-saves button[aria-pressed="true"] { background: #b66313; border-color: #f0a43e; }
+
+.hud-abilities-module { min-height: 220px; padding: 16px 18px 12px; }
+.hud-abilities-module > header { align-items: center; }
+.hud-abilities-module > header h2 { display: none; }
+.hud-abilities-module > header .hud-module-link { min-height: 34px; padding: 5px 10px; opacity: 0.58; }
+.hud-ability-grid { gap: 4px; }
+.hud-ability-instrument { min-height: 165px; padding: 5px; }
+.hud-instrument-label { color: #f1e8dc; font-size: 0.64rem; letter-spacing: 0.07em; }
+.hud-ability-geometry { width: clamp(82px, 7.5vw, 108px); }
+.hud-ability-geometry svg { stroke: #ce7712; stroke-width: 1.5; }
+.hud-ability-geometry strong { font-size: clamp(2rem, 3.2vw, 2.65rem); }
+.hud-ability-instrument > small { color: #eee3d4; font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; }
+
+.hud-saves-module,
+.hud-senses-module { min-height: 205px; padding: 16px 18px; }
+.hud-saves-module > header,
+.hud-senses-module > header { min-width: 0; align-items: start; }
+.hud-saves-module > header > div,
+.hud-senses-module > header > div { min-width: 0; }
+.hud-saves-module h2,
+.hud-senses-module h2 { color: #f1e8dc; font-size: 1.45rem; }
+.hud-save-list { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.hud-save-instrument {
+  min-height: 92px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 4px;
+  text-align: center;
+}
+.hud-save-instrument > span { display: flex; gap: 6px; align-items: center; color: #e8ded0; font-size: 0.72rem; }
+.hud-save-instrument > span .hud-glyph { width: 20px; height: 20px; stroke: #c6a675; }
+.hud-save-instrument > i,
+.hud-save-instrument > small { display: none; }
+.hud-save-instrument > strong { width: auto; height: auto; border: 0; clip-path: none; font-size: 1.65rem; }
+.hud-sense-list { grid-template-columns: minmax(210px, 1.1fr) minmax(160px, 0.9fr); gap: 2px 24px; }
+.hud-sense-list > div { grid-column: 1; min-height: 36px; padding: 0; border: 0; }
+.hud-sense-list > div strong { font-size: 1.65rem; text-align: left; }
+.hud-sense-list > div span { color: #e8ded0; font-weight: 500; }
+.hud-sense-list > p { grid-column: 2; grid-row: 1 / span 3; display: flex; gap: 12px; align-items: center; margin: 0; color: #eee5d9; font-weight: 500; }
+.hud-sense-list > p .hud-glyph { flex: 0 0 32px; width: 32px; height: 32px; stroke: #d3b174; }
+.live-hud-canvas .gameplay-card { border-color: rgb(139 174 174 / 0.035); box-shadow: 0 14px 35px rgb(0 0 0 / 0.2); }
+.live-hud-canvas .module-summary { background: rgb(3 8 9 / 0.2); border-color: rgb(139 174 174 / 0.06); }
+
+@media (max-width: 1100px) {
+  .sheet-page { padding-inline: 24px; }
+  .live-hud-canvas { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .live-hud-canvas > .layout-card { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="identity"] { grid-column: 1 / -1; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 3; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="health-combat"] { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="vitals"] { grid-column: 1 / -1; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="abilities"] { grid-column: 1 / -1; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="saving-throws"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: 1 / -1; }
+  .hud-identity-module { grid-template-columns: minmax(142px, 190px) minmax(0, 1fr); }
+  .hud-identity-module .portrait-picker.compact { max-width: 190px; }
+  .hud-saves-module { min-height: 220px; }
+  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .sheet-page { padding: 72px 20px 88px; }
+  .hud-page-masthead { padding-inline: 2px; }
+  .hud-page-masthead h1 { font-size: clamp(2.8rem, 9vw, 4rem); }
+  .live-hud-canvas > .layout-card,
+  .live-hud-canvas > .layout-card[data-layout-card-id="identity"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="health-combat"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="vitals"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="abilities"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="saving-throws"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="senses"] { grid-column: 1 / -1; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 6; }
+  .hud-identity-module,
+  .hud-orb-module,
+  .hud-health-module { min-height: 235px; }
+  .hud-identity-module { grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); }
+  .hud-identity-module .portrait-picker.compact { max-width: 200px; }
+  .hud-conditions-module,
+  .hud-inspiration-module { min-height: 142px; }
+  .hud-vitals-module { min-height: 142px; }
+  .hud-sense-list { grid-template-columns: 1fr; }
+  .hud-sense-list > p { grid-column: 1; grid-row: auto; padding-top: 9px; border-top: 1px solid rgb(215 124 12 / 0.18); }
+}
+
+@media (max-width: 680px) {
+  .sheet-page { padding: 72px 12px 94px; }
+  .hud-page-masthead { gap: 14px; margin-bottom: 16px; }
+  .hud-page-masthead h1 { font-size: 2.85rem; }
+  .hud-page-masthead p { font-size: 0.82rem; }
+  .hud-identity-module { min-height: 220px; grid-template-columns: minmax(132px, 174px) minmax(0, 1fr); padding-right: 12px; }
+  .hud-identity-module .portrait-picker.compact { max-width: 174px; }
+  .hud-orb-module { min-height: 180px; }
+  .hud-health-module { min-height: 235px; }
+  .hud-conditions-module,
+  .hud-inspiration-module { min-height: 132px; grid-template-columns: 62px minmax(0, 1fr); }
+  .hud-conditions-module .hud-glyph,
+  .hud-inspiration-module .hud-glyph { width: 54px; height: 54px; }
+  .hud-vitals-module { grid-template-columns: 1fr 1fr; }
+  .hud-vitals-module > button:nth-child(2) { border-right: 0; }
+  .hud-death-saves { grid-column: 1 / -1; padding: 12px; border-top: 1px solid rgb(215 124 12 / 0.18); }
+  .hud-ability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hud-abilities-module { min-height: 390px; }
+  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 430px) {
+  .sheet-page { padding-inline: 9px; }
+  .hud-page-masthead h1 { font-size: 2.5rem; }
+  .hud-page-actions { grid-template-columns: 1fr; justify-items: stretch; }
+  .hud-page-actions .hud-save-state { text-align: right; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: 1 / -1; }
+  .hud-identity-module { min-height: 380px; grid-template-columns: 1fr; grid-template-rows: auto auto auto; gap: 10px; padding: 12px; text-align: center; }
+  .hud-identity-module .portrait-picker.compact { width: min(174px, 58vw); max-width: none; grid-row: auto; margin: 0 auto; }
+  .hud-identity-module .portrait-picker.compact .portrait-frame { aspect-ratio: 1; }
+  .hud-identity-copy { justify-items: center; padding-top: 8px; }
+  .hud-identity-actions { width: 100%; justify-content: center; }
+  .hud-identity-actions .hud-module-link { width: auto; flex: 1 1 132px; }
+  .hud-identity-module .portrait-management .portrait-picker-controls { left: 0; transform: translateX(-42%); }
+  .hud-orb-module { min-height: 170px; }
+  .hud-health-primary strong { font-size: 3.6rem; }
+  .hud-rest-actions { grid-template-columns: 1fr 1fr; }
+  .hud-conditions-module,
+  .hud-inspiration-module { grid-template-columns: 58px minmax(0, 1fr); text-align: left; }
+  .hud-vitals-module > button { padding-inline: 10px; }
+  .hud-abilities-module { min-height: 365px; padding-inline: 10px; }
+  .hud-ability-instrument { min-height: 145px; }
+  .hud-ability-geometry { width: min(88px, 24vw); }
+  .hud-saves-module > header,
+  .hud-senses-module > header { flex-direction: row; }
+  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hud-sense-list { grid-template-columns: 1fr; }
 }

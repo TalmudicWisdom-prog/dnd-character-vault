@@ -90,6 +90,22 @@ function LevelUpHint() {
   return <small className="level-up-hint">Usually changed during level up.</small>;
 }
 
+type HudGlyphKind = "armor" | "initiative" | "conditions" | "inspiration" | "speed" | "hit-dice" | "sense" | "save";
+
+function HudGlyph({ className = "", kind }: { className?: string; kind: HudGlyphKind }) {
+  const common = { "aria-hidden": true, className: `hud-glyph ${className}`.trim(), viewBox: "0 0 48 48" } as const;
+  switch (kind) {
+    case "armor": return <svg {...common}><path d="M24 4 39 10v11c0 10-6 18-15 23C15 39 9 31 9 21V10l15-6Z" /><path d="M24 9v28M14 14l10-5 10 5v8c0 6-3 11-10 16" /></svg>;
+    case "initiative": return <svg {...common}><path d="m24 4 17 11-6 20H13L7 15 24 4Z" /><path d="m24 9 5 10 10 1-8 7 2 7-9-5-9 5 2-7-8-7 10-1 5-10Z" /><circle cx="24" cy="23" r="3" /></svg>;
+    case "conditions": return <svg {...common}><circle cx="24" cy="24" r="20" /><circle cx="24" cy="24" r="16" /><path d="m14 24 7 7 14-16" /></svg>;
+    case "inspiration": return <svg {...common}><circle cx="24" cy="24" r="10" /><path d="M24 2v8M24 38v8M2 24h8M38 24h8M8.5 8.5l5.7 5.7M33.8 33.8l5.7 5.7M39.5 8.5l-5.7 5.7M14.2 33.8l-5.7 5.7" /><path d="m24 5 4 7 8-1-1 8 7 5-7 5 1 8-8-1-4 7-4-7-8 1 1-8-7-5 7-5-1-8 8 1 4-7Z" /></svg>;
+    case "speed": return <svg {...common}><path d="M8 31c9 0 14-5 15-15l7 4c1 7 4 10 10 12l-3 7H15c-5 0-8-3-7-8Z" /><path d="m10 27 9 4M15 21l7 3M28 31h10" /></svg>;
+    case "hit-dice": return <svg {...common}><path d="m24 4 17 10v20L24 44 7 34V14L24 4Z" /><path d="m7 14 17 10 17-10M24 24v20" /><circle cx="18" cy="15" r="1.7" /><circle cx="30" cy="14" r="1.7" /><circle cx="15" cy="30" r="1.7" /><circle cx="22" cy="34" r="1.7" /><circle cx="31" cy="29" r="1.7" /></svg>;
+    case "sense": return <svg {...common}><path d="M3 24s8-12 21-12 21 12 21 12-8 12-21 12S3 24 3 24Z" /><circle cx="24" cy="24" r="7" /><circle cx="24" cy="24" r="2" /></svg>;
+    case "save": return <svg {...common}><path d="m24 5 14 8v12c0 8-5 14-14 18-9-4-14-10-14-18V13l14-8Z" /><path d="m17 24 5 5 10-11" /></svg>;
+  }
+}
+
 type LayoutCardProps = {
   children: ReactNode;
   id: SheetLayoutSectionId;
@@ -654,7 +670,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
           onClick={() => rollNow(`${abilityFullLabels[ability]} save`, `d20${formatModifier(modifier)}`, `hud-save-${ability}`)}
           type="button"
         >
-          <span>{abilityFullLabels[ability]}</span>
+          <span><HudGlyph kind="save" />{abilityLabels[ability]}</span>
           <i aria-hidden="true" />
           <small>{proficient ? "Proficient" : "Untrained"}</small>
           <strong>{formatModifier(modifier)}</strong>
@@ -669,7 +685,7 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       <div><strong>{passivePerception}</strong><span>Passive Perception</span></div>
       <div><strong>{passiveInvestigation}</strong><span>Passive Investigation</span></div>
       <div><strong>{passiveInsight}</strong><span>Passive Insight</span></div>
-      {sheet.customSenses.trim() && <p>{sheet.customSenses}</p>}
+      {sheet.customSenses.trim() && <p><HudGlyph kind="sense" /><span>{sheet.customSenses}</span></p>}
     </div>
   );
 
@@ -1026,16 +1042,16 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
             value={character.portraitDataUrl ?? ""}
           />
           <div className="hud-identity-copy"><span className="card-label">Active character</span><h2 id="sheet-character-title">{character.name}</h2><p>{characterSubtitle || "Touch-friendly live play sheet"}</p><small>{character.campaign || "No campaign set"}</small></div>
-          <button className="hud-module-link" onClick={() => openModuleOverlay("identity")} type="button">Edit identity</button>
+          <div className="hud-identity-actions"><button className="hud-module-link" onClick={() => openModuleOverlay("portrait")} type="button">Edit portrait</button><button className="hud-module-link" onClick={() => openModuleOverlay("identity")} type="button">Edit identity</button></div>
         </section>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("armor-class")}>
-        <button className="hud-module hud-orb-module" onClick={() => openModuleOverlay("armor-class")} type="button"><span>Armor Class</span><strong>{sheet.armorClass}</strong><small>Defense</small></button>
+        <button className="hud-module hud-orb-module" onClick={() => openModuleOverlay("armor-class")} type="button"><span>Armor Class</span><HudGlyph kind="armor" /><strong>{sheet.armorClass}</strong><small>Defense</small></button>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("initiative")}>
-        <button className="hud-module hud-orb-module" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "hud-initiative") : openModuleOverlay("initiative")} type="button"><span>Initiative</span><strong>{formatModifier(initiativeModifier)}</strong><small>{initiativeRow ? "Tap to roll" : "Edit combat"}</small><InlineRollFeedback result={inlineRolls["hud-initiative"]} /></button>
+        <button className="hud-module hud-orb-module" onClick={() => initiativeRow ? rollNow("Initiative", initiativeRow.formula, "hud-initiative") : openModuleOverlay("initiative")} type="button"><span>Initiative</span><HudGlyph kind="initiative" /><strong>{formatModifier(initiativeModifier)}</strong><small>{initiativeRow ? "Tap to roll" : "Edit combat"}</small><InlineRollFeedback result={inlineRolls["hud-initiative"]} /></button>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("health-combat")}>
@@ -1046,23 +1062,23 @@ export function CharacterSheetPage({ characterId, suppressPortrait = false }: { 
       </LayoutCard>
 
       <LayoutCard {...layoutProps("conditions")}>
-        <button className="hud-module hud-conditions-module" onClick={() => openModuleOverlay("conditions")} type="button"><span>Conditions</span><strong>{conditionsSummary}</strong><small>{sheet.activeConditions.length || sheet.exhaustionLevel ? "Tap to manage" : "No active conditions"}</small></button>
+        <button className="hud-module hud-conditions-module" onClick={() => openModuleOverlay("conditions")} type="button"><HudGlyph kind="conditions" /><span className="hud-status-copy"><span>Conditions</span><strong>{conditionsSummary}</strong><small>{sheet.activeConditions.length || sheet.exhaustionLevel ? "Tap to manage" : "No active conditions"}</small></span></button>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("inspiration")}>
-        <button aria-pressed={sheet.heroicInspiration} className={sheet.heroicInspiration ? "hud-module hud-inspiration-module ready" : "hud-module hud-inspiration-module"} onClick={() => edit((current) => ({ ...current, heroicInspiration: !current.heroicInspiration }))} type="button"><span>Heroic Inspiration</span><strong>{sheet.heroicInspiration ? "Ready" : "Used"}</strong><small>Tap to toggle</small></button>
+        <button aria-pressed={sheet.heroicInspiration} className={sheet.heroicInspiration ? "hud-module hud-inspiration-module ready" : "hud-module hud-inspiration-module"} onClick={() => edit((current) => ({ ...current, heroicInspiration: !current.heroicInspiration }))} type="button"><HudGlyph kind="inspiration" /><span className="hud-status-copy"><span>Heroic Inspiration</span><strong>{sheet.heroicInspiration ? "Ready" : "Used"}</strong><small>Tap to toggle</small></span></button>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("vitals")}>
         <section className="hud-module hud-vitals-module" aria-label="Speed, hit dice, and death saves">
-          <button onClick={() => openModuleOverlay("vitals")} type="button"><span>Speed</span><strong>{sheet.speed}</strong><small>feet</small></button>
-          <button className={!sheet.hitDice.trim() ? "needs-attention" : ""} onClick={() => openModuleOverlay("vitals")} type="button"><span>Hit Dice</span><strong>{sheet.hitDice || "Unset"}</strong><small>{sheet.hitDice ? "Rest resource" : "Tap to set"}</small></button>
+          <button onClick={() => openModuleOverlay("vitals")} type="button"><HudGlyph kind="speed" /><span>Speed</span><strong>{sheet.speed}</strong><small>feet</small></button>
+          <button className={!sheet.hitDice.trim() ? "needs-attention" : ""} onClick={() => openModuleOverlay("vitals")} type="button"><HudGlyph kind="hit-dice" /><span>Hit Dice</span><strong>{sheet.hitDice || "Unset"}</strong><small>{sheet.hitDice ? "Rest resource" : "Tap to set"}</small></button>
           <div className="hud-death-saves"><span>Death Saves</span><div><strong>Successes</strong>{[1, 2, 3].map((value) => <button aria-label={`Set death save successes to ${value}`} aria-pressed={sheet.deathSaveSuccesses >= value} key={`success-${value}`} onClick={() => edit((current) => ({ ...current, deathSaveSuccesses: current.deathSaveSuccesses === value ? value - 1 : value }))} type="button">{value}</button>)}</div><div><strong>Failures</strong>{[1, 2, 3].map((value) => <button aria-label={`Set death save failures to ${value}`} aria-pressed={sheet.deathSaveFailures >= value} key={`failure-${value}`} onClick={() => edit((current) => ({ ...current, deathSaveFailures: current.deathSaveFailures === value ? value - 1 : value }))} type="button">{value}</button>)}</div></div>
         </section>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("abilities")}>
-        <section className="hud-module hud-abilities-module"><header><div><span className="card-label">Ability Scores</span><h2>Core checks</h2></div><button className="hud-module-link" onClick={() => openModuleOverlay("abilities")} type="button">Edit scores</button></header>{renderHudAbilityScores()}</section>
+        <section className="hud-module hud-abilities-module"><header><div><span className="card-label">Ability Scores</span><h2>Core checks</h2></div><button className="hud-module-link" onClick={() => openModuleOverlay("abilities")} type="button">Edit</button></header>{renderHudAbilityScores()}</section>
       </LayoutCard>
 
       <LayoutCard {...layoutProps("saving-throws")}>
