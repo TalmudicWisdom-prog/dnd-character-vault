@@ -2791,7 +2791,11 @@ body:has(.sheet-page) {
 .hud-instrument-label { color: #f1e8dc; font-size: 0.64rem; letter-spacing: 0.07em; }
 .hud-ability-geometry { width: clamp(82px, 7.5vw, 108px); }
 .hud-ability-geometry svg { stroke: #ce7712; stroke-width: 1.5; }
-.hud-ability-geometry strong { font-size: clamp(2rem, 3.2vw, 2.65rem); }
+.hud-ability-geometry strong {
+  font-size: clamp(2rem, 3.2vw, 2.65rem);
+  line-height: 1;
+  transform: translateY(1px);
+}
 .hud-ability-instrument > small { color: #eee3d4; font-family: var(--font-display); font-size: 1.5rem; font-weight: 500; }
 
 .hud-saves-module,
