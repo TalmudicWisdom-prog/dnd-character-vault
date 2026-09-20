@@ -853,21 +853,28 @@ h1, h2, strong { color: var(--ink); }
 .portrait-framing-control button strong { color: var(--sheet-text); font-size: 0.88rem; }
 .portrait-framing-control button span { font-size: 0.7rem; line-height: 1.3; }
 .portrait-framing-control button.active { color: var(--sheet-text); background: color-mix(in srgb, var(--sheet-accent) 13%, var(--sheet-panel-strong)); border-color: color-mix(in srgb, var(--sheet-accent) 68%, var(--sheet-border)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sheet-accent) 20%, transparent); }
-.portrait-framing-control button.active strong::before { margin-right: 6px; content: "✓"; color: var(--sheet-accent); }
 .portrait-editor-frame {
-  width: min(360px, 74vw);
+  --portrait-frame-aspect: 1 / 1;
+  width: min(280px, 68vw);
+  aspect-ratio: 1 / 1;
   justify-self: center;
+  border: 2px solid #d77c0c;
+  border-radius: 50%;
   box-shadow: 0 16px 48px rgb(0 0 0 / 0.46), inset 0 0 0 1px rgb(255 255 255 / 0.12);
   cursor: grab;
   touch-action: none;
   user-select: none;
   outline: none;
 }
+.portrait-editor-frame .portrait-image,
+.portrait-editor-frame .portrait-image-backdrop {
+  border-radius: 50%;
+}
 .portrait-editor-frame:active { cursor: grabbing; }
 .portrait-editor-frame:focus-visible { box-shadow: 0 0 0 4px color-mix(in srgb, var(--sheet-accent) 32%, transparent), 0 16px 48px rgb(0 0 0 / 0.46); }
 .portrait-editor-frame.resetting .portrait-image-pan,
 .portrait-editor-frame.resetting .portrait-image img { transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-.portrait-editor-guide { position: absolute; inset: 8%; pointer-events: none; border: 1px solid rgb(255 255 255 / 0.24); border-radius: calc(var(--radius-lg) - 4px); box-shadow: 0 0 0 999px rgb(0 0 0 / 0.08); }
+.portrait-editor-guide { position: absolute; inset: 0; pointer-events: none; border: 1px dashed rgb(215 124 12 / 0.45); border-radius: 50%; }
 .portrait-editor-zoom { display: grid; gap: 7px; }
 .portrait-editor-zoom > label { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.78rem; font-weight: 850; text-transform: uppercase; letter-spacing: 0.08em; }
 .portrait-editor-zoom output { color: var(--sheet-text); }
@@ -1148,8 +1155,10 @@ h1, h2, strong { color: var(--ink); }
   height: 100%;
   color: var(--sheet-text);
   background: linear-gradient(155deg, color-mix(in srgb, var(--sheet-panel-strong) 78%, transparent), color-mix(in srgb, var(--fantasy-black) 72%, transparent));
-  border: 1px solid color-mix(in srgb, var(--fantasy-bronze) 62%, var(--sheet-border));
-  box-shadow: 0 12px 30px rgb(0 0 0 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.018);
+  border: 1px solid rgb(139 174 174 / 0.035);
+  border-radius: 10px;
+  box-shadow: 0 14px 35px rgb(0 0 0 / 0.2), inset 0 1px rgb(255 255 255 / 0.012);
+  backdrop-filter: blur(16px) saturate(0.84);
 }
 button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; place-content: center; justify-items: center; padding: 15px; text-align: center; }
 .hud-module:hover, .hud-module:focus-within { border-color: color-mix(in srgb, var(--fantasy-blue-glow) 76%, var(--sheet-border)); box-shadow: 0 12px 30px rgb(0 0 0 / 0.2), 0 0 0 2px color-mix(in srgb, var(--fantasy-blue) 13%, transparent); }
@@ -1776,7 +1785,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .portrait-frame > span:not(.portrait-image) { font-size: 3rem; }
   .portrait-editor-backdrop { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
   .portrait-editor-dialog { max-height: calc(100dvh - 20px); padding: 14px; gap: 11px; border-radius: var(--radius-md); }
-  .portrait-editor-frame { width: min(310px, 72vw); }
+  .portrait-editor-frame { width: min(280px, 68vw); }
   .portrait-framing-control button { min-height: 62px; padding: 8px 9px; }
   .portrait-editor-keyboard-help { display: none; }
   .dashboard .sheet-character-header { grid-column: 2; min-height: 132px; padding: 10px; }
@@ -1953,7 +1962,7 @@ button.hud-module { width: 100%; min-height: 136px; display: grid; gap: 5px; pla
   .dashboard .portrait-picker.compact { min-height: 152px; }
   .portrait-render-frame { --portrait-frame-aspect: 16 / 9; }
   .dashboard .portrait-picker.compact .portrait-frame { min-height: 0; aspect-ratio: var(--portrait-frame-aspect); }
-  .portrait-editor-frame { width: min(100%, 390px); }
+  .portrait-editor-frame { width: min(240px, 60vw); }
   .portrait-editor-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .portrait-editor-actions .portrait-editor-action-spacer { display: none; }
   .portrait-editor-actions > label,
@@ -2886,51 +2895,172 @@ body:has(.sheet-page) {
 }
 
 @media (max-width: 680px) {
-  .sheet-page { padding: 72px 12px 94px; }
-  .hud-page-masthead { gap: 14px; margin-bottom: 16px; }
-  .hud-page-masthead h1 { font-size: 2.85rem; }
-  .hud-page-masthead p { font-size: 0.82rem; }
-  .hud-identity-module { min-height: 220px; grid-template-columns: minmax(132px, 174px) minmax(0, 1fr); padding-right: 12px; }
-  .hud-identity-module .portrait-picker.compact { max-width: 174px; }
-  .hud-orb-module { min-height: 180px; }
-  .hud-health-module { min-height: 235px; }
+  .sheet-page { padding: 64px 10px 88px; }
+  .hud-page-masthead { gap: 10px; margin-bottom: 12px; }
+  .hud-page-masthead h1 { font-size: clamp(2.2rem, 7vw, 2.75rem); }
+  .hud-page-masthead p { font-size: 0.8rem; }
+  .live-hud-canvas { gap: 8px; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 6; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 6; }
+  .hud-identity-module {
+    min-height: auto;
+    grid-template-columns: minmax(100px, 120px) minmax(0, 1fr);
+    gap: 10px 12px;
+    padding: 10px;
+    padding-right: 12px;
+  }
+  .hud-identity-module .portrait-picker.compact {
+    max-width: 120px;
+    height: 120px;
+    min-height: 120px;
+  }
+  .hud-identity-module .portrait-picker.compact .portrait-frame {
+    height: 120px;
+    min-height: 120px;
+    border-radius: var(--radius-sm);
+  }
+  .hud-identity-copy h2 { font-size: clamp(1.45rem, 5vw, 1.95rem); }
+  .hud-orb-module { min-height: 125px; padding: 10px 6px; }
+  .hud-orb-module strong { font-size: clamp(2.2rem, 7vw, 2.9rem); }
+  .hud-health-module { min-height: 155px; padding: 10px 12px; }
+  .hud-health-primary strong { font-size: clamp(2.4rem, 8vw, 3.4rem); }
   .hud-conditions-module,
-  .hud-inspiration-module { min-height: 132px; grid-template-columns: 62px minmax(0, 1fr); }
+  .hud-inspiration-module { min-height: 96px; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; padding: 10px 12px; }
   .hud-conditions-module .hud-glyph,
-  .hud-inspiration-module .hud-glyph { width: 54px; height: 54px; }
-  .hud-vitals-module { grid-template-columns: 1fr 1fr; }
+  .hud-inspiration-module .hud-glyph { width: 42px; height: 42px; }
+  .hud-status-copy strong { font-size: clamp(1.15rem, 3.2vw, 1.5rem); }
+  .hud-vitals-module { min-height: 96px; grid-template-columns: 1fr 1fr; gap: 0; padding: 8px 6px; }
+  .hud-vitals-module > button { min-height: 80px; padding: 8px 10px; }
   .hud-vitals-module > button:nth-child(2) { border-right: 0; }
-  .hud-death-saves { grid-column: 1 / -1; padding: 12px; border-top: 1px solid rgb(215 124 12 / 0.18); }
-  .hud-ability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .hud-abilities-module { min-height: 390px; }
-  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hud-death-saves { grid-column: 1 / -1; padding: 10px; border-top: 1px solid rgb(215 124 12 / 0.18); }
+  .hud-ability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .hud-abilities-module { min-height: auto; padding: 12px 10px 10px; }
+  .hud-ability-instrument { min-height: 120px; padding: 4px 2px; }
+  .hud-ability-geometry { width: clamp(64px, 18vw, 78px); }
+  .hud-ability-geometry strong { font-size: clamp(1.6rem, 5vw, 2.1rem); }
+  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .hud-save-instrument { min-height: 72px; padding: 4px; }
 }
 
 @media (max-width: 430px) {
-  .sheet-page { padding-inline: 9px; }
-  .hud-page-masthead h1 { font-size: 2.5rem; }
-  .hud-page-actions { grid-template-columns: 1fr; justify-items: stretch; }
-  .hud-page-actions .hud-save-state { text-align: right; }
+  .sheet-page { padding: 58px 6px 82px; }
+  .hud-page-masthead { margin-bottom: 10px; }
+  .hud-page-masthead h1 { font-size: 2.35rem; }
+  .hud-page-actions { grid-template-columns: 1fr auto; justify-items: stretch; }
+  .hud-page-actions .hud-save-state { text-align: right; font-size: 0.68rem; }
+  .live-hud-canvas { gap: 6px; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="armor-class"],
+  .live-hud-canvas > .layout-card[data-layout-card-id="initiative"] { grid-column: span 6; }
   .live-hud-canvas > .layout-card[data-layout-card-id="conditions"],
-  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: 1 / -1; }
-  .hud-identity-module { min-height: 380px; grid-template-columns: 1fr; grid-template-rows: auto auto auto; gap: 10px; padding: 12px; text-align: center; }
-  .hud-identity-module .portrait-picker.compact { width: min(174px, 58vw); max-width: none; grid-row: auto; margin: 0 auto; }
-  .hud-identity-module .portrait-picker.compact .portrait-frame { aspect-ratio: 1; }
-  .hud-identity-copy { justify-items: center; padding-top: 8px; }
-  .hud-identity-actions { width: 100%; justify-content: center; }
-  .hud-identity-actions .hud-module-link { width: auto; flex: 1 1 132px; }
-  .hud-identity-module .portrait-management .portrait-picker-controls { left: 0; transform: translateX(-42%); }
-  .hud-orb-module { min-height: 170px; }
-  .hud-health-primary strong { font-size: 3.6rem; }
-  .hud-rest-actions { grid-template-columns: 1fr 1fr; }
+  .live-hud-canvas > .layout-card[data-layout-card-id="inspiration"] { grid-column: span 6; }
+  .hud-identity-module {
+    min-height: auto;
+    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  .hud-identity-module .portrait-picker.compact {
+    width: 88px;
+    height: 88px;
+    min-height: 88px;
+    max-width: 88px;
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+  .hud-identity-module .portrait-picker.compact .portrait-frame {
+    width: 88px;
+    height: 88px;
+    min-height: 88px;
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+  }
+  .hud-identity-copy {
+    grid-column: 2;
+    grid-row: 1;
+    justify-items: start;
+    gap: 2px;
+    padding: 0;
+  }
+  .hud-identity-copy .card-label { display: none; }
+  .hud-identity-copy h2 { font-size: clamp(1.35rem, 5.5vw, 1.7rem); }
+  .hud-identity-copy p { font-size: 0.76rem; }
+  .hud-identity-copy small { font-size: 0.7rem; }
+  .hud-identity-actions {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    justify-content: start;
+  }
+  .hud-identity-actions .hud-module-link {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    flex: 0 1 auto;
+  }
+  .hud-identity-module .portrait-management .portrait-picker-controls { left: 0; transform: translateX(-20%); }
+  .hud-orb-module { min-height: 110px; padding: 8px 4px; gap: 2px; border-radius: 20%; }
+  .hud-orb-module .hud-glyph { width: 22px; height: 22px; }
+  .hud-orb-module strong { font-size: clamp(2rem, 7.5vw, 2.6rem); }
+  .hud-orb-module > span { font-size: 0.6rem; letter-spacing: 0.04em; }
+  .hud-orb-module small { font-size: 0.62rem; }
+  .hud-health-module { min-height: 140px; padding: 8px 10px; gap: 4px; }
+  .hud-health-primary { padding: 2px; gap: 2px; }
+  .hud-health-primary strong { font-size: clamp(2.2rem, 8.5vw, 3rem); }
+  .hud-health-primary em { font-size: 0.68rem; }
+  .hud-health-primary > i { height: 5px; width: min(240px, 92%); }
+  .hud-rest-actions { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hud-rest-actions button { min-height: 32px; padding: 4px 8px; font-size: 0.72rem; }
   .hud-conditions-module,
-  .hud-inspiration-module { grid-template-columns: 58px minmax(0, 1fr); text-align: left; }
-  .hud-vitals-module > button { padding-inline: 10px; }
-  .hud-abilities-module { min-height: 365px; padding-inline: 10px; }
-  .hud-ability-instrument { min-height: 145px; }
-  .hud-ability-geometry { width: min(88px, 24vw); }
+  .hud-inspiration-module {
+    min-height: 84px;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 6px;
+    padding: 8px;
+    text-align: left;
+  }
+  .hud-conditions-module .hud-glyph,
+  .hud-inspiration-module .hud-glyph { width: 30px; height: 30px; }
+  .hud-status-copy { gap: 1px; }
+  .hud-status-copy > span { font-size: 0.56rem; }
+  .hud-status-copy strong { font-size: clamp(1rem, 3.6vw, 1.25rem); }
+  .hud-status-copy small { font-size: 0.6rem; }
+  .hud-vitals-module { min-height: 86px; padding: 6px 4px; }
+  .hud-vitals-module > button { min-height: 70px; padding: 6px 8px; gap: 2px 4px; }
+  .hud-vitals-module > button .hud-glyph { width: 20px; height: 20px; }
+  .hud-vitals-module > button > strong { font-size: 1.35rem; }
+  .hud-vitals-module > button:nth-child(2) > strong { font-size: 1.15rem; }
+  .hud-vitals-module > button > small { font-size: 0.6rem; }
+  .hud-death-saves { padding: 8px; gap: 3px; }
+  .hud-death-saves > div { grid-template-columns: minmax(50px, 1fr) repeat(3, 26px); gap: 4px; }
+  .hud-death-saves button { width: 26px; height: 26px; }
+  .hud-abilities-module { min-height: auto; padding: 10px 8px 8px; }
+  .hud-ability-grid { gap: 3px; }
+  .hud-ability-instrument { min-height: 108px; padding: 3px 2px; }
+  .hud-instrument-label { font-size: 0.56rem; }
+  .hud-ability-geometry { width: clamp(56px, 16vw, 70px); }
+  .hud-ability-geometry strong { font-size: clamp(1.4rem, 4.4vw, 1.85rem); }
+  .hud-ability-instrument > small { font-size: 1.05rem; }
+  .hud-saves-module,
+  .hud-senses-module { min-height: auto; padding: 10px 8px 8px; }
   .hud-saves-module > header,
   .hud-senses-module > header { flex-direction: row; }
-  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .hud-sense-list { grid-template-columns: 1fr; }
+  .hud-saves-module h2,
+  .hud-senses-module h2 { font-size: 1.1rem; }
+  .hud-save-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+  .hud-save-instrument { min-height: 60px; gap: 2px; padding: 2px; }
+  .hud-save-instrument > span { font-size: 0.62rem; gap: 2px; }
+  .hud-save-instrument > span .hud-glyph { width: 14px; height: 14px; }
+  .hud-save-instrument > strong { font-size: 1.2rem; }
+  .hud-sense-list { grid-template-columns: 1fr; gap: 2px; }
+  .hud-sense-list > div { min-height: 26px; }
+  .hud-sense-list > div strong { font-size: 1.25rem; }
+  .hud-sense-list > div span { font-size: 0.74rem; }
+  .hud-sense-list > p { font-size: 0.74rem; gap: 6px; padding-top: 5px; }
+  .hud-sense-list > p .hud-glyph { width: 20px; height: 20px; flex: 0 0 20px; }
 }
