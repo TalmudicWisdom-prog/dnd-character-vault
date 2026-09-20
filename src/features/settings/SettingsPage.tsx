@@ -5,6 +5,7 @@ import { getSettings, updateSettings } from "../../storage/database";
 import { BUILD_ID, APP_VERSION } from "../../app/version";
 import { checkForAppUpdate, hasWaitingUpdate, installWaitingUpdate, onUpdateAvailable } from "../../pwa/updates";
 import { optionalContentSources } from "../../rules/contentSources";
+import { SyncSettingsPanel } from "../../sync/SyncSettingsPanel";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -70,6 +71,8 @@ export function SettingsPage() {
           </label>
         </article>
 
+        <SyncSettingsPanel />
+
         <article className="panel setting-section content-source-settings">
           <div>
             <h2>Optional content sources</h2>
@@ -130,7 +133,7 @@ export function SettingsPage() {
         <article className="panel setting-section">
           <div>
             <h2>Data and privacy</h2>
-            <p>No accounts, analytics, tracking, or remote data storage are included.</p>
+            <p>No accounts, analytics, or tracking. Data stays on this device unless you connect a cloud sync provider above.</p>
           </div>
           <span className="status-badge good">Local only</span>
         </article>
