@@ -262,7 +262,6 @@ export class DropboxAdapter implements CloudSyncProvider {
       for (const entry of data.entries) {
         if (entry['.tag'] === 'file') {
           files.push({
-            id: entry.id,
             name: entry.name,
             path: entry.path_display,
             rev: entry.rev,

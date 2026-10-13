@@ -84,6 +84,7 @@ export class SyncEngine {
 
   private addLogEntry(action: SyncLogEntry['action'], message: string, characterIds?: string[]): void {
     const entry: SyncLogEntry = {
+      id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
       action,
       message,
@@ -150,8 +151,11 @@ export class SyncEngine {
         this.metadata = metadata;
       } else {
         this.metadata = {
+          id: 'sync',
           deviceId: crypto.randomUUID(),
+          providerId: null,
           lastSyncedAt: new Date().toISOString(),
+          providerAuth: null,
           ancestorSnapshots: {},
         };
         await db.table('syncMetadata').put(this.metadata, 'sync');
@@ -159,8 +163,11 @@ export class SyncEngine {
     } catch (err) {
       console.warn('Failed to load sync metadata, creating new', err);
       this.metadata = {
+        id: 'sync',
         deviceId: crypto.randomUUID(),
+        providerId: null,
         lastSyncedAt: new Date().toISOString(),
+        providerAuth: null,
         ancestorSnapshots: {},
       };
     }
