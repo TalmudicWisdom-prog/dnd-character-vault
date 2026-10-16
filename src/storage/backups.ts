@@ -246,10 +246,21 @@ export async function cloneCharacterBackupForImport(backup: VaultBackup): Promis
   });
 }
 
-async function putByMode<T>(table: { get(key: string): Promise<unknown>; put(value: T): Promise<unknown> }, records: T[], keyOf: (record: T) => string, replace: boolean) {
+async function putByMode<T>(table: { get(key: string): Promise<unknown>; bulkPut(values: T[]): Promise<unknown> }, records: T[], keyOf: (record: T) => string, replace: boolean) {
+  if (records.length === 0) return;
+  if (replace) {
+    await table.bulkPut(records);
+    return;
+  }
+  const toPut: T[] = [];
   for (const record of records) {
-    if (!replace && await table.get(keyOf(record))) continue;
-    await table.put(record);
+    const existing = await table.get(keyOf(record));
+    if (!existing) {
+      toPut.push(record);
+    }
+  }
+  if (toPut.length > 0) {
+    await table.bulkPut(toPut);
   }
 }
 
@@ -257,6 +268,15 @@ export async function restoreVaultBackup(backup: VaultBackup, mode: RestoreMode)
   const validated = await validateVaultBackup(backup);
   const replace = mode !== "merge-skip";
   const tables = [db.characters, db.characterSheets, db.characterCreationDrafts, db.inventoryContainers, db.inventoryItems, db.spellbooks, db.spells, db.soulReaperProgressions, db.pdfDocuments, db.pdfFiles, db.pdfBookmarks, db.settings];
+  
+  if (typeof navigator !== "undefined" && navigator.storage?.persist) {
+    try {
+      await navigator.storage.persist();
+    } catch {
+      // Best-effort storage persistence request
+    }
+  }
+
   await db.transaction("rw", tables, async () => {
     if (mode === "new") {
       await Promise.all(tables.map((table) => table.clear()));

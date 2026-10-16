@@ -52,10 +52,26 @@ export function CharacterImportWizardPage() {
   const [parsing, setParsing] = useState(false);
   const [failure, setFailure] = useState<ImportFailure | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<{ characterId: string; characterName: string; spellCount: number; customCount: number } | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
   const parseInFlight = useRef(false);
+  const creatingSession = useRef(false);
 
   useEffect(() => {
-    if (!session) void createImportSession();
+    if (!session && !creatingSession.current) {
+      creatingSession.current = true;
+      createImportSession()
+        .then(() => {
+          setSessionError(null);
+        })
+        .catch((err) => {
+          console.error("Failed to create or open import session in Dexie/IndexedDB:", err);
+          setSessionError(err instanceof Error ? err.message : "Failed to open database storage for import session.");
+        })
+        .finally(() => {
+          creatingSession.current = false;
+        });
+    }
   }, [session]);
   useEffect(() => {
     const refresh = () => setOnline(navigator.onLine);
@@ -82,6 +98,7 @@ export function CharacterImportWizardPage() {
       setStatus(`${selected.length} ${selected.length === 1 ? "file" : "files"} added to this character import.`);
       event.target.value = "";
     } catch (error) {
+      console.error("Error adding import files:", error);
       setStatus(error instanceof Error ? error.message : "Could not add files");
     }
   };
@@ -89,22 +106,42 @@ export function CharacterImportWizardPage() {
   const chooseBackupFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setIsImportingBackup(true);
     setStatus(`Reading ${file.name}...`);
     try {
-      const parsed = JSON.parse(await file.text()) as unknown;
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
       const backup = await validateVaultBackup(parsed);
       if (backup.payload.characters.length !== 1) throw new Error("This backup contains more than one character. Use Vault Tools to restore full-vault backups.");
       const importedBackup = await cloneCharacterBackupForImport(backup);
       const importedCharacter = importedBackup.payload.characters[0];
       const characterName = importedCharacter.name;
+      
+      // Ensure Dexie write transaction is fully committed before updating UI / navigating
       await restoreVaultBackup(importedBackup, "merge-skip");
+      
       await activateCharacter(importedCharacter.id);
       queueCharacterAnnouncement(`${characterName} imported.`);
       setStatus(`Imported ${characterName} from ${file.name}. Character sheet, spells, notes, layout, and inventory were restored locally.`);
       event.target.value = "";
       window.location.hash = `sheet/${importedCharacter.id}`;
     } catch (error) {
-      setStatus(error instanceof SyntaxError ? "That file is not valid JSON. Choose a Character Vault .json export." : error instanceof Error ? error.message : "Could not import character backup");
+      console.error("Failed to import character backup:", error);
+      const message = error instanceof SyntaxError
+        ? "That file is not valid JSON. Choose a Character Vault .json export."
+        : error instanceof DOMException && error.name === "QuotaExceededError"
+        ? "Storage quota exceeded on this device. Free up storage space to import this character."
+        : error instanceof DOMException && error.name === "DataCloneError"
+        ? "Data could not be cloned for storage on this device."
+        : error instanceof Error
+        ? error.message
+        : "Could not import character backup";
+      setStatus(message);
+    } finally {
+      setIsImportingBackup(false);
+      if (event.target) {
+        event.target.value = "";
+      }
     }
   };
 
@@ -194,21 +231,74 @@ export function CharacterImportWizardPage() {
         ? `${characterName} imported with ${result.spells.imported + result.spells.skippedExisting} spells.`
         : `${characterName} imported, but no structured spells were detected in the selected files.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save import");
+      console.error("Failed to save character import to IndexedDB/Dexie:", error);
+      const message = error instanceof DOMException && error.name === "QuotaExceededError"
+        ? "Storage quota exceeded on this device. Free up storage space to save this character."
+        : error instanceof DOMException && error.name === "DataCloneError"
+        ? "Data could not be cloned for storage on this device."
+        : error instanceof Error
+        ? error.message
+        : "Could not save import";
+      setStatus(message);
     }
   };
 
   const startFresh = async () => {
     if (!session || (session.fileOrder.length && !window.confirm("Discard this import session and its selected files?"))) return;
-    await discardImportSession(session.id);
-    await createImportSession();
-    setStatus("Started a new import session.");
+    try {
+      await discardImportSession(session.id);
+      await createImportSession();
+      setSessionError(null);
+      setStatus("Started a new import session.");
+    } catch (err) {
+      console.error("Failed to reset import session:", err);
+      setStatus(err instanceof Error ? err.message : "Could not reset import session");
+    }
   };
 
-  if (!session) return <section className="page"><div className="loading-state">Opening import session...</div></section>;
+  const retryOpenSession = async () => {
+    setSessionError(null);
+    try {
+      await createImportSession();
+    } catch (err) {
+      console.error("Retry opening session failed:", err);
+      setSessionError(err instanceof Error ? err.message : "Failed to open database storage for import session.");
+    }
+  };
+
+  if (!session) {
+    if (sessionError) {
+      return (
+        <section className="page import-page">
+          <PageHeader eyebrow="Character tools" title="Import one character" description="Combine PDFs, scans, photos, and screenshots into one reviewable character draft." />
+          <article className="panel import-error-panel" role="alert">
+            <span className="card-label">Storage error</span>
+            <h3>Could not open local import session</h3>
+            <p>{sessionError}</p>
+            <p>Your local IndexedDB database may be busy, upgrading, or restricted by the browser. You can retry opening the session, or import a character backup file directly below.</p>
+            <div className="import-error-actions">
+              <button className="primary-button" onClick={() => void retryOpenSession()} type="button">Retry opening session</button>
+              <a className="secondary-button button-link" href="#tools">Go to Vault Tools</a>
+            </div>
+          </article>
+          <article className="panel import-files-panel">
+            <div className="form-section-heading">
+              <div><span className="card-label">Character transfer</span><h2>Import an exported character backup</h2><p>You can still restore a Character Vault .json file shared from another device.</p></div>
+              <label className="file-button primary-button">Choose character backup<input accept="application/json,text/plain,.json" onChange={(event) => void chooseBackupFile(event)} type="file" /></label>
+            </div>
+            {isImportingBackup && <p className="inline-message">Restoring character backup...</p>}
+            {status && <p className="panel inline-message tool-status" role="status">{status}</p>}
+          </article>
+        </section>
+      );
+    }
+    return <section className="page"><div className="loading-state">Opening import session...</div></section>;
+  }
 
   return <section className="page import-page">
     <PageHeader eyebrow="Character tools" title="Import one character from several sources" description="Combine PDFs, scans, photos, and screenshots into one reviewable character draft. Your in-progress session stays on this device." actions={<button className="secondary-button" onClick={() => void startFresh()} type="button">New import session</button>} />
+
+    {isImportingBackup && <article className="panel inline-message" role="status"><span>Restoring character backup...</span></article>}
 
     {saveSuccess && <article className="panel import-success-panel" role="status">
       <span className="card-label">Import complete</span>
